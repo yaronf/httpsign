@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,21 +9,25 @@ import (
 )
 
 func signMessage(signatureName string, signer Signer, parsedMessage parsedMessage, fields []string) (string, string, error) {
-	sigParams := generateSigParams(signer.keyId, fields)
+	sigParams := generateSigParams(signer.keyId, signer.alg, fields)
 	sigInputHeader := fmt.Sprintf("%s=%s", signatureName, sigParams)
 	signatureInput, err := generateSignatureInput(parsedMessage, fields, sigParams)
 	if err != nil {
 		return "", "", err
 	}
-	signature, err := generateSignature(signer, signatureInput)
+	signature, err := generateSignature(signatureName, signer, signatureInput)
 	if err != nil {
 		return "", "", err
 	}
 	return sigInputHeader, signature, nil
 }
 
-func generateSignature(signer Signer, input string) (string, error) {
-	return "TBD", nil
+func generateSignature(name string, signer Signer, input string) (string, error) {
+	raw, err := signer.sign([]byte(input))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s=:%s:", name, base64.StdEncoding.EncodeToString(raw)), nil // TODO
 }
 
 func generateSignatureInput(message parsedMessage, fields []string, params string) (string, error) {
@@ -40,7 +45,7 @@ func generateSignatureInput(message parsedMessage, fields []string, params strin
 	return inp, nil
 }
 
-func generateSigParams(keyId string, fields []string) string {
+func generateSigParams(keyId, alg string, fields []string) string {
 	var sp string
 	if len(fields) == 0 {
 		sp = "();"
@@ -52,7 +57,8 @@ func generateSigParams(keyId string, fields []string) string {
 		sp += ");"
 	}
 	sp += fmt.Sprintf("created=%d;", time.Now().Unix()) +
-		fmt.Sprintf("keyid=\"%s\"", keyId)
+		fmt.Sprintf("keyid=\"%s\"", keyId) +
+		fmt.Sprintf("alg=\"%s\"", alg)
 	return sp
 }
 
