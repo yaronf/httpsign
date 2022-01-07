@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -9,14 +11,21 @@ type parsedMessage struct {
 	components map[string]string
 }
 
-func matchFields(components map[string]string, fields []string) map[string]string {
-	mf := map[string]string{}
+type component struct {
+	name, value string
+}
+
+func matchFields(components map[string]string, fields []string) ([]component, error) {
+	// Components for signature are ordered, thus an array of pairs and not a map
+	matched := make([]component, 0)
 	for _, f := range fields {
 		if c, found := components[f]; found {
-			mf[f] = c
+			matched = append(matched, component{f, c})
+		} else {
+			return nil, fmt.Errorf("missing component: %s", f)
 		}
 	}
-	return mf
+	return matched, nil
 }
 
 func ParseRequest(req *http.Request) parsedMessage {
@@ -59,5 +68,5 @@ func generateReqSpecialtyComponents(req *http.Request, components map[string]str
 }
 
 func generateResSpecialtyComponents(res *http.Response, components map[string]string) {
-	components["@status"] = res.Status
+	components["@status"] = strconv.Itoa(res.StatusCode)
 }
