@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-func signMessage(signatureName string, signer Signer, parsedMessage parsedMessage, fields []string) (string, string, error) {
-	sigParams := generateSigParams(signer.keyId, signer.alg, fields)
+func signMessage(config Config, signatureName string, signer Signer, parsedMessage parsedMessage, fields []string) (string, string, error) {
+	sigParams := generateSigParams(config, signer.keyId, signer.alg, fields)
 	sigInputHeader := fmt.Sprintf("%s=%s", signatureName, sigParams)
 	signatureInput, err := generateSignatureInput(parsedMessage, fields, sigParams)
 	if err != nil {
@@ -39,13 +39,13 @@ func generateSignatureInput(message parsedMessage, fields []string, params strin
 	for _, c := range mf {
 		inp += fmt.Sprintf("\"%s\": %s\n", c.name, c.value)
 	}
-	inp += fmt.Sprintf("\"%s\": %s\n", "@signature-params", params)
+	inp += fmt.Sprintf("\"%s\": %s", "@signature-params", params)
 	log.Println("Sig input:")
 	log.Println(inp)
 	return inp, nil
 }
 
-func generateSigParams(keyId, alg string, fields []string) string {
+func generateSigParams(config Config, keyId, alg string, fields []string) string {
 	var sp string
 	if len(fields) == 0 {
 		sp = "();"
@@ -56,18 +56,28 @@ func generateSigParams(keyId, alg string, fields []string) string {
 		}
 		sp += ");"
 	}
-	sp += fmt.Sprintf("created=%d;", time.Now().Unix()) +
-		fmt.Sprintf("keyid=\"%s\"", keyId) +
-		fmt.Sprintf("alg=\"%s\"", alg)
+	var createdTime int64
+	if config.FakeCreated != 0 {
+		createdTime = config.FakeCreated
+	} else {
+		createdTime = time.Now().Unix()
+	}
+	if config.SignCreated {
+		sp += fmt.Sprintf("created=%d;", createdTime)
+	}
+	if config.SignAlg {
+		sp += fmt.Sprintf("alg=\"%s\";", alg)
+	}
+	sp += fmt.Sprintf("keyid=\"%s\"", keyId)
 	return sp
 }
 
-func SignRequest(signatureName string, signer Signer, req *http.Request, fields []string) (string, string, error) {
+func SignRequest(config Config, signatureName string, signer Signer, req *http.Request, fields []string) (string, string, error) {
 	parsedMessage := ParseRequest(req)
-	return signMessage(signatureName, signer, parsedMessage, fields)
+	return signMessage(config, signatureName, signer, parsedMessage, fields)
 }
 
-func SignResponse(signatureName string, signer Signer, res *http.Response, fields []string) (string, string, error) {
+func SignResponse(config Config, signatureName string, signer Signer, res *http.Response, fields []string) (string, string, error) {
 	parsedMessage := ParseResponse(res)
-	return signMessage(signatureName, signer, parsedMessage, fields)
+	return signMessage(config, signatureName, signer, parsedMessage, fields)
 }

@@ -62,7 +62,7 @@ func generateReqSpecialtyComponents(req *http.Request, components map[string]str
 	components["@method"] = req.Method
 	url := req.URL
 	components["@target-uri"] = url.String()
-	components["@authority"] = url.Host
+	components["@authority"] = req.Host
 	components["@scheme"] = url.Scheme
 	components["@request-target"] = url.Path
 }
