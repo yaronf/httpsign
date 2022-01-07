@@ -7,21 +7,21 @@ import (
 	"time"
 )
 
-func signMessage(keyId, signatureName, alg string, parsedMessage parsedMessage, fields []string) (string, string, error) {
-	sigParams := generateSigParams(keyId, fields)
+func signMessage(signatureName string, signer Signer, parsedMessage parsedMessage, fields []string) (string, string, error) {
+	sigParams := generateSigParams(signer.keyId, fields)
 	sigInputHeader := fmt.Sprintf("%s=%s", signatureName, sigParams)
 	signatureInput, err := generateSignatureInput(parsedMessage, fields, sigParams)
 	if err != nil {
 		return "", "", err
 	}
-	signature, err := generateSignature(signatureInput)
+	signature, err := generateSignature(signer, signatureInput)
 	if err != nil {
 		return "", "", err
 	}
 	return sigInputHeader, signature, nil
 }
 
-func generateSignature(input string) (string, error) {
+func generateSignature(signer Signer, input string) (string, error) {
 	return "TBD", nil
 }
 
@@ -56,12 +56,12 @@ func generateSigParams(keyId string, fields []string) string {
 	return sp
 }
 
-func SignRequest(keyId, signatureName, alg string, req *http.Request, fields []string) (string, string, error) {
+func SignRequest(signatureName string, signer Signer, req *http.Request, fields []string) (string, string, error) {
 	parsedMessage := ParseRequest(req)
-	return signMessage(keyId, signatureName, alg, parsedMessage, fields)
+	return signMessage(signatureName, signer, parsedMessage, fields)
 }
 
-func SignResponse(keyId, signatureName, alg string, res *http.Response, fields []string) (string, string, error) {
+func SignResponse(signatureName string, signer Signer, res *http.Response, fields []string) (string, string, error) {
 	parsedMessage := ParseResponse(res)
-	return signMessage(keyId, signatureName, alg, parsedMessage, fields)
+	return signMessage(signatureName, signer, parsedMessage, fields)
 }

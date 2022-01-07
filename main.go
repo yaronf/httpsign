@@ -15,7 +15,11 @@ func main() {
 	}
 	// fields := []string{"@method", "@authority", "content-type", "cache-control"}
 	fields := []string{"@status", "content-type"}
-	sigInput, sig, err := SignResponse("key1", "sig1", "hmac-sha256", res, fields)
+	signer, err := NewHMACSHA256Signer("key1", []byte("01234567890123456789012345678901"))
+	if err != nil {
+		log.Fatal("Could not create signer: ", err)
+	}
+	sigInput, sig, err := SignResponse("sig1", *signer, res, fields)
 	if err != nil {
 		log.Fatal("Could not sign: ", err)
 	}
