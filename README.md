@@ -1,0 +1,1 @@
+HTTP Signatures as per [the new draft](https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html).
