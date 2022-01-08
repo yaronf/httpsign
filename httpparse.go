@@ -28,20 +28,38 @@ func matchFields(components map[string]string, fields []string) ([]component, er
 	return matched, nil
 }
 
-func ParseRequest(req *http.Request) parsedMessage {
+func parseRequest(req *http.Request) (*parsedMessage, error) {
+	err := validateMessageHeaders(req.Header)
+	if err != nil {
+		return nil, err
+	}
 	components := map[string]string{}
 	generateReqSpecialtyComponents(req, components)
 	generateHeaderComponents(req.Header, components)
 
-	return parsedMessage{components}
+	return &parsedMessage{components}, nil
 }
 
-func ParseResponse(res *http.Response) parsedMessage {
+func parseResponse(res *http.Response) (*parsedMessage, error) {
+	err := validateMessageHeaders(res.Header)
+	if err != nil {
+		return nil, err
+	}
 	components := map[string]string{}
 	generateResSpecialtyComponents(res, components)
 	generateHeaderComponents(res.Header, components)
 
-	return parsedMessage{components}
+	return &parsedMessage{components}, nil
+}
+
+func validateMessageHeaders(header http.Header) error {
+	// Go accepts header names that start with "@", which is forbidden by the RFC
+	for k := range header {
+		if strings.HasPrefix(k, "@") {
+			return fmt.Errorf("potentially malicious header detected: %s", k)
+		}
+	}
+	return nil
 }
 
 func generateHeaderComponents(headers http.Header, components map[string]string) {

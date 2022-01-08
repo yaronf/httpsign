@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
 func signMessage(config Config, signatureName string, signer Signer, parsedMessage parsedMessage,
 	fields []string) (sigInputHeader string, signature string, err error) {
+	err = validateFields(fields)
+	if err != nil {
+		return "", "", err
+	}
 	sigParams := generateSigParams(config, signer.keyId, signer.alg, fields)
 	sigInputHeader = fmt.Sprintf("%s=%s", signatureName, sigParams)
 	signatureInput, err := generateSignatureInput(parsedMessage, fields, sigParams)
@@ -21,6 +26,18 @@ func signMessage(config Config, signatureName string, signer Signer, parsedMessa
 		return "", "", err
 	}
 	return sigInputHeader, signature, nil
+}
+
+func validateFields(fields []string) error {
+	for _, f := range fields {
+		if f != strings.ToLower(f) {
+			return fmt.Errorf("field is not lowercase: %s", f)
+		}
+		if f == "signature" || f == "signature-input" {
+			return fmt.Errorf("cannot use signature fields in required header list: %s", f)
+		}
+	}
+	return nil
 }
 
 func generateSignature(name string, signer Signer, input string) (string, error) {
@@ -74,11 +91,17 @@ func generateSigParams(config Config, keyId, alg string, fields []string) string
 }
 
 func SignRequest(config Config, signatureName string, signer Signer, req *http.Request, fields []string) (string, string, error) {
-	parsedMessage := ParseRequest(req)
-	return signMessage(config, signatureName, signer, parsedMessage, fields)
+	parsedMessage, err := parseRequest(req)
+	if err != nil {
+		return "", "", err
+	}
+	return signMessage(config, signatureName, signer, *parsedMessage, fields)
 }
 
 func SignResponse(config Config, signatureName string, signer Signer, res *http.Response, fields []string) (string, string, error) {
-	parsedMessage := ParseResponse(res)
-	return signMessage(config, signatureName, signer, parsedMessage, fields)
+	parsedMessage, err := parseResponse(res)
+	if err != nil {
+		return "", "", nil
+	}
+	return signMessage(config, signatureName, signer, *parsedMessage, fields)
 }
