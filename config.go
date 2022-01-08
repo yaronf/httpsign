@@ -1,4 +1,4 @@
-package main
+package httpsign
 
 import (
 	"encoding/json"
@@ -19,10 +19,25 @@ func NewConfig() Config {
 	}
 }
 
+func (c Config) SetSignAlg(b bool) Config {
+	c.SignAlg = b
+	return c
+}
+
+func (c Config) SetSignCreated(b bool) Config {
+	c.SignCreated = b
+	return c
+}
+
+func (c Config) SetFakeCreated(i int64) Config {
+	c.FakeCreated = i
+	return c
+}
+
 func (c Config) String() string {
 	s, err := json.MarshalIndent(c, "", "    ")
 	if err != nil {
-		log.Fatalln("Cannot marshal config")
+		log.Fatal("Cannot marshal config")
 	}
 	return string(s)
 }

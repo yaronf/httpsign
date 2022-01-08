@@ -1,4 +1,4 @@
-package main
+package httpsign
 
 import (
 	"encoding/base64"
@@ -8,14 +8,15 @@ import (
 	"time"
 )
 
-func signMessage(config Config, signatureName string, signer Signer, parsedMessage parsedMessage, fields []string) (string, string, error) {
+func signMessage(config Config, signatureName string, signer Signer, parsedMessage parsedMessage,
+	fields []string) (sigInputHeader string, signature string, err error) {
 	sigParams := generateSigParams(config, signer.keyId, signer.alg, fields)
-	sigInputHeader := fmt.Sprintf("%s=%s", signatureName, sigParams)
+	sigInputHeader = fmt.Sprintf("%s=%s", signatureName, sigParams)
 	signatureInput, err := generateSignatureInput(parsedMessage, fields, sigParams)
 	if err != nil {
 		return "", "", err
 	}
-	signature, err := generateSignature(signatureName, signer, signatureInput)
+	signature, err = generateSignature(signatureName, signer, signatureInput)
 	if err != nil {
 		return "", "", err
 	}
