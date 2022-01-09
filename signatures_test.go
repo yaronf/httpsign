@@ -38,7 +38,7 @@ func TestSignRequest(t *testing.T) {
 		{
 			name: "test case B.2.5",
 			args: args{
-				config:        NewConfig().SetSignAlg(false).SetFakeCreated(1618884475),
+				config:        NewConfig().SignAlg(false).setFakeCreated(1618884475),
 				signatureName: "sig1",
 				signer: (func() Signer {
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
@@ -71,5 +71,29 @@ func TestSignRequest(t *testing.T) {
 				t.Errorf("SignRequest() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
+	}
+}
+
+func TestSignAndVerify(t *testing.T) {
+	config := NewConfig().SignAlg(false).setFakeCreated(1618884475)
+	signatureName := "sig1"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	signer, _ := NewHMACSHA256Signer("test-shared-secret", key)
+	in := strings.NewReader(http1)
+	req, _ := http.ReadRequest(bufio.NewReader(in))
+	fields := []string{"@authority", "date", "content-type"}
+	sigInput, sig, _ := SignRequest(config, signatureName, *signer, req, fields)
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key)
+	if err != nil {
+		t.Errorf("could not generate verifier: %s", err)
+	}
+	verified, err := VerifyRequest(signatureName, *verifier, req, fields)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+	if !verified {
+		t.Errorf("message did not pass verification")
 	}
 }

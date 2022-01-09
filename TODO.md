@@ -7,4 +7,4 @@
 * Add verification requirements, Sec. 3.2.1.
 
 # Draft comments
-* 
+* Security Considerations: implementations must be robust against attacks that introduce headers with a "@" prefix.

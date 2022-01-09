@@ -1,43 +1,36 @@
 package httpsign
 
-import (
-	"encoding/json"
-	"log"
-)
-
+// Config contains additional configuration for the signer.
 type Config struct {
-	SignAlg     bool
-	SignCreated bool
-	FakeCreated int64
+	signAlg     bool
+	signCreated bool
+	fakeCreated int64
 }
 
+// NewConfig generates a default configuration.
 func NewConfig() Config {
 	return Config{
-		SignAlg:     true,
-		SignCreated: true,
-		FakeCreated: 0,
+		signAlg:     true,
+		signCreated: true,
+		fakeCreated: 0,
 	}
 }
 
-func (c Config) SetSignAlg(b bool) Config {
-	c.SignAlg = b
+// SignAlg indicates that an "alg" signature parameters must be generated and signed (default: true).
+func (c Config) SignAlg(b bool) Config {
+	c.signAlg = b
 	return c
 }
 
-func (c Config) SetSignCreated(b bool) Config {
-	c.SignCreated = b
+// SignCreated indicates that a "created" signature parameters must be generated and signed (default: true).
+func (c Config) SignCreated(b bool) Config {
+	c.signCreated = b
 	return c
 }
 
-func (c Config) SetFakeCreated(i int64) Config {
-	c.FakeCreated = i
+// setFakeCreated indicates that the specified Unix timestamp must be used instead of the current time
+// (default: 0, meaning use current time). Only used for testing.
+func (c Config) setFakeCreated(ts int64) Config {
+	c.fakeCreated = ts
 	return c
-}
-
-func (c Config) String() string {
-	s, err := json.MarshalIndent(c, "", "    ")
-	if err != nil {
-		log.Fatal("Cannot marshal config")
-	}
-	return string(s)
 }

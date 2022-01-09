@@ -1,6 +1,7 @@
 package httpsign
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/hmac"
@@ -81,5 +82,35 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		return sig, nil
 	default:
 		return nil, fmt.Errorf("unknown algorithm: %s", s.alg)
+	}
+}
+
+type Verifier struct {
+	keyId string
+	key   interface{}
+	alg   string
+}
+
+func NewHMACSHA256Verifier(keyId string, key []byte) (*Verifier, error) {
+	if len(key) < 64 {
+		return nil, fmt.Errorf("key must be at least 64 bytes long")
+	}
+	return &Verifier{
+		keyId: keyId,
+		key:   key,
+		alg:   "hmac-sha256",
+	}, nil
+}
+
+// TODO more verifiers
+
+func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
+	switch v.alg {
+	case "hmac-sha256":
+		mac := hmac.New(sha256.New, v.key.([]byte))
+		mac.Write(buff)
+		return bytes.Equal(mac.Sum(nil), sig), nil
+	default:
+		return false, fmt.Errorf("unknown algorithm")
 	}
 }
