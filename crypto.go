@@ -29,7 +29,7 @@ func NewHMACSHA256Signer(keyId string, key []byte) (*Signer, error) {
 	}, nil
 }
 
-func NewRSASigner(keyId string, key rsa.PrivateKey) (*Signer, error) {
+func NewRSASigner(keyId string, key *rsa.PrivateKey) (*Signer, error) {
 	return &Signer{
 		keyId: keyId,
 		key:   key,
@@ -37,7 +37,7 @@ func NewRSASigner(keyId string, key rsa.PrivateKey) (*Signer, error) {
 	}, nil
 }
 
-func NewRSAPSSSigner(keyId string, key rsa.PrivateKey) (*Signer, error) {
+func NewRSAPSSSigner(keyId string, key *rsa.PrivateKey) (*Signer, error) {
 	return &Signer{
 		keyId: keyId,
 		key:   key,
@@ -45,7 +45,7 @@ func NewRSAPSSSigner(keyId string, key rsa.PrivateKey) (*Signer, error) {
 	}, nil
 }
 
-func NewP256Signer(keyId string, key ecdsa.PrivateKey) (*Signer, error) {
+func NewP256Signer(keyId string, key *ecdsa.PrivateKey) (*Signer, error) {
 	return &Signer{
 		keyId: keyId,
 		key:   key,
@@ -68,7 +68,7 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		return sig, nil
 	case "rsa-pss-sha512":
 		hashed := sha512.Sum512(buff)
-		sig, err := rsa.SignPSS(nil, s.key.(*rsa.PrivateKey), crypto.SHA512, hashed[:], nil)
+		sig, err := rsa.SignPSS(rand.Reader, s.key.(*rsa.PrivateKey), crypto.SHA512, hashed[:], nil)
 		if err != nil {
 			return nil, fmt.Errorf("RSA signature failed")
 		}
@@ -102,6 +102,30 @@ func NewHMACSHA256Verifier(keyId string, key []byte) (*Verifier, error) {
 	}, nil
 }
 
+func NewRSAVerifier(keyId string, key *rsa.PublicKey) (*Verifier, error) {
+	return &Verifier{
+		keyId: keyId,
+		key:   key,
+		alg:   "rsa-v1_5-sha256",
+	}, nil
+}
+
+func NewRSAPSSVerifier(keyId string, key *rsa.PublicKey) (*Verifier, error) {
+	return &Verifier{
+		keyId: keyId,
+		key:   key,
+		alg:   "rsa-pss-sha512",
+	}, nil
+}
+
+func NewP256Verifier(keyId string, key *ecdsa.PublicKey) (*Verifier, error) {
+	return &Verifier{
+		keyId: keyId,
+		key:   key,
+		alg:   "ecdsa-p256-sha256",
+	}, nil
+}
+
 // TODO more verifiers
 
 func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
@@ -110,6 +134,13 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		mac := hmac.New(sha256.New, v.key.([]byte))
 		mac.Write(buff)
 		return bytes.Equal(mac.Sum(nil), sig), nil
+	case "rsa-pss-sha512":
+		hashed := sha512.Sum512(buff)
+		err := rsa.VerifyPSS(v.key.(*rsa.PublicKey), crypto.SHA512, hashed[:], sig, nil)
+		if err != nil {
+			return false, fmt.Errorf("RSA verification failed")
+		}
+		return true, nil
 	default:
 		return false, fmt.Errorf("unknown algorithm")
 	}
