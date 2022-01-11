@@ -3,6 +3,7 @@ package httpsign
 import (
 	"bufio"
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -37,6 +38,46 @@ Content-Length: 18
 {"hello": "world"}
 `
 
+var rsaPubKey = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyD6Hrh5mV16s/jQngCF1
+IfpzLuJTraeqJFlNESsvbeNMcA4dQjU/LMX2XA3vyF7nOyleTisdmzFZb9TLoC1H
+UkcEBb1lkEh0ecm6Kz6wI6imKloeoDoASlXpIa6vr5dT3hcfek15SDBkOgbfEJoe
+UFvQZrBfIWFQt/fekPsfgSPT9FNw1Chi3+crmnEck8j2Nwoxi44O4jaVNbHm+CVM
+/FJH7jPjD9SY5UdC1rpmG3iBopnZDwEYWzDmH4yjYVNTb4Uvmwr+vbe2FEoLz3U1
++utEJ8RA03EEzAEkUVyp7wYpyvM/FWXbRCSwY/ZBSvRjrPgnW8C908k5GvC8QLSs
+OQIDAQAB
+-----END PUBLIC KEY-----
+`
+
+var rsaPrvKey = `-----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDIPoeuHmZXXqz+
+NCeAIXUh+nMu4lOtp6okWU0RKy9t40xwDh1CNT8sxfZcDe/IXuc7KV5OKx2bMVlv
+1MugLUdSRwQFvWWQSHR5yborPrAjqKYqWh6gOgBKVekhrq+vl1PeFx96TXlIMGQ6
+Bt8Qmh5QW9BmsF8hYVC3996Q+x+BI9P0U3DUKGLf5yuacRyTyPY3CjGLjg7iNpU1
+seb4JUz8UkfuM+MP1JjlR0LWumYbeIGimdkPARhbMOYfjKNhU1NvhS+bCv69t7YU
+SgvPdTX660QnxEDTcQTMASRRXKnvBinK8z8VZdtEJLBj9kFK9GOs+CdbwL3TyTka
+8LxAtKw5AgMBAAECggEBAKcW9mSmXUN+bt/XaTaTtIfb0o1GsghvpZubIKG45WTO
+jBPc0zFR+RtFPONnhbQu7MgDJvwXIidDsJuOdzN7VM4lEAgyGDOjIf4WBFDdiGDY
+837XoEKW43Mj6NsARv1ASu1BYjTNvOwt5RQ+c5gI4k6vrmBhv5+88nvwSzmzMoCw
+h3ZLz4DfyOoBu7dqlnw9EttZuW7k1SXXW/cC5Sh90j8gZmYlNN76O1LsiCxZowCj
+Ys5Qdm5tcNuV8jK3XIFE4uYyBRHx5+haNjgKeM8n8IEEPYhzqcYIAYWGRHSkTvGy
+DxAb8AJBwuFCsFQz0oXyzVd8Mqz8RbqC7N50LdncCWECgYEA9zE9u/x8r7/De25U
+FcDDLt63qkqDmSn1PMkwf1DdOj734fYWd8Ay2R5E43NJMQalcR7Q7++O5KOQOFUl
+mpd79U9LO3b9FE0vR8xG81wushKy3xhHQdB2ucKliGwcYvcfgjWUoD7aKfrlHmNA
+olj1/21tJQGotEGg9NpiinJaiT0CgYEAz2ENkkEH3ZXtMKr3DXoqLNU+er4pHzm1
+cRxzpCNqNwZBlv0pxeIo6izH4TIrBPdIqSApUpZ0N+NgA0bjj0527GATGkGDgo+b
+TZFAhOhg7bfUyLsbgL/zycnyQwDWw2fo5ei9Bb2pPqfeQgrgYE+ag+ucJrhJNymv
+3gG6Vmdwhq0CgYEAr6rwwl2Ghqdy1o7rdqIMk4x3Xa+iogBtZYtcyb2/2hrRsmVe
+Ri/yctXOAw3038BnZmKN/VVzaQzL+xyXoqswzn5Raqr+46SOiymi6mOCU85yC5WH
+XkA1f4HSfYbHDZWtcK1/N/oytE628Md8MWOjPqiXPgtVxvQ03I0uJlFqAckCgYB6
+w/yxwTez0MaqkftRCiofglnLdfmIF7S28l3vJFwDmPuJM/PfxoPsJXhqczWOagmk
+vXpY/uJsF3nGVtfuBUhXpISKfZAp4XPR1pQ4WgzPjY01C7c7X+clZRy616tL4J66
+RC5qUJ35joz/0cqEmXtibz9wmJYXRuFq7uDtt6ygvQKBgQCMopIJCcH5+DmbXmyw
+J8fxjxp8YpkEoFMtloaJ7lWHkiCUSWYCbGlvG1Nb1CoVqOuMffGXAZKAU9cw7YA2
+cJQuDUjlA0haDD4W3IibLGbANw414qqpqRmo5kM6aMpnShGsvxpp/0+XKrfcwgiC
+Ufa6y08wtZ/O7ZCBBbJTY90uqA==
+-----END PRIVATE KEY-----
+`
 var rsaPSSPubKey = `
 -----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr4tmm3r20Wd/PbqvP1s2
@@ -81,11 +122,24 @@ rOjr9w349JooGXhOxbu8nOxX
 -----END RSA PRIVATE KEY-----
 `
 
+var p256PubKey = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWAO+Y/BP3c7Aw7dSWYGkuckwl/e6
+H54D/P9uzXDjby0Frysdpcny/NL807iRVfVDDg+ctHhuRTzBwP+lwVdN2g==
+-----END PUBLIC KEY-----
+`
+
+var p256PrvKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIMLnTZwmWikcBCrKlXZVUjaq9jwsv22sy/P7yIIonkVwoAoGCCqGSM49
+AwEHoUQDQgAEWAO+Y/BP3c7Aw7dSWYGkuckwl/e6H54D/P9uzXDjby0Frysdpcny
+/NL807iRVfVDDg+ctHhuRTzBwP+lwVdN2g==
+-----END EC PRIVATE KEY-----
+`
+
 // Workaround, from https://go.dev/play/p/fIz218Lj2L0. Credit: Ryan Castner.
 
 var oidRsaPss = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 10}
 
-func loadPrivateKey(pemEncodedPK string) (crypto.PrivateKey, error) {
+func loadRSAPSSPrivateKey(pemEncodedPK string) (crypto.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(pemEncodedPK))
 	if block == nil {
 		return nil, errors.New("empty block")
@@ -113,7 +167,7 @@ func loadPrivateKey(pemEncodedPK string) (crypto.PrivateKey, error) {
 	return nil, errors.New("unknown algorithm")
 }
 
-// This will work when crypto/x509 implements PKCS8 RSA-PSS keys
+// This will work for PSS when crypto/x509 implements PKCS8 RSA-PSS keys
 func parseRsaPrivateKeyFromPemStr(pemString string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(pemString))
 	if block == nil {
@@ -136,6 +190,30 @@ func parseRsaPublicKeyFromPemStr(pemString string) (*rsa.PublicKey, error) {
 		return nil, err
 	}
 	return k.(*rsa.PublicKey), nil
+}
+
+func parseECPrivateKeyFromPemStr(pemString string) (*ecdsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(pemString))
+	if block == nil {
+		return nil, fmt.Errorf("cannot decode PEM")
+	}
+	k, err := x509.ParseECPrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return k, nil
+}
+
+func parseECPublicKeyFromPemStr(pemString string) (*ecdsa.PublicKey, error) {
+	block, _ := pem.Decode([]byte(pemString))
+	if block == nil {
+		return nil, fmt.Errorf("cannot decode PEM")
+	}
+	k, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return k.(*ecdsa.PublicKey), nil
 }
 
 func TestSignRequest(t *testing.T) {
@@ -176,7 +254,7 @@ func TestSignRequest(t *testing.T) {
 				config:        NewConfig().SignAlg(false).setFakeCreated(1618884475),
 				signatureName: "sig1",
 				signer: (func() Signer {
-					prvKey, err := loadPrivateKey(rsaPSSPrvKey)
+					prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
 					if err != nil {
 						t.Errorf("cannot parse private key: %v", err)
 					}
@@ -271,7 +349,7 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 func TestSignAndVerifyRSAPSS(t *testing.T) {
 	config := NewConfig().SignAlg(false).setFakeCreated(1618884475)
 	signatureName := "sig1"
-	prvKey, err := loadPrivateKey(rsaPSSPrvKey)
+	prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
 	if err != nil {
 		t.Errorf("cannot read private key")
 	}
@@ -286,6 +364,66 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 		t.Errorf("cannot read public key: %v", err)
 	}
 	verifier, err := NewRSAPSSVerifier("test-key-rsa-pss", pubKey)
+	if err != nil {
+		t.Errorf("could not generate verifier: %s", err)
+	}
+	verified, err := VerifyRequest(signatureName, *verifier, req, fields)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+	if !verified {
+		t.Errorf("message did not pass verification")
+	}
+}
+
+func TestSignAndVerifyRSA(t *testing.T) {
+	config := NewConfig().SignAlg(false).setFakeCreated(1618884475)
+	signatureName := "sig1"
+	prvKey, err := parseRsaPrivateKeyFromPemStr(rsaPrvKey)
+	if err != nil {
+		t.Errorf("cannot read private key")
+	}
+	signer, _ := NewRSASigner("test-key-rsa", prvKey)
+	req := readRequest(httpreq1)
+	fields := []string{"@authority", "date", "content-type"}
+	sigInput, sig, _ := SignRequest(config, signatureName, *signer, req, fields)
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPubKey)
+	if err != nil {
+		t.Errorf("cannot read public key: %v", err)
+	}
+	verifier, err := NewRSAVerifier("test-key-rsa", pubKey)
+	if err != nil {
+		t.Errorf("could not generate verifier: %s", err)
+	}
+	verified, err := VerifyRequest(signatureName, *verifier, req, fields)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+	if !verified {
+		t.Errorf("message did not pass verification")
+	}
+}
+
+func TestSignAndVerifyP256(t *testing.T) {
+	config := NewConfig().SignAlg(false).setFakeCreated(1618884475)
+	signatureName := "sig1"
+	prvKey, err := parseECPrivateKeyFromPemStr(p256PrvKey)
+	if err != nil {
+		t.Errorf("cannot read private key")
+	}
+	signer, _ := NewP256Signer("test-key-p256", prvKey)
+	req := readRequest(httpreq1)
+	fields := []string{"@authority", "date", "content-type"}
+	sigInput, sig, _ := SignRequest(config, signatureName, *signer, req, fields)
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	pubKey, err := parseECPublicKeyFromPemStr(p256PubKey)
+	if err != nil {
+		t.Errorf("cannot read public key: %v", err)
+	}
+	verifier, err := NewP256Verifier("test-key-p256", pubKey)
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}

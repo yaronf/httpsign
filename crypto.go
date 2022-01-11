@@ -18,9 +18,13 @@ type Signer struct {
 	alg   string
 }
 
+// NewHMACSHA256Signer returns a new Signer structure. Key must be at least 64 bytes long.
 func NewHMACSHA256Signer(keyId string, key []byte) (*Signer, error) {
-	if len(key) < 64 {
+	if key == nil || len(key) < 64 {
 		return nil, fmt.Errorf("key must be at least 64 bytes long")
+	}
+	if keyId == "" {
+		return nil, fmt.Errorf("keyId must not be empty")
 	}
 	return &Signer{
 		keyId: keyId,
@@ -30,6 +34,12 @@ func NewHMACSHA256Signer(keyId string, key []byte) (*Signer, error) {
 }
 
 func NewRSASigner(keyId string, key *rsa.PrivateKey) (*Signer, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
+	if keyId == "" {
+		return nil, fmt.Errorf("keyId must not be empty")
+	}
 	return &Signer{
 		keyId: keyId,
 		key:   key,
@@ -38,6 +48,12 @@ func NewRSASigner(keyId string, key *rsa.PrivateKey) (*Signer, error) {
 }
 
 func NewRSAPSSSigner(keyId string, key *rsa.PrivateKey) (*Signer, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
+	if keyId == "" {
+		return nil, fmt.Errorf("keyId must not be empty")
+	}
 	return &Signer{
 		keyId: keyId,
 		key:   key,
@@ -46,6 +62,12 @@ func NewRSAPSSSigner(keyId string, key *rsa.PrivateKey) (*Signer, error) {
 }
 
 func NewP256Signer(keyId string, key *ecdsa.PrivateKey) (*Signer, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
+	if keyId == "" {
+		return nil, fmt.Errorf("keyId must not be empty")
+	}
 	return &Signer{
 		keyId: keyId,
 		key:   key,
@@ -81,7 +103,7 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		}
 		return sig, nil
 	default:
-		return nil, fmt.Errorf("unknown algorithm: %s", s.alg)
+		return nil, fmt.Errorf("sign: unknown algorithm: %s", s.alg)
 	}
 }
 
@@ -126,14 +148,19 @@ func NewP256Verifier(keyId string, key *ecdsa.PublicKey) (*Verifier, error) {
 	}, nil
 }
 
-// TODO more verifiers
-
 func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 	switch v.alg {
 	case "hmac-sha256":
 		mac := hmac.New(sha256.New, v.key.([]byte))
 		mac.Write(buff)
 		return bytes.Equal(mac.Sum(nil), sig), nil
+	case "rsa-v1_5-sha256":
+		hashed := sha256.Sum256(buff)
+		err := rsa.VerifyPKCS1v15(v.key.(*rsa.PublicKey), crypto.SHA256, hashed[:], sig)
+		if err != nil {
+			return false, fmt.Errorf("RSA verification failed")
+		}
+		return true, nil
 	case "rsa-pss-sha512":
 		hashed := sha512.Sum512(buff)
 		err := rsa.VerifyPSS(v.key.(*rsa.PublicKey), crypto.SHA512, hashed[:], sig, nil)
@@ -141,7 +168,10 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 			return false, fmt.Errorf("RSA verification failed")
 		}
 		return true, nil
+	case "ecdsa-p256-sha256":
+		hashed := sha256.Sum256(buff)
+		return ecdsa.VerifyASN1(v.key.(*ecdsa.PublicKey), hashed[:], sig), nil
 	default:
-		return false, fmt.Errorf("unknown algorithm")
+		return false, fmt.Errorf("verify: unknown algorithm: %s", v.alg)
 	}
 }

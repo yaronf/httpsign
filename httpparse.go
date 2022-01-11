@@ -3,6 +3,7 @@ package httpsign
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -77,14 +78,47 @@ func foldFields(fields []string) string {
 }
 
 func generateReqSpecialtyComponents(req *http.Request, components map[string]string) {
-	components["@method"] = req.Method
-	url := req.URL
-	components["@target-uri"] = url.String()
-	components["@authority"] = req.Host
-	components["@scheme"] = url.Scheme
-	components["@request-target"] = url.Path
+	components["@method"] = scMethod(req)
+	theUrl := req.URL
+	components["@target-uri"] = scTargetUri(theUrl)
+	components["@authority"] = scAuthority(req)
+	components["@scheme"] = scScheme(theUrl)
+	components["@request-target"] = scRequestTarget(theUrl)
+	components["@query"] = scQuery(theUrl)
+}
+
+func scQuery(url *url.URL) string {
+	return "?" + url.RawQuery
+}
+
+func scRequestTarget(url *url.URL) string {
+	return url.Path
+}
+
+func scScheme(url *url.URL) string {
+	if url.Scheme == "" {
+		return "http"
+	} else {
+		return url.Scheme
+	}
+}
+
+func scAuthority(req *http.Request) string {
+	return req.Host
+}
+
+func scTargetUri(url *url.URL) string {
+	return url.String()
+}
+
+func scMethod(req *http.Request) string {
+	return req.Method
 }
 
 func generateResSpecialtyComponents(res *http.Response, components map[string]string) {
-	components["@status"] = strconv.Itoa(res.StatusCode)
+	components["@status"] = scStatus(res)
+}
+
+func scStatus(res *http.Response) string {
+	return strconv.Itoa(res.StatusCode)
 }
