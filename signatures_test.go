@@ -16,13 +16,22 @@ import (
 	"testing"
 )
 
-var http1 = `POST /foo?param=value&pet=dog HTTP/1.1
+var httpreq1 = `POST /foo?param=value&pet=dog HTTP/1.1
 Host: example.com
 Date: Tue, 20 Apr 2021 02:07:55 GMT
 Content-Type: application/json
 Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
 Cache-Control: max-age=60
 Cache-Control:    must-revalidate
+Content-Length: 18
+
+{"hello": "world"}
+`
+
+var httpres1 = `HTTP/1.1 200 OK
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Content-Type: application/json
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
 Content-Length: 18
 
 {"hello": "world"}
@@ -154,11 +163,7 @@ func TestSignRequest(t *testing.T) {
 					signer, _ := NewHMACSHA256Signer("test-shared-secret", key)
 					return *signer
 				})(),
-				req: (func() *http.Request {
-					in := strings.NewReader(http1)
-					req, _ := http.ReadRequest(bufio.NewReader(in))
-					return req
-				})(),
+				req:    readRequest(httpreq1),
 				fields: []string{"@authority", "date", "content-type"},
 			},
 			want:    "sig1=(\"@authority\" \"date\" \"content-type\");created=1618884475;keyid=\"test-shared-secret\"",
@@ -178,11 +183,7 @@ func TestSignRequest(t *testing.T) {
 					signer, _ := NewRSAPSSSigner("test-key-rsa-pss", prvKey.(*rsa.PrivateKey))
 					return *signer
 				})(),
-				req: (func() *http.Request {
-					in := strings.NewReader(http1)
-					req, _ := http.ReadRequest(bufio.NewReader(in))
-					return req
-				})(),
+				req:    readRequest(httpreq1),
 				fields: []string{},
 			},
 			want:    "sig1=();created=1618884475;keyid=\"test-key-rsa-pss\"",
@@ -207,13 +208,24 @@ func TestSignRequest(t *testing.T) {
 	}
 }
 
+func readRequest(s string) *http.Request {
+	in := strings.NewReader(s)
+	req, _ := http.ReadRequest(bufio.NewReader(in))
+	return req
+}
+
+func readResponse(s string) *http.Response {
+	in := strings.NewReader(s)
+	res, _ := http.ReadResponse(bufio.NewReader(in), nil)
+	return res
+}
+
 func TestSignAndVerifyHMAC(t *testing.T) {
 	config := NewConfig().SignAlg(false).setFakeCreated(1618884475)
 	signatureName := "sig1"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 	signer, _ := NewHMACSHA256Signer("test-shared-secret", key)
-	in := strings.NewReader(http1)
-	req, _ := http.ReadRequest(bufio.NewReader(in))
+	req := readRequest(httpreq1)
 	fields := []string{"@authority", "date", "content-type"}
 	sigInput, sig, _ := SignRequest(config, signatureName, *signer, req, fields)
 	req.Header.Add("Signature", sig)
@@ -231,6 +243,31 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 	}
 }
 
+func TestSignAndVerifyResponseHMAC(t *testing.T) {
+	config := NewConfig()
+	signatureName := "sigres"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	signer, _ := NewHMACSHA256Signer("test-shared-secret", key)
+	res := readResponse(httpres1)
+	fields := []string{"@status", "date", "content-type"}
+	sigInput, sig, err := SignResponse(config, signatureName, *signer, res, fields)
+
+	res2 := readResponse(httpres1)
+	res2.Header.Add("Signature", sig)
+	res2.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key)
+	if err != nil {
+		t.Errorf("could not generate verifier: %s", err)
+	}
+	verified, err := VerifyResponse(signatureName, *verifier, res2, fields)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+	if !verified {
+		t.Errorf("message did not pass verification")
+	}
+}
+
 func TestSignAndVerifyRSAPSS(t *testing.T) {
 	config := NewConfig().SignAlg(false).setFakeCreated(1618884475)
 	signatureName := "sig1"
@@ -239,8 +276,7 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 		t.Errorf("cannot read private key")
 	}
 	signer, _ := NewRSAPSSSigner("test-key-rsa-pss", prvKey.(*rsa.PrivateKey))
-	in := strings.NewReader(http1)
-	req, _ := http.ReadRequest(bufio.NewReader(in))
+	req := readRequest(httpreq1)
 	fields := []string{"@authority", "date", "content-type"}
 	sigInput, sig, _ := SignRequest(config, signatureName, *signer, req, fields)
 	req.Header.Add("Signature", sig)
@@ -259,5 +295,55 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 	}
 	if !verified {
 		t.Errorf("message did not pass verification")
+	}
+}
+
+func TestSignResponse(t *testing.T) {
+	type args struct {
+		config        Config
+		signatureName string
+		signer        Signer
+		res           *http.Response
+		fields        []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		want1   string
+		wantErr bool
+	}{
+		{
+			name: "test response with HMAC",
+			args: args{
+				config:        NewConfig().setFakeCreated(1618889999),
+				signatureName: "sig1",
+				signer: (func() Signer {
+					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+					signer, _ := NewHMACSHA256Signer("test-shared-secret", key)
+					return *signer
+				})(),
+				res:    readResponse(httpres1),
+				fields: []string{"@status", "date", "content-type"},
+			},
+			want:    "sig1=(\"@status\" \"date\" \"content-type\");created=1618889999;alg=\"hmac-sha256\";keyid=\"test-shared-secret\"",
+			want1:   "sig1=:5s7SCXZBsy7g/xqoFjVy+WWvWi4bb3G7bQoE+blEyz4=:",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := SignResponse(tt.args.config, tt.args.signatureName, tt.args.signer, tt.args.res, tt.args.fields)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SignResponse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("SignResponse() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("SignResponse() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
 	}
 }

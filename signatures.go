@@ -107,7 +107,7 @@ func SignRequest(config Config, signatureName string, signer Signer, req *http.R
 func SignResponse(config Config, signatureName string, signer Signer, res *http.Response, fields []string) (string, string, error) {
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
-		return "", "", nil
+		return "", "", err
 	}
 	return signMessage(config, signatureName, signer, *parsedMessage, fields)
 }
@@ -118,6 +118,18 @@ func SignResponse(config Config, signatureName string, signer Signer, res *http.
 //
 func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, fields []string) (bool, error) {
 	parsedMessage, err := parseRequest(req)
+	if err != nil {
+		return false, err
+	}
+	return verifyMessage(signatureName, verifier, *parsedMessage, fields)
+}
+
+//
+// VerifyResponse verifies a signed HTTP response. You must supply a Verifier structure,
+// and a list of fields that are expected to be signed (all lowercase). Returns true if verification was successful.
+//
+func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, fields []string) (bool, error) {
+	parsedMessage, err := parseResponse(res)
 	if err != nil {
 		return false, err
 	}
@@ -155,11 +167,11 @@ func verifyMessage(name string, verifier Verifier, message parsedMessage, fields
 	if err != nil {
 		return false, err
 	}
-	verified, err := verifySignature(name, verifier, signatureInput, wantSigRaw)
+	verified, err := verifySignature(verifier, signatureInput, wantSigRaw)
 	return verified, err
 }
 
-func verifySignature(name string, verifier Verifier, input string, signature []byte) (bool, error) {
+func verifySignature(verifier Verifier, input string, signature []byte) (bool, error) {
 	return verifier.verify([]byte(input), signature)
 }
 
