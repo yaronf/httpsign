@@ -109,7 +109,15 @@ func SignResponse(config Config, signatureName string, signer Signer, res *http.
 	if err != nil {
 		return "", "", err
 	}
+	addPseudoHeaders(parsedMessage, config)
 	return signMessage(config, signatureName, signer, *parsedMessage, fields)
+}
+
+func addPseudoHeaders(message *parsedMessage, config Config) {
+	if config.requestResponse.name != "" {
+		message.components["@request-response"] = config.requestResponse.signature
+		// TODO and what about the name?
+	}
 }
 
 //

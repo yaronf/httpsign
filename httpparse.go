@@ -85,6 +85,7 @@ func generateReqSpecialtyComponents(req *http.Request, components map[string]str
 	components["@scheme"] = scScheme(theUrl)
 	components["@request-target"] = scRequestTarget(theUrl)
 	components["@query"] = scQuery(theUrl)
+	// @request-response does not belong here
 }
 
 func scQuery(url *url.URL) string {
