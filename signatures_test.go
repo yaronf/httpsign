@@ -38,6 +38,62 @@ Content-Length: 18
 {"hello": "world"}
 `
 
+var httpreq1pssMinimal = `POST /foo?param=value&pet=dog HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Content-Type: application/json
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+Cache-Control: max-age=60
+Cache-Control:    must-revalidate
+Content-Length: 18
+Signature-Input: sig1=();created=1618884475;keyid="test-key-rsa-pss";alg="rsa-pss-sha512"
+Signature: sig1=:HWP69ZNiom9Obu1KIdqPPcu/C1a5ZUMBbqS/xwJECV8bhIQVmEAAAzz8LQPvtP1iFSxxluDO1KE9b8L+O64LEOvhwYdDctV5+E39Jy1eJiD7nYREBgxTpdUfzTO+Trath0vZdTylFlxK4H3l3s/cuFhnOCxmFYgEa+cw+StBRgY1JtafSFwNcZgLxVwialuH5VnqJS4JN8PHD91XLfkjMscTo4jmVMpFd3iLVe0hqVFl7MDt6TMkwIyVFnEZ7B/VIQofdShO+C/7MuupCSLVjQz5xA+Zs6Hw+W9ESD/6BuGs6LF1TcKLxW+5K+2zvDY/Cia34HNpRW5io7Iv9/b7iQ==:
+
+{"hello": "world"}
+`
+
+var httpreq1pssSelective = `POST /foo?param=value&pet=dog HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Content-Type: application/json
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+Cache-Control: max-age=60
+Cache-Control:    must-revalidate
+Content-Length: 18
+Signature-Input: sig1=("@authority" "content-type");created=1618884475;keyid="test-key-rsa-pss"
+Signature: sig1=:ik+OtGmM/kFqENDf9Plm8AmPtqtC7C9a+zYSaxr58b/E6h81ghJS3PcH+m1asiMp8yvccnO/RfaexnqanVB3C72WRNZN7skPTJmUVmoIeqZncdP2mlfxlLP6UbkrgYsk91NS6nwkKC6RRgLhBFqzP42oq8D2336OiQPDAo/04SxZt4Wx9nDGuy2SfZJUhsJqZyEWRk4204x7YEB3VxDAAlVgGt8ewilWbIKKTOKp3ymUeQIwptqYwv0l8mN404PPzRBTpB7+HpClyK4CNp+SVv46+6sHMfJU4taz10s/NoYRmYCGXyadzYYDj0BYnFdERB6NblI/AOWFGl5Axhhmjg==:
+
+{"hello": "world"}
+`
+
+var httpreq1pssFull = `POST /foo?param=value&pet=dog HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Content-Type: application/json
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+Cache-Control: max-age=60
+Cache-Control:    must-revalidate
+Content-Length: 18
+Signature-Input: sig1=("date" "@method" "@path" "@query" "@authority" "content-type" "digest" "content-length");created=1618884475;keyid="test-key-rsa-pss"
+Signature: sig1=:JuJnJMFGD4HMysAGsfOY6N5ZTZUknsQUdClNG51VezDgPUOW03QMe74vbIdndKwW1BBrHOHR3NzKGYZJ7X3ur23FMCdANe4VmKb3Rc1Q/5YxOO8p7KoyfVa4uUcMk5jB9KAn1M1MbgBnqwZkRWsbv8ocCqrnD85Kavr73lx51k1/gU8w673WT/oBtxPtAn1eFjUyIKyA+XD7kYph82I+ahvm0pSgDPagu917SlqUjeaQaNnlZzO03Iy1RZ5XpgbNeDLCqSLuZFVID80EohC2CQ1cL5svjslrlCNstd2JCLmhjL7xV3NYXerLim4bqUQGRgDwNJRnqobpS6C1NBns/Q==:
+
+{"hello": "world"}
+`
+
+var httpreq1p256 = `POST /foo?param=value&pet=dog HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Content-Type: application/json
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+Cache-Control: max-age=60
+Cache-Control:    must-revalidate
+Content-Length: 18
+Signature-Input: sig1=("content-type" "digest" "content-length");created=1618884475;keyid="test-key-ecc-p256"
+Signature: sig1=:n8RKXkj0iseWDmC6PNSQ1GX2R9650v+lhbb6rTGoSrSSx18zmn6fPOtBx48/WffYLO0n1RHHf9scvNGAgGq52Q==:
+
+{"hello": "world"}
+`
+
 var rsaPubKey = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyD6Hrh5mV16s/jQngCF1
 IfpzLuJTraeqJFlNESsvbeNMcA4dQjU/LMX2XA3vyF7nOyleTisdmzFZb9TLoC1H
@@ -132,6 +188,19 @@ var p256PrvKey = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIMLnTZwmWikcBCrKlXZVUjaq9jwsv22sy/P7yIIonkVwoAoGCCqGSM49
 AwEHoUQDQgAEWAO+Y/BP3c7Aw7dSWYGkuckwl/e6H54D/P9uzXDjby0Frysdpcny
 /NL807iRVfVDDg+ctHhuRTzBwP+lwVdN2g==
+-----END EC PRIVATE KEY-----
+`
+
+var p256PubKey2 = `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqIVYZVLCrPZHGHjP17CTW0/+D9Lf
+w0EkjqF7xB4FivAxzic30tMM4GF+hR6Dxh71Z50VGGdldkkDXZCnTNnoXQ==
+-----END PUBLIC KEY-----
+`
+
+var p256PrvKey2 = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIFKbhfNZfpDsW43+0+JjUr9K+bTeuxopu653+hBaXGA7oAoGCCqGSM49
+AwEHoUQDQgAEqIVYZVLCrPZHGHjP17CTW0/+D9Lfw0EkjqF7xB4FivAxzic30tMM
+4GF+hR6Dxh71Z50VGGdldkkDXZCnTNnoXQ==
 -----END EC PRIVATE KEY-----
 `
 
@@ -249,7 +318,7 @@ func TestSignRequest(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "test case B.2.1",
+			name: "test case B.2.1 (partial)",
 			args: args{
 				config:        NewConfig().SignAlg(false).setFakeCreated(1618884475),
 				signatureName: "sig1",
@@ -481,6 +550,106 @@ func TestSignResponse(t *testing.T) {
 			}
 			if got1 != tt.want1 {
 				t.Errorf("SignResponse() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func TestVerifyRequest(t *testing.T) {
+	type args struct {
+		signatureName string
+		verifier      Verifier
+		req           *http.Request
+		fields        []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "test case B.2.1",
+			args: args{
+				signatureName: "sig1",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey)
+					return *verifier
+				})(),
+				req:    readRequest(httpreq1pssMinimal),
+				fields: []string{},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "test case B.2.2",
+			args: args{
+				signatureName: "sig1",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey)
+					return *verifier
+				})(),
+				req:    readRequest(httpreq1pssSelective),
+				fields: []string{},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "test case B.2.3",
+			args: args{
+				signatureName: "sig1",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey)
+					return *verifier
+				})(),
+				req:    readRequest(httpreq1pssFull),
+				fields: []string{},
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "test case B.2.4",
+			args: args{
+				signatureName: "sig1",
+				verifier: (func() Verifier {
+					pubKey, err := parseECPublicKeyFromPemStr(p256PubKey2)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewP256Verifier("test-key-ecc-p256", pubKey)
+					return *verifier
+				})(),
+				req:    readRequest(httpreq1p256),
+				fields: []string{},
+			},
+			want:    true,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := VerifyRequest(tt.args.signatureName, tt.args.verifier, tt.args.req, tt.args.fields)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("VerifyRequest() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("VerifyRequest() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

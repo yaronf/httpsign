@@ -81,11 +81,16 @@ func generateReqSpecialtyComponents(req *http.Request, components map[string]str
 	components["@method"] = scMethod(req)
 	theUrl := req.URL
 	components["@target-uri"] = scTargetUri(theUrl)
+	components["@path"] = scPath(theUrl)
 	components["@authority"] = scAuthority(req)
 	components["@scheme"] = scScheme(theUrl)
 	components["@request-target"] = scRequestTarget(theUrl)
 	components["@query"] = scQuery(theUrl)
 	// @request-response does not belong here
+}
+
+func scPath(theUrl *url.URL) string {
+	return theUrl.EscapedPath()
 }
 
 func scQuery(url *url.URL) string {

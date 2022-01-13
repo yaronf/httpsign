@@ -58,6 +58,7 @@ func generateSignatureInput(message parsedMessage, fields []string, params strin
 		inp += fmt.Sprintf("\"%s\": %s\n", c.name, c.value)
 	}
 	inp += fmt.Sprintf("\"%s\": %s", "@signature-params", params)
+	// log.Println("inp:", inp)
 	return inp, nil
 }
 
@@ -93,6 +94,9 @@ func generateSigParams(config Config, keyId, alg string, fields []string) string
 // and a list of fields to be signed (all lowercase). Returns the Signature-Input and the Signature header values.
 //
 func SignRequest(config Config, signatureName string, signer Signer, req *http.Request, fields []string) (string, string, error) {
+	if req == nil {
+		return "", "", fmt.Errorf("req is nil")
+	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
 		return "", "", err
@@ -105,6 +109,9 @@ func SignRequest(config Config, signatureName string, signer Signer, req *http.R
 // and a list of fields to be signed (all lowercase). Returns the Signature-Input and the Signature header values.
 //
 func SignResponse(config Config, signatureName string, signer Signer, res *http.Response, fields []string) (string, string, error) {
+	if res == nil {
+		return "", "", fmt.Errorf("res is nil")
+	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
 		return "", "", err
@@ -125,6 +132,9 @@ func addPseudoHeaders(message *parsedMessage, config Config) {
 // and a list of fields that are expected to be signed (all lowercase). Returns true if verification was successful.
 //
 func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, fields []string) (bool, error) {
+	if req == nil {
+		return false, fmt.Errorf("req is nil")
+	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
 		return false, err
@@ -137,6 +147,9 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, f
 // and a list of fields that are expected to be signed (all lowercase). Returns true if verification was successful.
 //
 func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, fields []string) (bool, error) {
+	if res == nil {
+		return false, fmt.Errorf("res is nil")
+	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
 		return false, err
