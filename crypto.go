@@ -99,7 +99,7 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		hashed := sha256.Sum256(buff)
 		sig, err := ecdsa.SignASN1(rand.Reader, s.key.(*ecdsa.PrivateKey), hashed[:])
 		if err != nil {
-			return nil, fmt.Errorf("RSA signature failed")
+			return nil, fmt.Errorf("ECDSA signature failed")
 		}
 		return sig, nil
 	default:
@@ -158,14 +158,14 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		hashed := sha256.Sum256(buff)
 		err := rsa.VerifyPKCS1v15(v.key.(*rsa.PublicKey), crypto.SHA256, hashed[:], sig)
 		if err != nil {
-			return false, fmt.Errorf("RSA verification failed")
+			return false, fmt.Errorf("RSA verification failed: %v", err)
 		}
 		return true, nil
 	case "rsa-pss-sha512":
 		hashed := sha512.Sum512(buff)
 		err := rsa.VerifyPSS(v.key.(*rsa.PublicKey), crypto.SHA512, hashed[:], sig, nil)
 		if err != nil {
-			return false, fmt.Errorf("RSA verification failed")
+			return false, fmt.Errorf("RSA verification failed: %v", err)
 		}
 		return true, nil
 	case "ecdsa-p256-sha256":

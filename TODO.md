@@ -12,3 +12,5 @@
 * 3 pipeline symbols at the end of lines in 2.1.2 appear to be typos
 * In B.2.3, this is NOT the input message specified at the top of B.2. The date is off by 1 second!
 * And B.2.4 fails for some reason
+
+*

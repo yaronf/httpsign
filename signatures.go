@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/dunglas/httpsfv"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -58,7 +59,7 @@ func generateSignatureInput(message parsedMessage, fields []string, params strin
 		inp += fmt.Sprintf("\"%s\": %s\n", c.name, c.value)
 	}
 	inp += fmt.Sprintf("\"%s\": %s", "@signature-params", params)
-	// log.Println("inp:", inp)
+	log.Println("inp:", "\n"+inp)
 	return inp, nil
 }
 

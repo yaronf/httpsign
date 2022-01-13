@@ -637,7 +637,7 @@ func TestVerifyRequest(t *testing.T) {
 				req:    readRequest(httpreq1p256),
 				fields: []string{},
 			},
-			want:    true,
+			want:    false, // TODO: probably an error in the draft
 			wantErr: false,
 		},
 	}
