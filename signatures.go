@@ -34,7 +34,7 @@ func signMessage(config Config, signatureName string, signer Signer, parsedMessa
 func validateFields(fields []string) error {
 	for _, f := range fields {
 		if f != strings.ToLower(f) {
-			return fmt.Errorf("field is not lowercase: %s", f)
+			return fmt.Errorf("field \"%s\" is not lowercase", f)
 		}
 		// Note that using "signature" and "signature-input" is allowed
 	}
@@ -96,7 +96,7 @@ func generateSigParams(config Config, keyId, alg string, fields []string) string
 //
 func SignRequest(config Config, signatureName string, signer Signer, req *http.Request, fields []string) (string, string, error) {
 	if req == nil {
-		return "", "", fmt.Errorf("req is nil")
+		return "", "", fmt.Errorf("nil request")
 	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
@@ -111,7 +111,7 @@ func SignRequest(config Config, signatureName string, signer Signer, req *http.R
 //
 func SignResponse(config Config, signatureName string, signer Signer, res *http.Response, fields []string) (string, string, error) {
 	if res == nil {
-		return "", "", fmt.Errorf("res is nil")
+		return "", "", fmt.Errorf("nil response")
 	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
@@ -134,7 +134,7 @@ func addPseudoHeaders(message *parsedMessage, config Config) {
 //
 func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, fields []string) (bool, error) {
 	if req == nil {
-		return false, fmt.Errorf("req is nil")
+		return false, fmt.Errorf("nil request")
 	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
@@ -149,7 +149,7 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, f
 //
 func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, fields []string) (bool, error) {
 	if res == nil {
-		return false, fmt.Errorf("res is nil")
+		return false, fmt.Errorf("nil response")
 	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
@@ -226,7 +226,7 @@ func parseSignatureInput(input string, name string) (*psiSignature, error) {
 	psi := parsedSignatureInput{}
 	sigs, err := httpsfv.UnmarshalDictionary([]string{input})
 	if err != nil {
-		return nil, fmt.Errorf("could not parse Signature-Input as list")
+		return nil, fmt.Errorf("could not parse Signature-Input as list: %w", err)
 	}
 	for _, name := range sigs.Names() {
 		memberForName, ok := sigs.Get(name)
@@ -236,7 +236,7 @@ func parseSignatureInput(input string, name string) (*psiSignature, error) {
 		fieldsList, ok := memberForName.(httpsfv.InnerList)
 		osp, err := httpsfv.Marshal(fieldsList) // undocumented functionality
 		if err != nil {
-			return nil, fmt.Errorf("could not marshal inner list")
+			return nil, fmt.Errorf("could not marshal inner list: %w", err)
 		}
 		if !ok {
 			return nil, fmt.Errorf("Signature-Input: signature %s does not have an inner list", name)
@@ -265,17 +265,17 @@ func parseSignatureInput(input string, name string) (*psiSignature, error) {
 			return &s, nil
 		}
 	}
-	return nil, fmt.Errorf("couldn't find signature input for %s", name)
+	return nil, fmt.Errorf("couldn't find signature input for \"%s\"", name)
 }
 
 func parseWantSignature(wantSignature string, name string) ([]byte, error) {
 	parsedSignature, err := httpsfv.UnmarshalDictionary([]string{wantSignature})
 	if err != nil {
-		return nil, fmt.Errorf("could not parse signature field")
+		return nil, fmt.Errorf("could not parse signature field: %w", err)
 	}
 	wantSigValue, found := parsedSignature.Get(name)
 	if !found {
-		return nil, fmt.Errorf("could not find signature: %s", name)
+		return nil, fmt.Errorf("could not find signature \"%s\"", name)
 	}
 	wantSigItem, ok := wantSigValue.(httpsfv.Item)
 	if !ok {

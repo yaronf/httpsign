@@ -23,7 +23,7 @@ func matchFields(components map[string]string, fields []string) ([]component, er
 		if c, found := components[f]; found {
 			matched = append(matched, component{f, c})
 		} else {
-			return nil, fmt.Errorf("missing component: %s", f)
+			return nil, fmt.Errorf("missing component \"%s\"", f)
 		}
 	}
 	return matched, nil
@@ -57,7 +57,7 @@ func validateMessageHeaders(header http.Header) error {
 	// Go accepts header names that start with "@", which is forbidden by the RFC
 	for k := range header {
 		if strings.HasPrefix(k, "@") {
-			return fmt.Errorf("potentially malicious header detected: %s", k)
+			return fmt.Errorf("potentially malicious header detected \"%s\"", k)
 		}
 	}
 	return nil

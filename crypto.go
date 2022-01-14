@@ -92,7 +92,7 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		hashed := sha512.Sum512(buff)
 		sig, err := rsa.SignPSS(rand.Reader, s.key.(*rsa.PrivateKey), crypto.SHA512, hashed[:], nil)
 		if err != nil {
-			return nil, fmt.Errorf("RSA signature failed")
+			return nil, fmt.Errorf("RSA-PSS signature failed")
 		}
 		return sig, nil
 	case "ecdsa-p256-sha256":
@@ -103,7 +103,7 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		}
 		return sig, nil
 	default:
-		return nil, fmt.Errorf("sign: unknown algorithm: %s", s.alg)
+		return nil, fmt.Errorf("sign: unknown algorithm \"%s\"", s.alg)
 	}
 }
 
@@ -158,20 +158,20 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		hashed := sha256.Sum256(buff)
 		err := rsa.VerifyPKCS1v15(v.key.(*rsa.PublicKey), crypto.SHA256, hashed[:], sig)
 		if err != nil {
-			return false, fmt.Errorf("RSA verification failed: %v", err)
+			return false, fmt.Errorf("RSA verification failed: %w", err)
 		}
 		return true, nil
 	case "rsa-pss-sha512":
 		hashed := sha512.Sum512(buff)
 		err := rsa.VerifyPSS(v.key.(*rsa.PublicKey), crypto.SHA512, hashed[:], sig, nil)
 		if err != nil {
-			return false, fmt.Errorf("RSA verification failed: %v", err)
+			return false, fmt.Errorf("RSA-PSS verification failed: %w", err)
 		}
 		return true, nil
 	case "ecdsa-p256-sha256":
 		hashed := sha256.Sum256(buff)
 		return ecdsa.VerifyASN1(v.key.(*ecdsa.PublicKey), hashed[:], sig), nil
 	default:
-		return false, fmt.Errorf("verify: unknown algorithm: %s", v.alg)
+		return false, fmt.Errorf("verify: unknown algorithm \"%s\"", v.alg)
 	}
 }
