@@ -97,11 +97,12 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		return sig, nil
 	case "ecdsa-p256-sha256":
 		hashed := sha256.Sum256(buff)
-		sig, err := ecdsa.SignASN1(rand.Reader, s.key.(*ecdsa.PrivateKey), hashed[:])
-		if err != nil {
-			return nil, fmt.Errorf("ECDSA signature failed")
-		}
-		return sig, nil
+		return ecdsaSignRaw(rand.Reader, s.key.(*ecdsa.PrivateKey), hashed[:])
+		// sig, err := ecdsa.SignASN1(rand.Reader, s.key.(*ecdsa.PrivateKey), hashed[:])
+		//if err != nil {
+		//	return nil, fmt.Errorf("ECDSA signature failed")
+		//}
+		// return sig, nil
 	default:
 		return nil, fmt.Errorf("sign: unknown algorithm \"%s\"", s.alg)
 	}
@@ -170,7 +171,8 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		return true, nil
 	case "ecdsa-p256-sha256":
 		hashed := sha256.Sum256(buff)
-		return ecdsa.VerifyASN1(v.key.(*ecdsa.PublicKey), hashed[:], sig), nil
+		return ecdsaVerifyRaw(v.key.(*ecdsa.PublicKey), hashed[:], sig)
+		//		return ecdsa.VerifyASN1(v.key.(*ecdsa.PublicKey), hashed[:], sig), nil
 	default:
 		return false, fmt.Errorf("verify: unknown algorithm \"%s\"", v.alg)
 	}
