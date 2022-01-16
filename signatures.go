@@ -17,7 +17,10 @@ func signMessage(config *Config, signatureName string, signer Signer, parsedMess
 	if err != nil {
 		return "", "", err
 	}
-	sigParams := generateSigParams(config, signer.keyId, signer.alg, fields)
+	sigParams, err := generateSigParams(config, signer.keyId, signer.alg, fields)
+	if err != nil {
+		return "", "", err
+	}
 	sigInputHeader = fmt.Sprintf("%s=%s", signatureName, sigParams)
 	signatureInput, err := generateSignatureInput(parsedMessage, fields, sigParams)
 	if err != nil {
@@ -45,7 +48,7 @@ func generateSignature(name string, signer Signer, input string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s=:%s:", name, base64.StdEncoding.EncodeToString(raw)), nil // TODO
+	return fmt.Sprintf("%s=:%s:", name, base64.StdEncoding.EncodeToString(raw)), nil // TODO use httpsfv
 }
 
 func generateSignatureInput(message parsedMessage, fields Fields, params string) (string, error) {
@@ -59,21 +62,31 @@ func generateSignatureInput(message parsedMessage, fields Fields, params string)
 		if err != nil {
 			return "", fmt.Errorf("could not marshal %v", c.f)
 		}
-		inp += fmt.Sprintf("%s: %s\n", f, c.v)
+		for _, v := range c.v {
+			inp += fmt.Sprintf("%s: %s\n", f, v)
+		}
 	}
 	inp += fmt.Sprintf("\"%s\": %s", "@signature-params", params)
 	// log.Println("inp:", "\n"+inp)
 	return inp, nil
 }
 
-func generateSigParams(config *Config, keyId, alg string, fields Fields) string {
+func generateSigParams(config *Config, keyId, alg string, fields Fields) (string, error) {
 	var sp string
 	if len(fields) == 0 {
 		sp = "();"
 	} else {
-		sp = "(" + fmt.Sprintf("\"%s\"", fields[0].name)
+		f, err := fields[0].asSignatureInput()
+		if err != nil {
+			return "", err
+		}
+		sp = "(" + fmt.Sprintf("%s", f)
 		for i := 1; i < len(fields); i++ {
-			sp += fmt.Sprintf(" \"%s\"", fields[i].name)
+			f, err := fields[i].asSignatureInput()
+			if err != nil {
+				return "", err
+			}
+			sp += fmt.Sprintf(" %s", f)
 		}
 		sp += ");"
 	}
@@ -90,7 +103,7 @@ func generateSigParams(config *Config, keyId, alg string, fields Fields) string 
 		sp += fmt.Sprintf("alg=\"%s\";", alg)
 	}
 	sp += fmt.Sprintf("keyid=\"%s\"", keyId)
-	return sp
+	return sp, nil
 }
 
 //
@@ -126,7 +139,7 @@ func SignResponse(config *Config, signatureName string, signer Signer, res *http
 
 func addPseudoHeaders(message *parsedMessage, config *Config) {
 	if config.requestResponse.name != "" {
-		message.components[*fromHeaderName("@request-response")] = config.requestResponse.signature
+		message.components[*fromHeaderName("@request-response")] = []string{config.requestResponse.signature}
 		// TODO and what about the name?
 	}
 }
@@ -162,14 +175,16 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response,
 }
 
 func verifyMessage(name string, verifier Verifier, message parsedMessage, fields Fields) (bool, error) {
-	wantSignatureInput, found := message.components[*fromHeaderName("signature-input")]
+	wsi, found := message.components[*fromHeaderName("signature-input")]
 	if !found {
 		return false, fmt.Errorf("missing \"signature-input\" header")
 	}
-	wantSignature, found := message.components[*fromHeaderName("signature")]
+	wantSignatureInput := wsi[0]
+	ws, found := message.components[*fromHeaderName("signature")]
 	if !found {
 		return false, fmt.Errorf("missing \"signature\" header")
 	}
+	wantSignature := ws[0]
 	delete(message.components, *fromHeaderName("signature-input"))
 	delete(message.components, *fromHeaderName("signature"))
 	err := validateFields(fields)
@@ -236,10 +251,25 @@ func parseSignatureInput(input string, name string) (*psiSignature, error) {
 			if !ok {
 				return nil, fmt.Errorf("Signature-Input: value is not a string")
 			}
-			f = append(f, *fromHeaderName(fname))
+			if ff.Params == nil || len(ff.Params.Names()) == 0 {
+				f = append(f, *fromHeaderName(fname))
+			} else {
+				if len(ff.Params.Names()) > 1 {
+					return nil, fmt.Errorf("more than one param for \"%s\"", fname)
+				}
+				flagNames := ff.Params.Names()
+				flagName := flagNames[0]
+				flagValue, _ := ff.Params.Get(flagName)
+				fv := flagValue.(string)
+				f = append(f, field{
+					name:      fname,
+					flagName:  flagName,
+					flagValue: fv,
+				})
+			}
 		}
 		params := map[string]interface{}{}
-		ps := memberForName.(httpsfv.InnerList).Params // assertion already checked
+		ps := fieldsList.Params
 		for _, p := range (*ps).Names() {
 			pp, ok := ps.Get(p)
 			if !ok {

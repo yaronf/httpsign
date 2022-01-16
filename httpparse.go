@@ -8,7 +8,8 @@ import (
 	"strings"
 )
 
-type components map[field]string
+// some fields (specifically, query params) may appear more than once, and those occurrences are ordered.
+type components map[field][]string
 
 type parsedMessage struct {
 	components components
@@ -16,7 +17,7 @@ type parsedMessage struct {
 
 type fvPair struct {
 	f field
-	v string
+	v []string
 }
 
 func matchFields(comps components, fields Fields) ([]fvPair, error) {
@@ -40,8 +41,19 @@ func parseRequest(req *http.Request) (*parsedMessage, error) {
 	components := components{}
 	generateReqSpecialtyComponents(req, components)
 	generateHeaderComponents(req.Header, components)
+	values, err := url.ParseQuery(req.URL.RawQuery)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse query: %s", req.URL.RawQuery)
+	}
+	generateQueryParams(values, components)
 
 	return &parsedMessage{components}, nil
+}
+
+func generateQueryParams(v map[string][]string, components components) {
+	for name, values := range v {
+		components[*fromQueryParam(name)] = values
+	}
 }
 
 func parseResponse(res *http.Response) (*parsedMessage, error) {
@@ -66,10 +78,11 @@ func validateMessageHeaders(header http.Header) error {
 	return nil
 }
 
+// TODO: dictionary headers
 func generateHeaderComponents(headers http.Header, components components) {
 	for key, val := range headers {
 		k := strings.ToLower(key)
-		components[*fromHeaderName(k)] = foldFields(val)
+		components[*fromHeaderName(k)] = []string{foldFields(val)}
 	}
 }
 
@@ -82,7 +95,7 @@ func foldFields(fields []string) string {
 }
 
 func specialtyComponent(name, v string, components components) {
-	components[*fromHeaderName(name)] = v
+	components[*fromHeaderName(name)] = []string{v}
 }
 
 func generateReqSpecialtyComponents(req *http.Request, components components) {

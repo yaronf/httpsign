@@ -94,6 +94,27 @@ Signature: sig1=:n8RKXkj0iseWDmC6PNSQ1GX2R9650v+lhbb6rTGoSrSSx18zmn6fPOtBx48/Wff
 {"hello": "world"}
 `
 
+var httpreq2 = `POST /foo?param=value&pet=dog&pet=snake&bar=baz HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Content-Type: application/json
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+Cache-Control: max-age=60
+Cache-Control:    must-revalidate
+Content-Length: 18
+
+{"hello": "world"}
+`
+
+var httpres2 = `HTTP/1.1 200 OK
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Content-Type: application/json
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+Content-Length: 18
+
+{"hello": "world"}
+`
+
 var rsaPubKey = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyD6Hrh5mV16s/jQngCF1
 IfpzLuJTraeqJFlNESsvbeNMcA4dQjU/LMX2XA3vyF7nOyleTisdmzFZb9TLoC1H
@@ -389,11 +410,11 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	signatureName := "sigres"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 	signer, _ := NewHMACSHA256Signer("test-shared-secret", key)
-	res := readResponse(httpres1)
+	res := readResponse(httpres2)
 	fields := HeaderList([]string{"@status", "date", "content-type"})
 	sigInput, sig, err := SignResponse(config, signatureName, *signer, res, fields)
 
-	res2 := readResponse(httpres1)
+	res2 := readResponse(httpres2)
 	res2.Header.Add("Signature", sig)
 	res2.Header.Add("Signature-Input", sigInput)
 	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key)
@@ -477,9 +498,9 @@ func TestSignAndVerifyP256(t *testing.T) {
 		t.Errorf("cannot read private key")
 	}
 	signer, _ := NewP256Signer("test-key-p256", prvKey)
-	req := readRequest(httpreq1)
-	fields := HeaderList([]string{"@authority", "date", "content-type"})
-	sigInput, sig, _ := SignRequest(config, signatureName, *signer, req, fields)
+	req := readRequest(httpreq2)
+	fields := *NewFields().AddHeaderName("@method").AddHeaderName("date").AddHeaderName("content-type").AddQueryParam("pet")
+	sigInput, sig, err := SignRequest(config, signatureName, *signer, req, fields)
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
 	pubKey, err := parseECPublicKeyFromPemStr(p256PubKey)

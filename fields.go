@@ -91,7 +91,7 @@ func (ap *AdditionalParams) AddParam(name, value string) *AdditionalParams {
 	return ap
 }
 
-func (f *field) asSignatureInput() (string, error) {
+func (f field) asSignatureInput() (string, error) {
 	p := httpsfv.NewParams()
 	if f.flagName != "" {
 		p.Add(f.flagName, f.flagValue)
