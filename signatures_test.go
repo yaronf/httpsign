@@ -191,17 +191,11 @@ AwEHoUQDQgAEWAO+Y/BP3c7Aw7dSWYGkuckwl/e6H54D/P9uzXDjby0Frysdpcny
 -----END EC PRIVATE KEY-----
 `
 
+// Note: the private key from the draft is never used
 var p256PubKey2 = `-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqIVYZVLCrPZHGHjP17CTW0/+D9Lf
 w0EkjqF7xB4FivAxzic30tMM4GF+hR6Dxh71Z50VGGdldkkDXZCnTNnoXQ==
 -----END PUBLIC KEY-----
-`
-
-var p256PrvKey2 = `-----BEGIN EC PRIVATE KEY-----
-MHcCAQEEIFKbhfNZfpDsW43+0+JjUr9K+bTeuxopu653+hBaXGA7oAoGCCqGSM49
-AwEHoUQDQgAEqIVYZVLCrPZHGHjP17CTW0/+D9Lfw0EkjqF7xB4FivAxzic30tMM
-4GF+hR6Dxh71Z50VGGdldkkDXZCnTNnoXQ==
------END EC PRIVATE KEY-----
 `
 
 // Workaround, from https://go.dev/play/p/fIz218Lj2L0. Credit: Ryan Castner.
@@ -287,11 +281,11 @@ func parseECPublicKeyFromPemStr(pemString string) (*ecdsa.PublicKey, error) {
 
 func TestSignRequest(t *testing.T) {
 	type args struct {
-		config        Config
+		config        *Config
 		signatureName string
 		signer        Signer
 		req           *http.Request
-		fields        []string
+		fields        Fields
 	}
 	tests := []struct {
 		name    string
@@ -311,7 +305,7 @@ func TestSignRequest(t *testing.T) {
 					return *signer
 				})(),
 				req:    readRequest(httpreq1),
-				fields: []string{"@authority", "date", "content-type"},
+				fields: HeaderList([]string{"@authority", "date", "content-type"}),
 			},
 			want:    "sig1=(\"@authority\" \"date\" \"content-type\");created=1618884475;keyid=\"test-shared-secret\"",
 			want1:   "sig1=:fN3AMNGbx0V/cIEKkZOvLOoC3InI+lM2+gTv22x3ia8=:",
@@ -331,7 +325,7 @@ func TestSignRequest(t *testing.T) {
 					return *signer
 				})(),
 				req:    readRequest(httpreq1),
-				fields: []string{},
+				fields: *NewFields(),
 			},
 			want:    "sig1=();created=1618884475;keyid=\"test-key-rsa-pss\"",
 			want1:   "",
@@ -373,7 +367,7 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 	signer, _ := NewHMACSHA256Signer("test-shared-secret", key)
 	req := readRequest(httpreq1)
-	fields := []string{"@authority", "date", "content-type"}
+	fields := HeaderList([]string{"@authority", "date", "content-type"})
 	sigInput, sig, _ := SignRequest(config, signatureName, *signer, req, fields)
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
@@ -396,7 +390,7 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 	signer, _ := NewHMACSHA256Signer("test-shared-secret", key)
 	res := readResponse(httpres1)
-	fields := []string{"@status", "date", "content-type"}
+	fields := HeaderList([]string{"@status", "date", "content-type"})
 	sigInput, sig, err := SignResponse(config, signatureName, *signer, res, fields)
 
 	res2 := readResponse(httpres1)
@@ -424,7 +418,7 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 	}
 	signer, _ := NewRSAPSSSigner("test-key-rsa-pss", prvKey.(*rsa.PrivateKey))
 	req := readRequest(httpreq1)
-	fields := []string{"@authority", "date", "content-type"}
+	fields := HeaderList([]string{"@authority", "date", "content-type"})
 	sigInput, sig, _ := SignRequest(config, signatureName, *signer, req, fields)
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
@@ -454,7 +448,7 @@ func TestSignAndVerifyRSA(t *testing.T) {
 	}
 	signer, _ := NewRSASigner("test-key-rsa", prvKey)
 	req := readRequest(httpreq1)
-	fields := []string{"@authority", "date", "content-type"}
+	fields := HeaderList([]string{"@authority", "date", "content-type"})
 	sigInput, sig, _ := SignRequest(config, signatureName, *signer, req, fields)
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
@@ -484,7 +478,7 @@ func TestSignAndVerifyP256(t *testing.T) {
 	}
 	signer, _ := NewP256Signer("test-key-p256", prvKey)
 	req := readRequest(httpreq1)
-	fields := []string{"@authority", "date", "content-type"}
+	fields := HeaderList([]string{"@authority", "date", "content-type"})
 	sigInput, sig, _ := SignRequest(config, signatureName, *signer, req, fields)
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
@@ -507,11 +501,11 @@ func TestSignAndVerifyP256(t *testing.T) {
 
 func TestSignResponse(t *testing.T) {
 	type args struct {
-		config        Config
+		config        *Config
 		signatureName string
 		signer        Signer
 		res           *http.Response
-		fields        []string
+		fields        Fields
 	}
 	tests := []struct {
 		name    string
@@ -531,7 +525,7 @@ func TestSignResponse(t *testing.T) {
 					return *signer
 				})(),
 				res:    readResponse(httpres1),
-				fields: []string{"@status", "date", "content-type"},
+				fields: HeaderList([]string{"@status", "date", "content-type"}),
 			},
 			want:    "sig1=(\"@status\" \"date\" \"content-type\");created=1618889999;alg=\"hmac-sha256\";keyid=\"test-shared-secret\"",
 			want1:   "sig1=:5s7SCXZBsy7g/xqoFjVy+WWvWi4bb3G7bQoE+blEyz4=:",
@@ -560,7 +554,7 @@ func TestVerifyRequest(t *testing.T) {
 		signatureName string
 		verifier      Verifier
 		req           *http.Request
-		fields        []string
+		fields        Fields
 	}
 	tests := []struct {
 		name    string
@@ -581,7 +575,7 @@ func TestVerifyRequest(t *testing.T) {
 					return *verifier
 				})(),
 				req:    readRequest(httpreq1pssMinimal),
-				fields: []string{},
+				fields: *NewFields(),
 			},
 			want:    true,
 			wantErr: false,
@@ -599,7 +593,7 @@ func TestVerifyRequest(t *testing.T) {
 					return *verifier
 				})(),
 				req:    readRequest(httpreq1pssSelective),
-				fields: []string{},
+				fields: *NewFields(),
 			},
 			want:    true,
 			wantErr: false,
@@ -617,7 +611,7 @@ func TestVerifyRequest(t *testing.T) {
 					return *verifier
 				})(),
 				req:    readRequest(httpreq1pssFull),
-				fields: []string{},
+				fields: *NewFields(),
 			},
 			want:    true,
 			wantErr: false,
@@ -635,7 +629,7 @@ func TestVerifyRequest(t *testing.T) {
 					return *verifier
 				})(),
 				req:    readRequest(httpreq1p256),
-				fields: []string{},
+				fields: *NewFields(),
 			},
 			want:    true,
 			wantErr: false,

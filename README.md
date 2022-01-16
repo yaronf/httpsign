@@ -5,5 +5,6 @@ HTTP Signatures as per [draft-ietf-httpbis-message-signatures-07](https://www.ie
 * Request-response "specialty" component
 * JWS algorithms
 * Dictionary Structured Field Members
+* Accept-Signature
 
 **Note**: the API is likely to change to accommodate some of these features.

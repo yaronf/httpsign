@@ -8,22 +8,25 @@ import (
 	"strings"
 )
 
+type components map[field]string
+
 type parsedMessage struct {
-	components map[string]string
+	components components
 }
 
-type component struct {
-	name, value string
+type fvPair struct {
+	f field
+	v string
 }
 
-func matchFields(components map[string]string, fields []string) ([]component, error) {
+func matchFields(comps components, fields Fields) ([]fvPair, error) {
 	// Components for signature are ordered, thus an array of pairs and not a map
-	matched := make([]component, 0)
+	matched := make([]fvPair, 0)
 	for _, f := range fields {
-		if c, found := components[f]; found {
-			matched = append(matched, component{f, c})
+		if v, found := comps[f]; found {
+			matched = append(matched, fvPair{f, v})
 		} else {
-			return nil, fmt.Errorf("missing component \"%s\"", f)
+			return nil, fmt.Errorf("missing component \"%s\"", f.name)
 		}
 	}
 	return matched, nil
@@ -34,7 +37,7 @@ func parseRequest(req *http.Request) (*parsedMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	components := map[string]string{}
+	components := components{}
 	generateReqSpecialtyComponents(req, components)
 	generateHeaderComponents(req.Header, components)
 
@@ -46,7 +49,7 @@ func parseResponse(res *http.Response) (*parsedMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	components := map[string]string{}
+	components := components{}
 	generateResSpecialtyComponents(res, components)
 	generateHeaderComponents(res.Header, components)
 
@@ -63,9 +66,10 @@ func validateMessageHeaders(header http.Header) error {
 	return nil
 }
 
-func generateHeaderComponents(headers http.Header, components map[string]string) {
+func generateHeaderComponents(headers http.Header, components components) {
 	for key, val := range headers {
-		components[strings.ToLower(key)] = foldFields(val)
+		k := strings.ToLower(key)
+		components[*fromHeaderName(k)] = foldFields(val)
 	}
 }
 
@@ -77,15 +81,19 @@ func foldFields(fields []string) string {
 	return ff
 }
 
-func generateReqSpecialtyComponents(req *http.Request, components map[string]string) {
-	components["@method"] = scMethod(req)
+func specialtyComponent(name, v string, components components) {
+	components[*fromHeaderName(name)] = v
+}
+
+func generateReqSpecialtyComponents(req *http.Request, components components) {
+	specialtyComponent("@method", scMethod(req), components)
 	theUrl := req.URL
-	components["@target-uri"] = scTargetUri(theUrl)
-	components["@path"] = scPath(theUrl)
-	components["@authority"] = scAuthority(req)
-	components["@scheme"] = scScheme(theUrl)
-	components["@request-target"] = scRequestTarget(theUrl)
-	components["@query"] = scQuery(theUrl)
+	specialtyComponent("@target-uri", scTargetUri(theUrl), components)
+	specialtyComponent("@path", scPath(theUrl), components)
+	specialtyComponent("@authority", scAuthority(req), components)
+	specialtyComponent("@scheme", scScheme(theUrl), components)
+	specialtyComponent("@request-target", scRequestTarget(theUrl), components)
+	specialtyComponent("@query", scQuery(theUrl), components)
 	// @request-response does not belong here
 }
 
@@ -121,8 +129,8 @@ func scMethod(req *http.Request) string {
 	return req.Method
 }
 
-func generateResSpecialtyComponents(res *http.Response, components map[string]string) {
-	components["@status"] = scStatus(res)
+func generateResSpecialtyComponents(res *http.Response, components components) {
+	specialtyComponent("@status", scStatus(res), components)
 }
 
 func scStatus(res *http.Response) string {

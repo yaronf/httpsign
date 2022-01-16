@@ -6,14 +6,13 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/dunglas/httpsfv"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 )
 
-func signMessage(config Config, signatureName string, signer Signer, parsedMessage parsedMessage,
-	fields []string) (sigInputHeader string, signature string, err error) {
+func signMessage(config *Config, signatureName string, signer Signer, parsedMessage parsedMessage,
+	fields Fields) (sigInputHeader string, signature string, err error) {
 	err = validateFields(fields)
 	if err != nil {
 		return "", "", err
@@ -31,10 +30,10 @@ func signMessage(config Config, signatureName string, signer Signer, parsedMessa
 	return sigInputHeader, signature, nil
 }
 
-func validateFields(fields []string) error {
+func validateFields(fields Fields) error {
 	for _, f := range fields {
-		if f != strings.ToLower(f) {
-			return fmt.Errorf("field \"%s\" is not lowercase", f)
+		if f.name != strings.ToLower(f.name) {
+			return fmt.Errorf("field \"%s\" is not lowercase", f.name)
 		}
 		// Note that using "signature" and "signature-input" is allowed
 	}
@@ -49,28 +48,32 @@ func generateSignature(name string, signer Signer, input string) (string, error)
 	return fmt.Sprintf("%s=:%s:", name, base64.StdEncoding.EncodeToString(raw)), nil // TODO
 }
 
-func generateSignatureInput(message parsedMessage, fields []string, params string) (string, error) {
+func generateSignatureInput(message parsedMessage, fields Fields, params string) (string, error) {
 	mf, err := matchFields(message.components, fields)
 	if err != nil {
 		return "", err
 	}
 	inp := ""
 	for _, c := range mf {
-		inp += fmt.Sprintf("\"%s\": %s\n", c.name, c.value)
+		f, err := c.f.asSignatureInput()
+		if err != nil {
+			return "", fmt.Errorf("could not marshal %v", c.f)
+		}
+		inp += fmt.Sprintf("%s: %s\n", f, c.v)
 	}
 	inp += fmt.Sprintf("\"%s\": %s", "@signature-params", params)
-	log.Println("inp:", "\n"+inp)
+	// log.Println("inp:", "\n"+inp)
 	return inp, nil
 }
 
-func generateSigParams(config Config, keyId, alg string, fields []string) string {
+func generateSigParams(config *Config, keyId, alg string, fields Fields) string {
 	var sp string
 	if len(fields) == 0 {
 		sp = "();"
 	} else {
-		sp = "(" + fmt.Sprintf("\"%s\"", fields[0])
+		sp = "(" + fmt.Sprintf("\"%s\"", fields[0].name)
 		for i := 1; i < len(fields); i++ {
-			sp += fmt.Sprintf(" \"%s\"", fields[i])
+			sp += fmt.Sprintf(" \"%s\"", fields[i].name)
 		}
 		sp += ");"
 	}
@@ -94,7 +97,7 @@ func generateSigParams(config Config, keyId, alg string, fields []string) string
 // SignRequest signs an HTTP request. You must supply a Signer structure, a Config configuration,
 // and a list of fields to be signed (all lowercase). Returns the Signature-Input and the Signature header values.
 //
-func SignRequest(config Config, signatureName string, signer Signer, req *http.Request, fields []string) (string, string, error) {
+func SignRequest(config *Config, signatureName string, signer Signer, req *http.Request, fields Fields) (string, string, error) {
 	if req == nil {
 		return "", "", fmt.Errorf("nil request")
 	}
@@ -109,7 +112,7 @@ func SignRequest(config Config, signatureName string, signer Signer, req *http.R
 // SignResponse signs an HTTP response. You must supply a Signer structure, a Config configuration,
 // and a list of fields to be signed (all lowercase). Returns the Signature-Input and the Signature header values.
 //
-func SignResponse(config Config, signatureName string, signer Signer, res *http.Response, fields []string) (string, string, error) {
+func SignResponse(config *Config, signatureName string, signer Signer, res *http.Response, fields Fields) (string, string, error) {
 	if res == nil {
 		return "", "", fmt.Errorf("nil response")
 	}
@@ -121,9 +124,9 @@ func SignResponse(config Config, signatureName string, signer Signer, res *http.
 	return signMessage(config, signatureName, signer, *parsedMessage, fields)
 }
 
-func addPseudoHeaders(message *parsedMessage, config Config) {
+func addPseudoHeaders(message *parsedMessage, config *Config) {
 	if config.requestResponse.name != "" {
-		message.components["@request-response"] = config.requestResponse.signature
+		message.components[*fromHeaderName("@request-response")] = config.requestResponse.signature
 		// TODO and what about the name?
 	}
 }
@@ -132,7 +135,7 @@ func addPseudoHeaders(message *parsedMessage, config Config) {
 // VerifyRequest verifies a signed HTTP request. You must supply a Verifier structure,
 // and a list of fields that are expected to be signed (all lowercase). Returns true if verification was successful.
 //
-func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, fields []string) (bool, error) {
+func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, fields Fields) (bool, error) {
 	if req == nil {
 		return false, fmt.Errorf("nil request")
 	}
@@ -147,7 +150,7 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, f
 // VerifyResponse verifies a signed HTTP response. You must supply a Verifier structure,
 // and a list of fields that are expected to be signed (all lowercase). Returns true if verification was successful.
 //
-func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, fields []string) (bool, error) {
+func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, fields Fields) (bool, error) {
 	if res == nil {
 		return false, fmt.Errorf("nil response")
 	}
@@ -158,17 +161,17 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response,
 	return verifyMessage(signatureName, verifier, *parsedMessage, fields)
 }
 
-func verifyMessage(name string, verifier Verifier, message parsedMessage, fields []string) (bool, error) {
-	wantSignatureInput, found := message.components["signature-input"]
+func verifyMessage(name string, verifier Verifier, message parsedMessage, fields Fields) (bool, error) {
+	wantSignatureInput, found := message.components[*fromHeaderName("signature-input")]
 	if !found {
 		return false, fmt.Errorf("missing \"signature-input\" header")
 	}
-	wantSignature, found := message.components["signature"]
+	wantSignature, found := message.components[*fromHeaderName("signature")]
 	if !found {
 		return false, fmt.Errorf("missing \"signature\" header")
 	}
-	delete(message.components, "signature-input")
-	delete(message.components, "signature")
+	delete(message.components, *fromHeaderName("signature-input"))
+	delete(message.components, *fromHeaderName("signature"))
 	err := validateFields(fields)
 	if err != nil {
 		return false, err
@@ -181,7 +184,7 @@ func verifyMessage(name string, verifier Verifier, message parsedMessage, fields
 	if err != nil {
 		return false, err
 	}
-	if !compareFields(psiSig.fields, fields) {
+	if !(psiSig.fields.contains(&fields)) {
 		return false, fmt.Errorf("actual signature does not cover all required fields")
 	}
 	// TODO: apply policy, e.g. are some sig parameters required
@@ -197,24 +200,10 @@ func verifySignature(verifier Verifier, input string, signature []byte) (bool, e
 	return verifier.verify([]byte(input), signature)
 }
 
-//  compareFields verify that all required fields are in seeFields (yes, this is O(n^2))
-func compareFields(seenFields []string, requiredFields []string) bool {
-outer:
-	for _, f1 := range requiredFields {
-		for _, f2 := range seenFields {
-			if f1 == f2 {
-				continue outer
-			}
-		}
-		return false
-	}
-	return true
-}
-
 type psiSignature struct {
 	signatureName string
 	origSigParams string
-	fields        []string
+	fields        Fields
 	params        map[string]interface{}
 }
 
@@ -241,13 +230,13 @@ func parseSignatureInput(input string, name string) (*psiSignature, error) {
 		if !ok {
 			return nil, fmt.Errorf("Signature-Input: signature %s does not have an inner list", name)
 		}
-		var f []string
-		for _, ff := range fieldsList.Items {
+		var f Fields
+		for _, ff := range fieldsList.Items { // TODO: parse item params as well
 			fname, ok := ff.Value.(string)
 			if !ok {
 				return nil, fmt.Errorf("Signature-Input: value is not a string")
 			}
-			f = append(f, fname)
+			f = append(f, *fromHeaderName(fname))
 		}
 		params := map[string]interface{}{}
 		ps := memberForName.(httpsfv.InnerList).Params // assertion already checked

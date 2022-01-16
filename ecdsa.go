@@ -53,7 +53,7 @@ func sigComponentLen(curve string) (int, int, error) {
 		lr = 32
 		ls = 32
 	default:
-		return 0, 0, fmt.Errorf("unknown curve \"curve\"")
+		return 0, 0, fmt.Errorf("unknown curve \"%s\"", curve)
 	}
 	return lr, ls, nil
 }

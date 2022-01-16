@@ -18,7 +18,7 @@ func TestConfig_SetSignCreated(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-		want   Config
+		want   *Config
 	}{
 		{
 			name: "happy path",
@@ -28,7 +28,7 @@ func TestConfig_SetSignCreated(t *testing.T) {
 				fakeCreated: 8,
 			},
 			args: args{b: true},
-			want: Config{
+			want: &Config{
 				signAlg:     false,
 				signCreated: true,
 				fakeCreated: 8,
