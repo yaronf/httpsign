@@ -11,4 +11,7 @@ godoc -url http://localhost:6060/lib/godoc/style.css > ./lib/godoc/style.css
 export pkg="httpsign"
 godoc -url http://localhost:6060/pkg/$pkg | tail -n +2 > $pkg.html
 
+# Munge file locations for GH Pages
+sed -i 's+/lib/godoc/+/httpsign/lib/godoc/+g' $pkg.html
+
 echo "Generated $pkg.html"
