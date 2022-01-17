@@ -16,6 +16,7 @@ jobs:
 
       - name: godoc
         run: |
+         go install golang.org/x/tools/...@latest
          mkdir docs
          cd docs
          ../gendoc.sh 
