@@ -3,7 +3,7 @@ name: Document Go Code
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   godoc:
