@@ -19,4 +19,13 @@ jobs:
          go install golang.org/x/tools/...@latest
          mkdir docs
          cd docs
-         ../gendoc.sh 
+         ../gendoc.sh
+
+      # Publish to GitHub Pages
+      - name: Publish
+        uses: JamesIves/github-pages-deploy-action@4.1.4
+        with:
+          branch: gh-pages # The branch the action should deploy to.
+          folder: docs # The folder the action should deploy.
+          target-folder: docs
+          clean: true # delete old files
