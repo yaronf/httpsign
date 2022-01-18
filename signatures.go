@@ -72,24 +72,7 @@ func generateSignatureInput(message parsedMessage, fields Fields, params string)
 }
 
 func generateSigParams(config *Config, keyId, alg string, fields Fields) (string, error) {
-	var sp string
-	if len(fields) == 0 {
-		sp = "();"
-	} else {
-		f, err := fields[0].asSignatureInput()
-		if err != nil {
-			return "", err
-		}
-		sp = "(" + fmt.Sprintf("%s", f)
-		for i := 1; i < len(fields); i++ {
-			f, err := fields[i].asSignatureInput()
-			if err != nil {
-				return "", err
-			}
-			sp += fmt.Sprintf(" %s", f)
-		}
-		sp += ");"
-	}
+	p := httpsfv.NewParams()
 	var createdTime int64
 	if config.fakeCreated != 0 {
 		createdTime = config.fakeCreated
@@ -97,13 +80,13 @@ func generateSigParams(config *Config, keyId, alg string, fields Fields) (string
 		createdTime = time.Now().Unix()
 	}
 	if config.signCreated {
-		sp += fmt.Sprintf("created=%d;", createdTime)
+		p.Add("created", createdTime)
 	}
 	if config.signAlg {
-		sp += fmt.Sprintf("alg=\"%s\";", alg)
+		p.Add("alg", alg)
 	}
-	sp += fmt.Sprintf("keyid=\"%s\"", keyId)
-	return sp, nil
+	p.Add("keyid", keyId)
+	return fields.asSignatureInput(p)
 }
 
 //

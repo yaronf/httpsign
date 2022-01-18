@@ -1,10 +1,13 @@
 package httpsign
 
-import "testing"
+import (
+	"github.com/dunglas/httpsfv"
+	"testing"
+)
 
 func TestFields_asSignatureInput(t *testing.T) {
 	type args struct {
-		ap AdditionalParams
+		p *httpsfv.Params
 	}
 	tests := []struct {
 		name    string
@@ -17,7 +20,7 @@ func TestFields_asSignatureInput(t *testing.T) {
 			name: "Just headers",
 			fs:   HeaderList([]string{"hdr1", "hdr2", "@Hdr3"}),
 			args: args{
-				ap: AdditionalParams{},
+				p: httpsfv.NewParams(),
 			},
 			want:    `("hdr1" "hdr2" "@hdr3")`,
 			wantErr: false,
@@ -31,7 +34,7 @@ func TestFields_asSignatureInput(t *testing.T) {
 				return *f
 			}(),
 			args: args{
-				ap: AdditionalParams{},
+				p: httpsfv.NewParams(),
 			},
 			want:    `("hdr-name" "@query-params";name="qparamname")`,
 			wantErr: false,
@@ -39,7 +42,7 @@ func TestFields_asSignatureInput(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.fs.asSignatureInput(tt.args.ap)
+			got, err := tt.fs.asSignatureInput(tt.args.p)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("asSignatureInput() error = %v, wantErr %v", err, tt.wantErr)
 				return

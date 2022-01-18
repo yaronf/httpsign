@@ -75,22 +75,6 @@ func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
 	return fs.addHeaderAndFlag(hdr, "key", k)
 }
 
-type AdditionalParams []param
-
-type param struct {
-	name, value string
-}
-
-func NewAdditionalParams() AdditionalParams {
-	return []param{}
-}
-
-func (ap *AdditionalParams) AddParam(name, value string) *AdditionalParams {
-	n := strings.ToLower(name) // but not the value!
-	*ap = append(*ap, param{n, value})
-	return ap
-}
-
 func (f field) asSignatureInput() (string, error) {
 	p := httpsfv.NewParams()
 	if f.flagName != "" {
@@ -104,7 +88,7 @@ func (f field) asSignatureInput() (string, error) {
 	return s, err
 }
 
-func (fs *Fields) asSignatureInput(ap AdditionalParams) (string, error) {
+func (fs *Fields) asSignatureInput(p *httpsfv.Params) (string, error) {
 	il := httpsfv.InnerList{
 		Items:  []httpsfv.Item{},
 		Params: httpsfv.NewParams(),
@@ -124,11 +108,7 @@ func (fs *Fields) asSignatureInput(ap AdditionalParams) (string, error) {
 			})
 		}
 	}
-	if len(ap) > 0 {
-		for _, p := range ap {
-			il.Params.Add(p.name, p.value)
-		}
-	}
+	il.Params = p
 	s, err := httpsfv.Marshal(il)
 	return s, err
 }
