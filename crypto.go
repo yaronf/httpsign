@@ -115,6 +115,9 @@ type Verifier struct {
 }
 
 func NewHMACSHA256Verifier(keyId string, key []byte) (*Verifier, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
 	if len(key) < 64 {
 		return nil, fmt.Errorf("key must be at least 64 bytes long")
 	}
@@ -126,6 +129,9 @@ func NewHMACSHA256Verifier(keyId string, key []byte) (*Verifier, error) {
 }
 
 func NewRSAVerifier(keyId string, key *rsa.PublicKey) (*Verifier, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
 	return &Verifier{
 		keyId: keyId,
 		key:   key,
@@ -134,6 +140,9 @@ func NewRSAVerifier(keyId string, key *rsa.PublicKey) (*Verifier, error) {
 }
 
 func NewRSAPSSVerifier(keyId string, key *rsa.PublicKey) (*Verifier, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
 	return &Verifier{
 		keyId: keyId,
 		key:   key,
@@ -142,6 +151,9 @@ func NewRSAPSSVerifier(keyId string, key *rsa.PublicKey) (*Verifier, error) {
 }
 
 func NewP256Verifier(keyId string, key *ecdsa.PublicKey) (*Verifier, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
 	return &Verifier{
 		keyId: keyId,
 		key:   key,

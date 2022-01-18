@@ -97,6 +97,9 @@ func SignRequest(config *Config, signatureName string, signer Signer, req *http.
 	if req == nil {
 		return "", "", fmt.Errorf("nil request")
 	}
+	if signatureName == "" {
+		return "", "", fmt.Errorf("empty signature name")
+	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
 		return "", "", err
@@ -111,6 +114,9 @@ func SignRequest(config *Config, signatureName string, signer Signer, req *http.
 func SignResponse(config *Config, signatureName string, signer Signer, res *http.Response, fields Fields) (string, string, error) {
 	if res == nil {
 		return "", "", fmt.Errorf("nil response")
+	}
+	if signatureName == "" {
+		return "", "", fmt.Errorf("empty signature name")
 	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
@@ -135,6 +141,9 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, f
 	if req == nil {
 		return false, fmt.Errorf("nil request")
 	}
+	if signatureName == "" {
+		return false, fmt.Errorf("empty signature name")
+	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
 		return false, err
@@ -149,6 +158,9 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, f
 func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, fields Fields) (bool, error) {
 	if res == nil {
 		return false, fmt.Errorf("nil response")
+	}
+	if signatureName == "" {
+		return false, fmt.Errorf("empty signature name")
 	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {

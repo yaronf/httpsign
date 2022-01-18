@@ -66,6 +66,20 @@ Signature: sig1=:ik+OtGmM/kFqENDf9Plm8AmPtqtC7C9a+zYSaxr58b/E6h81ghJS3PcH+m1asiM
 {"hello": "world"}
 `
 
+var httpreq1pssSelectiveBad = `POST /foo?param=value&pet=dog HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Content-Type: application/json
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+Cache-Control: max-age=60
+Cache-Control:    must-revalidate
+Content-Length: 18
+Signature-Input: sig1=("@authority" "content-type");created=1618884475;keyid="test-key-rsa-pss"
+Signature: sig1=:badbadik+OtGmM/kFqENDf9Plm8AmPtqtC7C9a+zYSaxr58b/E6h81ghJS3PcH+m1asiMp8yvccnO/RfaexnqanVB3C72WRNZN7skPTJmUVmoIeqZncdP2mlfxlLP6UbkrgYsk91NS6nwkKC6RRgLhBFqzP42oq8D2336OiQPDAo/04SxZt4Wx9nDGuy2SfZJUhsJqZyEWRk4204x7YEB3VxDAAlVgGt8ewilWbIKKTOKp3ymUeQIwptqYwv0l8mN404PPzRBTpB7+HpClyK4CNp+SVv46+6sHMfJU4taz10s/NoYRmYCGXyadzYYDj0BYnFdERB6NblI/AOWFGl5Axhhmjg==:
+
+{"hello": "world"}
+`
+
 var httpreq1pssFull = `POST /foo?param=value&pet=dog HTTP/1.1
 Host: example.com
 Date: Tue, 20 Apr 2021 02:07:56 GMT
@@ -110,6 +124,19 @@ var httpres2 = `HTTP/1.1 200 OK
 Date: Tue, 20 Apr 2021 02:07:56 GMT
 Content-Type: application/json
 Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+Content-Length: 18
+
+{"hello": "world"}
+`
+
+var httpreq3 = `POST /foo?param=value&pet=dog&pet=snake&bar=baz HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Content-Type: application/json
+@Method: GET
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+Cache-Control: max-age=60
+Cache-Control:    must-revalidate
 Content-Length: 18
 
 {"hello": "world"}
@@ -333,6 +360,108 @@ func TestSignRequest(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "sign request: nil request",
+			args: args{
+				config:        NewConfig().SignAlg(false).setFakeCreated(1618884475),
+				signatureName: "sig1",
+				signer: (func() Signer {
+					prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
+					if err != nil {
+						t.Errorf("cannot parse private key: %v", err)
+					}
+					signer, _ := NewRSAPSSSigner("test-key-rsa-pss", prvKey.(*rsa.PrivateKey))
+					return *signer
+				})(),
+				req:    nil,
+				fields: *NewFields(),
+			},
+			want:    "",
+			want1:   "",
+			wantErr: true,
+		},
+		{
+			name: "sign request: malicious request",
+			args: args{
+				config:        NewConfig().SignAlg(false).setFakeCreated(1618884475),
+				signatureName: "sig1",
+				signer:        makeRSAPSSSigner(t),
+				req:           readRequest(httpreq3),
+				fields:        *NewFields(),
+			},
+			want:    "",
+			want1:   "",
+			wantErr: true,
+		},
+		{
+			name: "sign request: empty sig name",
+			args: args{
+				config:        NewConfig().SignAlg(false).setFakeCreated(1618884475),
+				signatureName: "",
+				signer:        makeRSAPSSSigner(t),
+				req:           readRequest(httpreq1),
+				fields:        *NewFields(),
+			},
+			want:    "",
+			want1:   "",
+			wantErr: true,
+		},
+		{
+			name: "sign request: missing required field",
+			args: args{
+				config:        NewConfig().SignAlg(false).setFakeCreated(1618884475),
+				signatureName: "sig1",
+				signer:        makeRSAPSSSigner(t),
+				req:           readRequest(httpreq1),
+				fields:        *NewFields().AddHeaderName("Missing"),
+			},
+			want:    "",
+			want1:   "",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := SignRequest(tt.args.config, tt.args.signatureName, tt.args.signer, tt.args.req, tt.args.fields)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SignRequest() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("SignRequest() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("SignRequest() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func makeRSAPSSSigner(t *testing.T) Signer {
+	prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
+	if err != nil {
+		t.Errorf("cannot parse private key: %v", err)
+	}
+	signer, _ := NewRSAPSSSigner("test-key-rsa-pss", prvKey.(*rsa.PrivateKey))
+	return *signer
+}
+
+// Do not test for a particular signature: for non-deterministic methods
+func TestSignRequestDiscardSig(t *testing.T) {
+	type args struct {
+		config        *Config
+		signatureName string
+		signer        Signer
+		req           *http.Request
+		fields        Fields
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		want1   string
+		wantErr bool
+	}{
+		{
 			name: "test case B.2.1 (partial)",
 			args: args{
 				config:        NewConfig().SignAlg(false).setFakeCreated(1618884475),
@@ -552,6 +681,23 @@ func TestSignResponse(t *testing.T) {
 			want1:   "sig1=:5s7SCXZBsy7g/xqoFjVy+WWvWi4bb3G7bQoE+blEyz4=:",
 			wantErr: false,
 		},
+		{
+			name: "test response with HMAC: nil response",
+			args: args{
+				config:        NewConfig().setFakeCreated(1618889999),
+				signatureName: "sig1",
+				signer: (func() Signer {
+					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+					signer, _ := NewHMACSHA256Signer("test-shared-secret", key)
+					return *signer
+				})(),
+				res:    nil,
+				fields: HeaderList([]string{"@status", "date", "content-type"}),
+			},
+			want:    "",
+			want1:   "",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -587,16 +733,9 @@ func TestVerifyRequest(t *testing.T) {
 			name: "test case B.2.1",
 			args: args{
 				signatureName: "sig1",
-				verifier: (func() Verifier {
-					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
-					if err != nil {
-						t.Errorf("cannot parse public key: %v", err)
-					}
-					verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey)
-					return *verifier
-				})(),
-				req:    readRequest(httpreq1pssMinimal),
-				fields: *NewFields(),
+				verifier:      makeRSAVerifier(t),
+				req:           readRequest(httpreq1pssMinimal),
+				fields:        *NewFields(),
 			},
 			want:    true,
 			wantErr: false,
@@ -655,6 +794,28 @@ func TestVerifyRequest(t *testing.T) {
 			want:    true,
 			wantErr: false,
 		},
+		{
+			name: "verify bad sig (not base64)",
+			args: args{
+				signatureName: "sig1",
+				verifier:      makeRSAVerifier(t),
+				req:           readRequest(httpreq1pssSelectiveBad),
+				fields:        *NewFields(),
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "missing fields",
+			args: args{
+				signatureName: "sig1",
+				verifier:      makeRSAVerifier(t),
+				req:           readRequest(httpreq1pssMinimal),
+				fields:        *NewFields().AddQueryParam("missing"),
+			},
+			want:    false,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -668,4 +829,15 @@ func TestVerifyRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func makeRSAVerifier(t *testing.T) Verifier {
+	return (func() Verifier {
+		pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+		if err != nil {
+			t.Errorf("cannot parse public key: %v", err)
+		}
+		verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey)
+		return *verifier
+	})()
 }
