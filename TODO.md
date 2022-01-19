@@ -4,7 +4,6 @@
 * Check MUSTs and SHOULDs.
 * Add verification requirements, Sec. 3.2.1.
 * Fuzz tests.
-* Examples in the docs.
 
 # Draft comments
 *
