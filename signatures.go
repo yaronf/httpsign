@@ -93,7 +93,7 @@ func generateSigParams(config *Config, keyId, alg string, fields Fields) (string
 // SignRequest signs an HTTP request. You must supply a Signer structure, a Config configuration,
 // and a list of fields to be signed (all lowercase). Returns the Signature-Input and the Signature header values.
 //
-func SignRequest(config *Config, signatureName string, signer Signer, req *http.Request, fields Fields) (string, string, error) {
+func SignRequest(config *Config, signatureName string, signer Signer, req *http.Request, fields Fields) (signatureInput, signature string, err error) {
 	if req == nil {
 		return "", "", fmt.Errorf("nil request")
 	}
@@ -111,7 +111,7 @@ func SignRequest(config *Config, signatureName string, signer Signer, req *http.
 // SignResponse signs an HTTP response. You must supply a Signer structure, a Config configuration,
 // and a list of fields to be signed (all lowercase). Returns the Signature-Input and the Signature header values.
 //
-func SignResponse(config *Config, signatureName string, signer Signer, res *http.Response, fields Fields) (string, string, error) {
+func SignResponse(config *Config, signatureName string, signer Signer, res *http.Response, fields Fields) (signatureInput, signature string, err error) {
 	if res == nil {
 		return "", "", fmt.Errorf("nil response")
 	}
@@ -137,7 +137,7 @@ func addPseudoHeaders(message *parsedMessage, config *Config) {
 // VerifyRequest verifies a signed HTTP request. You must supply a Verifier structure,
 // and a list of fields that are expected to be signed (all lowercase). Returns true if verification was successful.
 //
-func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, fields Fields) (bool, error) {
+func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, fields Fields) (verified bool, err error) {
 	if req == nil {
 		return false, fmt.Errorf("nil request")
 	}
@@ -155,7 +155,7 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, f
 // VerifyResponse verifies a signed HTTP response. You must supply a Verifier structure,
 // and a list of fields that are expected to be signed (all lowercase). Returns true if verification was successful.
 //
-func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, fields Fields) (bool, error) {
+func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, fields Fields) (verified bool, err error) {
 	if res == nil {
 		return false, fmt.Errorf("nil response")
 	}

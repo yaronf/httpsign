@@ -69,7 +69,7 @@ func (fs *Fields) AddQueryParam(qp string) *Fields {
 	return fs
 }
 
-// AddDictHeader indicates that a specific instance of a header is to be signed
+// AddDictHeader indicates that a specific instance of a header is to be signed (TODO: unimplemented)
 func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
 	k := strings.ToLower(key)
 	return fs.addHeaderAndFlag(hdr, "key", k)
