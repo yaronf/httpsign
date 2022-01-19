@@ -2,6 +2,7 @@ package httpsign
 
 import (
 	"bufio"
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
@@ -325,6 +326,24 @@ func parseECPublicKeyFromPemStr(pemString string) (*ecdsa.PublicKey, error) {
 		return nil, err
 	}
 	return k.(*ecdsa.PublicKey), nil
+}
+
+func ExampleSignRequest() {
+	config := NewConfig().SignCreated(false) // SignCreated should be "true" to protect against replay attacks
+	signer, _ := NewHMACSHA256Signer("my-shared-secret", bytes.Repeat([]byte{0x77}, 64))
+	reqStr := `GET /foo HTTP/1.1
+Host: example.org
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Cache-Control: max-age=60
+
+`
+	req, _ := http.ReadRequest(bufio.NewReader(strings.NewReader(reqStr)))
+	fields := HeaderList([]string{"@authority", "date", "@method"})
+	signatureInput, signature, _ := SignRequest(config, "sig77", *signer, req, fields)
+	fmt.Printf("Signature-Input: %s\n", signatureInput)
+	fmt.Printf("Signature:       %s", signature)
+	// Output: Signature-Input: sig77=("@authority" "date" "@method");alg="hmac-sha256";keyid="my-shared-secret"
+	//Signature:       sig77=:3e9KqLP62NHfHY5OMG4036+U6tvBowZF35ALzTjpsf0=:
 }
 
 func TestSignRequest(t *testing.T) {
@@ -714,6 +733,23 @@ func TestSignResponse(t *testing.T) {
 			}
 		})
 	}
+}
+
+func ExampleVerifyRequest() {
+	verifier, _ := NewHMACSHA256Verifier("my-shared-secret", bytes.Repeat([]byte{0x77}, 64))
+	reqStr := `GET /foo HTTP/1.1
+Host: example.org
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Cache-Control: max-age=60
+Signature-Input: sig77=("@authority" "date" "@method");alg="hmac-sha256";keyid="my-shared-secret"
+Signature:       sig77=:3e9KqLP62NHfHY5OMG4036+U6tvBowZF35ALzTjpsf0=:
+
+`
+	req, _ := http.ReadRequest(bufio.NewReader(strings.NewReader(reqStr)))
+	fields := HeaderList([]string{"@authority", "date", "@method"})
+	verified, _ := VerifyRequest("sig77", *verifier, req, fields)
+	fmt.Printf("verified: %t", verified)
+	// Output: verified: true
 }
 
 func TestVerifyRequest(t *testing.T) {
