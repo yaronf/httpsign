@@ -10,6 +10,8 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 	type args struct {
 		keyId string
 		key   []byte
+		c     *SignConfig
+		f     Fields
 	}
 	tests := []struct {
 		name    string
@@ -22,11 +24,15 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 			args: args{
 				keyId: "key1",
 				key:   []byte(strings.Repeat("c", 64)),
+				c:     nil,
+				f:     Fields{},
 			},
 			want: &Signer{
-				keyId: "key1",
-				key:   []byte(strings.Repeat("c", 64)),
-				alg:   "hmac-sha256",
+				keyId:  "key1",
+				key:    []byte(strings.Repeat("c", 64)),
+				alg:    "hmac-sha256",
+				config: NewSignConfig(),
+				fields: Fields{},
 			},
 			wantErr: false,
 		},
@@ -42,7 +48,7 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewHMACSHA256Signer(tt.args.keyId, tt.args.key)
+			got, err := NewHMACSHA256Signer(tt.args.keyId, tt.args.key, tt.args.c, tt.args.f)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHMACSHA256Signer() error = %v, wantErr %v", err, tt.wantErr)
 				return

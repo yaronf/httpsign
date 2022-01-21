@@ -11,13 +11,13 @@ import (
 	"time"
 )
 
-func signMessage(config *Config, signatureName string, signer Signer, parsedMessage parsedMessage,
+func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage parsedMessage,
 	fields Fields) (sigInputHeader string, signature string, err error) {
 	err = validateFields(fields)
 	if err != nil {
 		return "", "", err
 	}
-	sigParams, err := generateSigParams(config, signer.keyId, signer.alg, fields)
+	sigParams, err := generateSigParams(&config, signer.keyId, signer.alg, fields)
 	if err != nil {
 		return "", "", err
 	}
@@ -71,7 +71,7 @@ func generateSignatureInput(message parsedMessage, fields Fields, params string)
 	return inp, nil
 }
 
-func generateSigParams(config *Config, keyId, alg string, fields Fields) (string, error) {
+func generateSigParams(config *SignConfig, keyId, alg string, fields Fields) (string, error) {
 	p := httpsfv.NewParams()
 	var createdTime int64
 	if config.fakeCreated != 0 {
@@ -90,10 +90,9 @@ func generateSigParams(config *Config, keyId, alg string, fields Fields) (string
 }
 
 //
-// SignRequest signs an HTTP request. You must supply a Signer structure, a Config configuration,
-// and a list of fields to be signed (all lowercase). Returns the Signature-Input and the Signature header values.
+// SignRequest signs an HTTP request. Returns the Signature-Input and the Signature header values.
 //
-func SignRequest(config *Config, signatureName string, signer Signer, req *http.Request, fields Fields) (signatureInput, signature string, err error) {
+func SignRequest(signatureName string, signer Signer, req *http.Request) (signatureInput, signature string, err error) {
 	if req == nil {
 		return "", "", fmt.Errorf("nil request")
 	}
@@ -104,14 +103,13 @@ func SignRequest(config *Config, signatureName string, signer Signer, req *http.
 	if err != nil {
 		return "", "", err
 	}
-	return signMessage(config, signatureName, signer, *parsedMessage, fields)
+	return signMessage(*signer.config, signatureName, signer, *parsedMessage, signer.fields)
 }
 
 //
-// SignResponse signs an HTTP response. You must supply a Signer structure, a Config configuration,
-// and a list of fields to be signed (all lowercase). Returns the Signature-Input and the Signature header values.
+// SignResponse signs an HTTP response. Returns the Signature-Input and the Signature header values.
 //
-func SignResponse(config *Config, signatureName string, signer Signer, res *http.Response, fields Fields) (signatureInput, signature string, err error) {
+func SignResponse(signatureName string, signer Signer, res *http.Response) (signatureInput, signature string, err error) {
 	if res == nil {
 		return "", "", fmt.Errorf("nil response")
 	}
@@ -122,11 +120,11 @@ func SignResponse(config *Config, signatureName string, signer Signer, res *http
 	if err != nil {
 		return "", "", err
 	}
-	addPseudoHeaders(parsedMessage, config)
-	return signMessage(config, signatureName, signer, *parsedMessage, fields)
+	addPseudoHeaders(parsedMessage, *signer.config)
+	return signMessage(*signer.config, signatureName, signer, *parsedMessage, signer.fields)
 }
 
-func addPseudoHeaders(message *parsedMessage, config *Config) {
+func addPseudoHeaders(message *parsedMessage, config SignConfig) {
 	if config.requestResponse.name != "" {
 		message.components[*fromHeaderName("@request-response")] = []string{config.requestResponse.signature}
 		// TODO and what about the name?
@@ -134,10 +132,9 @@ func addPseudoHeaders(message *parsedMessage, config *Config) {
 }
 
 //
-// VerifyRequest verifies a signed HTTP request. You must supply a Verifier structure,
-// and a list of fields that are expected to be signed (all lowercase). Returns true if verification was successful.
+// VerifyRequest verifies a signed HTTP request. Returns true if verification was successful.
 //
-func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, fields Fields) (verified bool, err error) {
+func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) (verified bool, err error) {
 	if req == nil {
 		return false, fmt.Errorf("nil request")
 	}
@@ -148,12 +145,11 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request, f
 	if err != nil {
 		return false, err
 	}
-	return verifyMessage(signatureName, verifier, *parsedMessage, fields)
+	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, verifier.f)
 }
 
 //
-// VerifyResponse verifies a signed HTTP response. You must supply a Verifier structure,
-// and a list of fields that are expected to be signed (all lowercase). Returns true if verification was successful.
+// VerifyResponse verifies a signed HTTP response. Returns true if verification was successful.
 //
 func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, fields Fields) (verified bool, err error) {
 	if res == nil {
@@ -166,10 +162,10 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response,
 	if err != nil {
 		return false, err
 	}
-	return verifyMessage(signatureName, verifier, *parsedMessage, fields)
+	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, fields)
 }
 
-func verifyMessage(name string, verifier Verifier, message parsedMessage, fields Fields) (bool, error) {
+func verifyMessage(_ VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) (bool, error) {
 	wsi, found := message.components[*fromHeaderName("signature-input")]
 	if !found {
 		return false, fmt.Errorf("missing \"signature-input\" header")
