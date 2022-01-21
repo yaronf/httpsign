@@ -3,9 +3,10 @@
 # Auxiliary files
 mkdir lib/
 mkdir lib/godoc
-godoc -url http://localhost:6060/lib/godoc/godocs.js > ./lib/godoc/godocs.js
-godoc -url http://localhost:6060/lib/godoc/jquery.js > ./lib/godoc/jquery.js
-godoc -url http://localhost:6060/lib/godoc/style.css > ./lib/godoc/style.css
+# godoc adds a header line to every file
+godoc -url http://localhost:6060/lib/godoc/godocs.js | tail -n +2 > ./lib/godoc/godocs.js
+godoc -url http://localhost:6060/lib/godoc/jquery.js | tail -n +2 > ./lib/godoc/jquery.js
+godoc -url http://localhost:6060/lib/godoc/style.css | tail -n +2 > ./lib/godoc/style.css
 
 # Generate the doc (the first line generated is garbage, removed with "tail")
 export suffix=httpsign
