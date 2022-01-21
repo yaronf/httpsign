@@ -8,10 +8,10 @@ godoc -url http://localhost:6060/lib/godoc/jquery.js > ./lib/godoc/jquery.js
 godoc -url http://localhost:6060/lib/godoc/style.css > ./lib/godoc/style.css
 
 # Generate the doc (the first line generated is garbage, removed with "tail")
-export pkg="httpsign"
+export pkg="github.com/yaronf/httpsign"
 godoc -url http://localhost:6060/pkg/$pkg | tail -n +2 > $pkg.html
 
 # Munge file locations for GH Pages
-sed -i 's+/lib/godoc/+/httpsign/lib/godoc/+g' $pkg.html
+sed -i "s+/lib/godoc/+/$pkg/lib/godoc/+g' $pkg.html
 
 echo "Generated $pkg.html"
