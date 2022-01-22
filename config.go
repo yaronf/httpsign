@@ -105,7 +105,7 @@ func (h *HandlerConfig) SetReqNotVerified(f func(w http.ResponseWriter, r *http.
 	return h
 }
 
-// SetFetchVerifier defines a callback that looks at the incoming request and provided
+// SetFetchVerifier defines a callback that looks at the incoming request and provides
 // a Verifier structure. In the simplest case, the signature name is a constant, and the key ID
 // and key value are fetched based on the sender's identity, which in turn is gleaned
 // from a header or query parameter.
@@ -114,6 +114,12 @@ func (h *HandlerConfig) SetFetchVerifier(f func(r *http.Request) (sigName string
 	return h
 }
 
+// SetFetchSigner defines a callback that looks at the incoming request and the response, just before it is sent,
+// and provides
+// a Signer structure. In the simplest case, the signature name is a constant, and the key ID
+// and key value are fetched based on the sender's identity. To simplify this logic,
+// it is recommended to use the request's ctx (Context) member
+// to store this information.
 func (h *HandlerConfig) SetFetchSigner(f func(res http.Response, r *http.Request) (sigName string, signer Signer)) *HandlerConfig {
 	h.fetchSigner = f
 	return h
