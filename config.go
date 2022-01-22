@@ -65,7 +65,6 @@ type HandlerConfig struct {
 	verifyRequest  bool
 	signResponse   bool
 	reqNotVerified func(w http.ResponseWriter, r *http.Request, err error)
-	sigFailed      func(w http.ResponseWriter, r *http.Request, err error)
 	fetchVerifier  func(r *http.Request) (sigName string, verifier Verifier)
 	fetchSigner    func(res http.Response, r *http.Request) (sigName string, signer Signer)
 }
@@ -79,7 +78,6 @@ func NewHandlerConfig() *HandlerConfig {
 		reqNotVerified: defaultReqNotVerified,
 		fetchVerifier:  nil,
 		fetchSigner:    nil,
-		sigFailed:      defaultSigFailed,
 	}
 }
 
@@ -98,11 +96,6 @@ func (h *HandlerConfig) SetSignResponse(b bool) *HandlerConfig {
 func defaultReqNotVerified(w http.ResponseWriter, _ *http.Request, err error) {
 	w.WriteHeader(http.StatusUnauthorized)
 	_, _ = fmt.Fprintln(w, "Could not verify request signature: "+err.Error())
-}
-
-func defaultSigFailed(w http.ResponseWriter, _ *http.Request, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	_, _ = fmt.Fprintln(w, "Failed to sign response: "+err.Error())
 }
 
 // SetReqNotVerified defines a callback to be called when a request fails to verify. The default

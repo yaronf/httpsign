@@ -29,6 +29,7 @@ func Test_VerifyAndSign(t *testing.T) {
 		w.WriteHeader(200)
 		w.Header().Set("bar", "baz")
 		fmt.Fprintln(w, "Hello, client")
+		fmt.Fprintln(w, "Hello again")
 	}
 	config := NewHandlerConfig().SetFetchVerifier(fetchVerifier).SetVerifyRequest(false).
 		SetFetchSigner(fetchSigner)
