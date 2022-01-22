@@ -1,5 +1,8 @@
 // Package httpsign signs HTTP requests and responses as defined in draft-ietf-httpbis-message-signatures.
 // See https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html.
+//
+// For client-side message signing, use SignRequest, VerifyResponse etc. For server-side operation,
+// VerifyAndSign installs a wrapper around a normal HTTP message handler.
 package httpsign
 
 import (
@@ -127,7 +130,7 @@ func SignResponse(signatureName string, signer Signer, res *http.Response) (sign
 func addPseudoHeaders(message *parsedMessage, config SignConfig) {
 	if config.requestResponse.name != "" {
 		message.components[*fromHeaderName("@request-response")] = []string{config.requestResponse.signature}
-		// TODO and what about the name?
+		// TODO and what about the name? (request-response)
 	}
 }
 
@@ -237,7 +240,7 @@ func parseSignatureInput(input string, name string) (*psiSignature, error) {
 			return nil, fmt.Errorf("Signature-Input: signature %s does not have an inner list", name)
 		}
 		var f Fields
-		for _, ff := range fieldsList.Items { // TODO: parse item params as well
+		for _, ff := range fieldsList.Items {
 			fname, ok := ff.Value.(string)
 			if !ok {
 				return nil, fmt.Errorf("Signature-Input: value is not a string")

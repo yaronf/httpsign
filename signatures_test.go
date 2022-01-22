@@ -422,7 +422,7 @@ func TestSignRequest(t *testing.T) {
 			name: "sign request: missing required field",
 			args: args{
 				signatureName: "sig1",
-				signer:        makeRSAPSSSigner(t, *NewSignConfig().SignAlg(false).setFakeCreated(1618884475), *NewFields().AddHeaderName("Missing")),
+				signer:        makeRSAPSSSigner(t, *NewSignConfig().SignAlg(false).setFakeCreated(1618884475), *NewFields().AddHeader("Missing")),
 				req:           readRequest(httpreq1),
 			},
 			want:    "",
@@ -634,7 +634,7 @@ func TestSignAndVerifyP256(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot read private key")
 	}
-	fields := *NewFields().AddHeaderName("@method").AddHeaderName("date").AddHeaderName("content-type").AddQueryParam("pet")
+	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
 	signer, _ := NewP256Signer("test-key-p256", prvKey, config, fields)
 	req := readRequest(httpreq2)
 	sigInput, sig, err := SignRequest(signatureName, *signer, req)

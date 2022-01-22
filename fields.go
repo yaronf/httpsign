@@ -37,8 +37,8 @@ func fromHeaderName(hdr string) *field {
 	return &f
 }
 
-// AddHeaderName appends a bare header name, e.g. "cache-control"
-func (fs *Fields) AddHeaderName(hdr string) *Fields {
+// AddHeader appends a bare header name, e.g. "cache-control"
+func (fs *Fields) AddHeader(hdr string) *Fields {
 	f := fromHeaderName(hdr)
 	*fs = append(*fs, *f)
 	return fs

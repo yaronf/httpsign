@@ -29,7 +29,7 @@ func TestFields_asSignatureInput(t *testing.T) {
 			name: "Misc components",
 			fs: func() Fields {
 				f := NewFields()
-				f.AddHeaderName("hdr-Name")
+				f.AddHeader("hdr-Name")
 				f.AddQueryParam("qparamname")
 				return *f
 			}(),

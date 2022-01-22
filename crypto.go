@@ -21,7 +21,7 @@ type Signer struct {
 }
 
 // NewHMACSHA256Signer returns a new Signer structure. Key must be at least 64 bytes long.
-// Field name must be all lowercase, config may be nil for a default configuration
+// Field names must be all lowercase, config may be nil for a default configuration.
 func NewHMACSHA256Signer(keyId string, key []byte, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil || len(key) < 64 {
 		return nil, fmt.Errorf("key must be at least 64 bytes long")
