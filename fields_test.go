@@ -22,7 +22,7 @@ func TestFields_asSignatureInput(t *testing.T) {
 			args: args{
 				p: httpsfv.NewParams(),
 			},
-			want:    `("hdr1" "hdr2" "@hdr3")`,
+			want:    `("hdr99" "hdr2" "@hdr3")`,
 			wantErr: false,
 		},
 		{
