@@ -6,5 +6,4 @@ HTTP Signatures, implementing [draft-ietf-httpbis-message-signatures-07](https:/
 * Dictionary Structured Field Members
 * Accept-Signature
 
-## Package Documentation
-The latest version is available [here](https://pkg.go.dev/github.com/yaronf/httpsign). 
+[![Go Reference](https://pkg.go.dev/badge/github.com/yaronf/httpsign.svg)](https://pkg.go.dev/github.com/yaronf/httpsign)
