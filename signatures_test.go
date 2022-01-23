@@ -549,7 +549,7 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, nil, fields) // default config
 	res := readResponse(httpres2)
-	sigInput, sig, err := SignResponse(signatureName, *signer, res)
+	sigInput, sig, _ := SignResponse(signatureName, *signer, res)
 
 	res2 := readResponse(httpres2)
 	res2.Header.Add("Signature", sig)
@@ -638,6 +638,9 @@ func TestSignAndVerifyP256(t *testing.T) {
 	signer, _ := NewP256Signer("test-key-p256", prvKey, config, fields)
 	req := readRequest(httpreq2)
 	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	if err != nil {
+		t.Errorf("signature failed: %v", err)
+	}
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
 	pubKey, err := parseECPublicKeyFromPemStr(p256PubKey)

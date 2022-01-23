@@ -20,7 +20,7 @@ func signMessage(config SignConfig, signatureName string, signer Signer, parsedM
 	if err != nil {
 		return "", "", err
 	}
-	sigParams, err := generateSigParams(&config, signer.keyId, signer.alg, fields)
+	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, fields)
 	if err != nil {
 		return "", "", err
 	}
@@ -74,7 +74,7 @@ func generateSignatureInput(message parsedMessage, fields Fields, params string)
 	return inp, nil
 }
 
-func generateSigParams(config *SignConfig, keyId, alg string, fields Fields) (string, error) {
+func generateSigParams(config *SignConfig, keyID, alg string, fields Fields) (string, error) {
 	p := httpsfv.NewParams()
 	var createdTime int64
 	if config.fakeCreated != 0 {
@@ -88,7 +88,7 @@ func generateSigParams(config *SignConfig, keyId, alg string, fields Fields) (st
 	if config.signAlg {
 		p.Add("alg", alg)
 	}
-	p.Add("keyid", keyId)
+	p.Add("keyid", keyID)
 	return fields.asSignatureInput(p)
 }
 

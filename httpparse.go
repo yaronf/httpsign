@@ -100,18 +100,18 @@ func specialtyComponent(name, v string, components components) {
 
 func generateReqSpecialtyComponents(req *http.Request, components components) {
 	specialtyComponent("@method", scMethod(req), components)
-	theUrl := req.URL
-	specialtyComponent("@target-uri", scTargetUri(theUrl), components)
-	specialtyComponent("@path", scPath(theUrl), components)
+	theURL := req.URL
+	specialtyComponent("@target-uri", scTargetURI(theURL), components)
+	specialtyComponent("@path", scPath(theURL), components)
 	specialtyComponent("@authority", scAuthority(req), components)
-	specialtyComponent("@scheme", scScheme(theUrl), components)
-	specialtyComponent("@request-target", scRequestTarget(theUrl), components)
-	specialtyComponent("@query", scQuery(theUrl), components)
+	specialtyComponent("@scheme", scScheme(theURL), components)
+	specialtyComponent("@request-target", scRequestTarget(theURL), components)
+	specialtyComponent("@query", scQuery(theURL), components)
 	// @request-response does not belong here
 }
 
-func scPath(theUrl *url.URL) string {
-	return theUrl.EscapedPath()
+func scPath(theURL *url.URL) string {
+	return theURL.EscapedPath()
 }
 
 func scQuery(url *url.URL) string {
@@ -125,16 +125,15 @@ func scRequestTarget(url *url.URL) string {
 func scScheme(url *url.URL) string {
 	if url.Scheme == "" {
 		return "http"
-	} else {
-		return url.Scheme
 	}
+	return url.Scheme
 }
 
 func scAuthority(req *http.Request) string {
 	return req.Host
 }
 
-func scTargetUri(url *url.URL) string {
+func scTargetURI(url *url.URL) string {
 	return url.String()
 }
 

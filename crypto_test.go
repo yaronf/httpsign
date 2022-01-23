@@ -8,7 +8,7 @@ import (
 
 func TestNewHMACSHA256Signer(t *testing.T) {
 	type args struct {
-		keyId string
+		keyID string
 		key   []byte
 		c     *SignConfig
 		f     Fields
@@ -22,13 +22,13 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 		{
 			name: "happy path",
 			args: args{
-				keyId: "key1",
+				keyID: "key1",
 				key:   []byte(strings.Repeat("c", 64)),
 				c:     nil,
 				f:     Fields{},
 			},
 			want: &Signer{
-				keyId:  "key1",
+				keyID:  "key1",
 				key:    []byte(strings.Repeat("c", 64)),
 				alg:    "hmac-sha256",
 				config: NewSignConfig(),
@@ -39,7 +39,7 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 		{
 			name: "key too short",
 			args: args{
-				keyId: "key2",
+				keyID: "key2",
 				key:   []byte("abc"),
 			},
 			want:    nil,
@@ -48,7 +48,7 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewHMACSHA256Signer(tt.args.keyId, tt.args.key, tt.args.c, tt.args.f)
+			got, err := NewHMACSHA256Signer(tt.args.keyID, tt.args.key, tt.args.c, tt.args.f)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHMACSHA256Signer() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -62,7 +62,7 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 
 func TestSigner_sign(t *testing.T) {
 	type fields struct {
-		keyId string
+		keyID string
 		key   interface{}
 		alg   string
 	}
@@ -79,7 +79,7 @@ func TestSigner_sign(t *testing.T) {
 		{
 			name: "happy path",
 			fields: fields{
-				keyId: "key1",
+				keyID: "key1",
 				key:   []byte(strings.Repeat("a", 64)),
 				alg:   "hmac-sha256",
 			},
@@ -92,7 +92,7 @@ func TestSigner_sign(t *testing.T) {
 		{
 			name: "bad alg",
 			fields: fields{
-				keyId: "key1",
+				keyID: "key1",
 				key:   []byte(strings.Repeat("a", 64)),
 				alg:   "hmac-sha999",
 			},
@@ -106,7 +106,7 @@ func TestSigner_sign(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Signer{
-				keyId: tt.fields.keyId,
+				keyID: tt.fields.keyID,
 				key:   tt.fields.key,
 				alg:   tt.fields.alg,
 			}

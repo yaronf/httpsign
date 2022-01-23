@@ -12,8 +12,9 @@ import (
 	"fmt"
 )
 
+// Signer includes a cryptographic key and configuration of what needs to be signed.
 type Signer struct {
-	keyId  string
+	keyID  string
 	key    interface{}
 	alg    string
 	config *SignConfig
@@ -22,18 +23,18 @@ type Signer struct {
 
 // NewHMACSHA256Signer returns a new Signer structure. Key must be at least 64 bytes long.
 // Field names must be all lowercase, config may be nil for a default configuration.
-func NewHMACSHA256Signer(keyId string, key []byte, config *SignConfig, fields Fields) (*Signer, error) {
+func NewHMACSHA256Signer(keyID string, key []byte, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil || len(key) < 64 {
 		return nil, fmt.Errorf("key must be at least 64 bytes long")
 	}
-	if keyId == "" {
-		return nil, fmt.Errorf("keyId must not be empty")
+	if keyID == "" {
+		return nil, fmt.Errorf("keyID must not be empty")
 	}
 	if config == nil {
 		config = NewSignConfig()
 	}
 	return &Signer{
-		keyId:  keyId,
+		keyID:  keyID,
 		key:    key,
 		alg:    "hmac-sha256",
 		config: config,
@@ -41,18 +42,20 @@ func NewHMACSHA256Signer(keyId string, key []byte, config *SignConfig, fields Fi
 	}, nil
 }
 
-func NewRSASigner(keyId string, key *rsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
+// NewRSASigner returns a new Signer structure. Key is an RSA private key.
+// Field names must be all lowercase, config may be nil for a default configuration.
+func NewRSASigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
-	if keyId == "" {
-		return nil, fmt.Errorf("keyId must not be empty")
+	if keyID == "" {
+		return nil, fmt.Errorf("keyID must not be empty")
 	}
 	if config == nil {
 		config = NewSignConfig()
 	}
 	return &Signer{
-		keyId:  keyId,
+		keyID:  keyID,
 		key:    key,
 		alg:    "rsa-v1_5-sha256",
 		config: config,
@@ -60,18 +63,20 @@ func NewRSASigner(keyId string, key *rsa.PrivateKey, config *SignConfig, fields 
 	}, nil
 }
 
-func NewRSAPSSSigner(keyId string, key *rsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
+// NewRSAPSSSigner returns a new Signer structure. Key is an RSA private key.
+// Field names must be all lowercase, config may be nil for a default configuration.
+func NewRSAPSSSigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
-	if keyId == "" {
-		return nil, fmt.Errorf("keyId must not be empty")
+	if keyID == "" {
+		return nil, fmt.Errorf("keyID must not be empty")
 	}
 	if config == nil {
 		config = NewSignConfig()
 	}
 	return &Signer{
-		keyId:  keyId,
+		keyID:  keyID,
 		key:    key,
 		alg:    "rsa-pss-sha512",
 		config: config,
@@ -79,18 +84,20 @@ func NewRSAPSSSigner(keyId string, key *rsa.PrivateKey, config *SignConfig, fiel
 	}, nil
 }
 
-func NewP256Signer(keyId string, key *ecdsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
+// NewP256Signer returns a new Signer structure. Key is an elliptic curve P-256 private key.
+// Field names must be all lowercase, config may be nil for a default configuration.
+func NewP256Signer(keyID string, key *ecdsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
-	if keyId == "" {
-		return nil, fmt.Errorf("keyId must not be empty")
+	if keyID == "" {
+		return nil, fmt.Errorf("keyID must not be empty")
 	}
 	if config == nil {
 		config = NewSignConfig()
 	}
 	return &Signer{
-		keyId:  keyId,
+		keyID:  keyID,
 		key:    key,
 		alg:    "ecdsa-p256-sha256",
 		config: config,
@@ -126,8 +133,9 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 	}
 }
 
+// Verifier includes a cryptographic key (typically a public key) and configuration of what needs to be verified.
 type Verifier struct {
-	keyId string
+	keyID string
 	key   interface{}
 	alg   string
 	c     *VerifyConfig
@@ -136,7 +144,7 @@ type Verifier struct {
 
 // NewHMACSHA256Verifier generates a new verifier for HMAC-SHA256 signatures. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
-func NewHMACSHA256Verifier(keyId string, key []byte, config *VerifyConfig, fields Fields) (*Verifier, error) {
+func NewHMACSHA256Verifier(keyID string, key []byte, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
@@ -147,7 +155,7 @@ func NewHMACSHA256Verifier(keyId string, key []byte, config *VerifyConfig, field
 		config = NewVerifyConfig()
 	}
 	return &Verifier{
-		keyId: keyId,
+		keyID: keyID,
 		key:   key,
 		alg:   "hmac-sha256",
 		c:     config,
@@ -155,7 +163,9 @@ func NewHMACSHA256Verifier(keyId string, key []byte, config *VerifyConfig, field
 	}, nil
 }
 
-func NewRSAVerifier(keyId string, key *rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
+// NewRSAVerifier generates a new verifier for RSA signatures. Set config to nil for a default configuration.
+// Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
+func NewRSAVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
@@ -163,7 +173,7 @@ func NewRSAVerifier(keyId string, key *rsa.PublicKey, config *VerifyConfig, fiel
 		config = NewVerifyConfig()
 	}
 	return &Verifier{
-		keyId: keyId,
+		keyID: keyID,
 		key:   key,
 		alg:   "rsa-v1_5-sha256",
 		c:     config,
@@ -171,7 +181,9 @@ func NewRSAVerifier(keyId string, key *rsa.PublicKey, config *VerifyConfig, fiel
 	}, nil
 }
 
-func NewRSAPSSVerifier(keyId string, key *rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
+// NewRSAPSSVerifier generates a new verifier for RSA-PSS signatures. Set config to nil for a default configuration.
+// Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
+func NewRSAPSSVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
@@ -179,7 +191,7 @@ func NewRSAPSSVerifier(keyId string, key *rsa.PublicKey, config *VerifyConfig, f
 		config = NewVerifyConfig()
 	}
 	return &Verifier{
-		keyId: keyId,
+		keyID: keyID,
 		key:   key,
 		alg:   "rsa-pss-sha512",
 		c:     config,
@@ -187,7 +199,9 @@ func NewRSAPSSVerifier(keyId string, key *rsa.PublicKey, config *VerifyConfig, f
 	}, nil
 }
 
-func NewP256Verifier(keyId string, key *ecdsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
+// NewP256Verifier generates a new verifier for ECDSA (P-256) signatures. Set config to nil for a default configuration.
+// Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
+func NewP256Verifier(keyID string, key *ecdsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
@@ -195,7 +209,7 @@ func NewP256Verifier(keyId string, key *ecdsa.PublicKey, config *VerifyConfig, f
 		config = NewVerifyConfig()
 	}
 	return &Verifier{
-		keyId: keyId,
+		keyID: keyID,
 		key:   key,
 		alg:   "ecdsa-p256-sha256",
 		c:     config,

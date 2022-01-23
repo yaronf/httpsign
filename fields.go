@@ -113,11 +113,11 @@ func (fs *Fields) asSignatureInput(p *httpsfv.Params) (string, error) {
 	return s, err
 }
 
-//  compareFields verify that all required fields are in seenFields (yes, this is O(n^2))
-func (seenFields *Fields) contains(requiredFields *Fields) bool {
+//  contains verifies that all required fields are in the given list of fields (yes, this is O(n^2))
+func (fs *Fields) contains(requiredFields *Fields) bool {
 outer:
 	for _, f1 := range *requiredFields {
-		for _, f2 := range *seenFields {
+		for _, f2 := range *fs {
 			if f1 == f2 {
 				continue outer
 			}
