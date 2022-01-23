@@ -2,7 +2,7 @@
 // See https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html.
 //
 // For client-side message signing, use SignRequest, VerifyResponse etc. For server-side operation,
-// VerifyAndSign installs a wrapper around a normal HTTP message handler.
+// WrapHandler installs a wrapper around a normal HTTP message handler.
 package httpsign
 
 import (
@@ -211,7 +211,7 @@ func messageKeyID(signatureName string, parsedMessage parsedMessage) (string, er
 //
 // VerifyResponse verifies a signed HTTP response. Returns true if verification was successful.
 //
-func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, fields Fields) (verified bool, err error) {
+func VerifyResponse(signatureName string, verifier Verifier, res *http.Response) (verified bool, err error) {
 	if res == nil {
 		return false, fmt.Errorf("nil response")
 	}
@@ -222,7 +222,7 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response,
 	if err != nil {
 		return false, err
 	}
-	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, fields)
+	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, verifier.f)
 }
 
 func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) (bool, error) {
@@ -307,7 +307,11 @@ func applyVerificationPolicy(psi *psiSignature, config VerifyConfig) error {
 }
 
 func verifySignature(verifier Verifier, input string, signature []byte) (bool, error) {
-	return verifier.verify([]byte(input), signature)
+	verified, err := verifier.verify([]byte(input), signature)
+	if !verified && err == nil {
+		err = fmt.Errorf("bad signature, check key or signature value")
+	}
+	return verified, err
 }
 
 type psiSignature struct {

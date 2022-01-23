@@ -11,7 +11,6 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -265,7 +264,7 @@ var oidRsaPss = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 10}
 func loadRSAPSSPrivateKey(pemEncodedPK string) (crypto.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(pemEncodedPK))
 	if block == nil {
-		return nil, errors.New("empty block")
+		return nil, fmt.Errorf("empty block")
 	}
 
 	// taken from crypto/x509/pkcs8.go
@@ -287,7 +286,7 @@ func loadRSAPSSPrivateKey(pemEncodedPK string) (crypto.PrivateKey, error) {
 		}
 	}
 
-	return nil, errors.New("unknown algorithm")
+	return nil, fmt.Errorf("unknown algorithm")
 }
 
 // This will work for PSS when crypto/x509 implements PKCS8 RSA-PSS keys
@@ -569,7 +568,7 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
-	verified, err := VerifyResponse(signatureName, *verifier, res2, fields)
+	verified, err := VerifyResponse(signatureName, *verifier, res2)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
 	}
@@ -639,7 +638,7 @@ func TestSignAndVerifyRSA(t *testing.T) {
 }
 
 func TestSignAndVerifyP256(t *testing.T) {
-	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+	config := NewSignConfig().setFakeCreated(1618884475)
 	signatureName := "sig1"
 	prvKey, err := parseECPrivateKeyFromPemStr(p256PrvKey)
 	if err != nil {
@@ -658,7 +657,7 @@ func TestSignAndVerifyP256(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot read public key: %v", err)
 	}
-	verifier, err := NewP256Verifier("test-key-p256", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewP256Verifier("test-key-p256", pubKey, NewVerifyConfig().SetVerifyCreated(false).SetVerifyAlg(true), fields)
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}

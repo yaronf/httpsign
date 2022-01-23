@@ -1,17 +1,16 @@
 package httpsign
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 )
 
-// VerifyAndSign wraps a server's HTTP request handler so that the incoming request is verified
+// WrapHandler wraps a server's HTTP request handler so that the incoming request is verified
 // and the response is signed. Both operations are optional. If config is nil, the default
 // configuration is applied: requests are verified and responses are signed.
-func VerifyAndSign(h http.Handler, config *HandlerConfig) http.Handler {
+func WrapHandler(h http.Handler, config *HandlerConfig) http.Handler {
 	if config == nil {
 		config = NewHandlerConfig()
 	}
@@ -61,11 +60,15 @@ func signServerResponse(wrapped *wrappedResponseWriter, r *http.Request, config 
 		TLS:              nil,
 	}
 	if config.fetchSigner == nil {
-		sigFailed(wrapped.ResponseWriter, r, errors.New("could not fetch a signer"))
+		sigFailed(wrapped.ResponseWriter, r, fmt.Errorf("could not fetch a signer"))
 		return false
 	}
 	sigName, signer := config.fetchSigner(response, r)
-	signatureInput, signature, err := SignResponse(sigName, signer, &response)
+	if signer == nil {
+		sigFailed(wrapped.ResponseWriter, r, fmt.Errorf("could not fetch a signer, check key ID"))
+		return false
+	}
+	signatureInput, signature, err := SignResponse(sigName, *signer, &response)
 	if err != nil {
 		sigFailed(wrapped.ResponseWriter, r, fmt.Errorf("failed to sign the response: %w", err))
 		return false
@@ -123,11 +126,15 @@ func (w *wrappedResponseWriter) WriteHeader(code int) {
 
 func verifyServerRequest(w http.ResponseWriter, r *http.Request, config *HandlerConfig) bool {
 	if config.fetchVerifier == nil {
-		config.reqNotVerified(w, r, errors.New("could not fetch a verifier"))
+		config.reqNotVerified(w, r, fmt.Errorf("could not fetch a verifier"))
 		return false
 	}
 	sigName, verifier := config.fetchVerifier(r)
-	verified, err := VerifyRequest(sigName, verifier, r)
+	if verifier == nil {
+		config.reqNotVerified(w, r, fmt.Errorf("could not fetch a verifier, check key ID"))
+		return false
+	}
+	verified, err := VerifyRequest(sigName, *verifier, r)
 	if !verified {
 		config.reqNotVerified(w, r, err)
 		return false

@@ -109,7 +109,7 @@ func (v *VerifyConfig) SetVerifyCreated(verifyCreated bool) *VerifyConfig {
 // SetVerifyAlg indicates that the "alg" parameter exist. Use SetAllowedAlgs to specify allowed values.
 // Default: false.
 func (v *VerifyConfig) SetVerifyAlg(verifyAlg bool) *VerifyConfig {
-	v.verifyCreated = verifyAlg
+	v.verifyAlg = verifyAlg
 	return v
 }
 
@@ -129,8 +129,8 @@ type HandlerConfig struct {
 	verifyRequest  bool
 	signResponse   bool
 	reqNotVerified func(w http.ResponseWriter, r *http.Request, err error)
-	fetchVerifier  func(r *http.Request) (sigName string, verifier Verifier)
-	fetchSigner    func(res http.Response, r *http.Request) (sigName string, signer Signer)
+	fetchVerifier  func(r *http.Request) (sigName string, verifier *Verifier)
+	fetchSigner    func(res http.Response, r *http.Request) (sigName string, signer *Signer)
 }
 
 // NewHandlerConfig generates a default configuration. When verification or respectively,
@@ -159,6 +159,9 @@ func (h *HandlerConfig) SetSignResponse(b bool) *HandlerConfig {
 
 func defaultReqNotVerified(w http.ResponseWriter, _ *http.Request, err error) {
 	w.WriteHeader(http.StatusUnauthorized)
+	if err == nil { // should not happen
+		_, _ = fmt.Fprintf(w, "Unknown error")
+	}
 	_, _ = fmt.Fprintln(w, "Could not verify request signature: "+err.Error())
 }
 
@@ -172,8 +175,8 @@ func (h *HandlerConfig) SetReqNotVerified(f func(w http.ResponseWriter, r *http.
 // SetFetchVerifier defines a callback that looks at the incoming request and provides
 // a Verifier structure. In the simplest case, the signature name is a constant, and the key ID
 // and key value are fetched based on the sender's identity, which in turn is gleaned
-// from a header or query parameter.
-func (h *HandlerConfig) SetFetchVerifier(f func(r *http.Request) (sigName string, verifier Verifier)) *HandlerConfig {
+// from a header or query parameter. If a verifier cannot be determined, the function should return verifier as nil.
+func (h *HandlerConfig) SetFetchVerifier(f func(r *http.Request) (sigName string, verifier *Verifier)) *HandlerConfig {
 	h.fetchVerifier = f
 	return h
 }
@@ -183,8 +186,8 @@ func (h *HandlerConfig) SetFetchVerifier(f func(r *http.Request) (sigName string
 // a Signer structure. In the simplest case, the signature name is a constant, and the key ID
 // and key value are fetched based on the sender's identity. To simplify this logic,
 // it is recommended to use the request's ctx (Context) member
-// to store this information.
-func (h *HandlerConfig) SetFetchSigner(f func(res http.Response, r *http.Request) (sigName string, signer Signer)) *HandlerConfig {
+// to store this information. If a signer cannot be determined, the function should return signer as nil.
+func (h *HandlerConfig) SetFetchSigner(f func(res http.Response, r *http.Request) (sigName string, signer *Signer)) *HandlerConfig {
 	h.fetchSigner = f
 	return h
 }
