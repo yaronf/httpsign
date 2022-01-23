@@ -7,4 +7,4 @@ HTTP Signatures, implementing [draft-ietf-httpbis-message-signatures-07](https:/
 * Accept-Signature
 
 ## Package Documentation
-The latest version is available [here](https://www.sheffer.org/httpsign/httpsign.html). 
+The latest version is available [here](https://pkg.go.dev/github.com/yaronf/httpsign). 
