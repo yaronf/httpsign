@@ -51,7 +51,7 @@ func generateSignature(name string, signer Signer, input string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s=:%s:", name, base64.StdEncoding.EncodeToString(raw)), nil // TODO use httpsfv
+	return fmt.Sprintf("%s=:%s:", name, base64.StdEncoding.EncodeToString(raw)), nil
 }
 
 func generateSignatureInput(message parsedMessage, fields Fields, params string) (string, error) {
@@ -84,6 +84,12 @@ func generateSigParams(config *SignConfig, keyID, alg string, fields Fields) (st
 	}
 	if config.signCreated {
 		p.Add("created", createdTime)
+	}
+	if config.expires != 0 {
+		p.Add("expires", config.expires)
+	}
+	if config.nonce != "" {
+		p.Add("nonce", config.nonce)
 	}
 	if config.signAlg {
 		p.Add("alg", alg)
@@ -151,6 +157,57 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) (
 	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, verifier.f)
 }
 
+// RequestKeyID parses a signed request and returns the key ID used in the given signature.
+func RequestKeyID(signatureName string, req *http.Request) (string, error) {
+	if req == nil {
+		return "", fmt.Errorf("nil request")
+	}
+	if signatureName == "" {
+		return "", fmt.Errorf("empty signature name")
+	}
+	parsedMessage, err := parseRequest(req)
+	if err != nil {
+		return "", err
+	}
+	return messageKeyID(signatureName, *parsedMessage)
+}
+
+// ResponseKeyID parses a signed response and returns the key ID used in the given signature.
+func ResponseKeyID(signatureName string, res *http.Response) (string, error) {
+	if res == nil {
+		return "", fmt.Errorf("nil response")
+	}
+	if signatureName == "" {
+		return "", fmt.Errorf("empty signature name")
+	}
+	parsedMessage, err := parseResponse(res)
+	if err != nil {
+		return "", err
+	}
+	return messageKeyID(signatureName, *parsedMessage)
+}
+
+func messageKeyID(signatureName string, parsedMessage parsedMessage) (string, error) {
+	si, found := parsedMessage.components[*fromHeaderName("signature-input")]
+	if !found {
+		return "", fmt.Errorf("missing \"signature-input\" header")
+	}
+	signatureInput := si[0]
+	psi, err := parseSignatureInput(signatureInput, signatureName)
+	if err != nil {
+		return "", err
+	}
+	keyIDParam, ok := psi.params["keyid"]
+	if !ok {
+		return "", fmt.Errorf("missing \"keyid\" parameter")
+	}
+	keyID, ok := keyIDParam.(string)
+	if !ok {
+		return "", fmt.Errorf("malformed \"keyid\" parameter")
+	}
+	return keyID, nil
+}
+
 //
 // VerifyResponse verifies a signed HTTP response. Returns true if verification was successful.
 //
@@ -168,7 +225,7 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response,
 	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, fields)
 }
 
-func verifyMessage(_ VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) (bool, error) {
+func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) (bool, error) {
 	wsi, found := message.components[*fromHeaderName("signature-input")]
 	if !found {
 		return false, fmt.Errorf("missing \"signature-input\" header")
@@ -196,13 +253,57 @@ func verifyMessage(_ VerifyConfig, name string, verifier Verifier, message parse
 	if !(psiSig.fields.contains(&fields)) {
 		return false, fmt.Errorf("actual signature does not cover all required fields")
 	}
-	// TODO: apply policy, e.g. are some sig parameters required
+	err = applyVerificationPolicy(psiSig, config)
+	if err != nil {
+		return false, err
+	}
 	signatureInput, err := generateSignatureInput(message, psiSig.fields, psiSig.origSigParams)
 	if err != nil {
 		return false, err
 	}
 	verified, err := verifySignature(verifier, signatureInput, wantSigRaw)
 	return verified, err
+}
+
+func applyVerificationPolicy(psi *psiSignature, config VerifyConfig) error {
+	if config.verifyCreated {
+		now := time.Now()
+		createdParam, ok := psi.params["created"]
+		if !ok {
+			return fmt.Errorf("missing \"created\" parameter")
+		}
+		created, ok := createdParam.(int64)
+		if !ok {
+			return fmt.Errorf("malformed \"created\" parameter")
+		}
+		createdTime := time.Unix(created, 0)
+		if createdTime.After(now.Add(config.notNewerThan)) {
+			return fmt.Errorf("message appears to be too new, check for clock skew")
+		}
+		if createdTime.Add(config.notOlderThan).Before(now) {
+			return fmt.Errorf("message is too old, check for replay")
+		}
+	}
+	if config.verifyAlg && len(config.allowedAlgs) > 0 {
+		algParam, ok := psi.params["alg"]
+		if !ok {
+			return fmt.Errorf("missing \"alg\" parameter")
+		}
+		alg, ok := algParam.(string)
+		if !ok {
+			return fmt.Errorf("malformed \"alg\" parameter")
+		}
+		var algFound = false
+		for _, a := range config.allowedAlgs {
+			if a == alg {
+				algFound = true
+			}
+		}
+		if !algFound {
+			return fmt.Errorf("\"alg\" parameter not allowed by policy")
+		}
+	}
+	return nil
 }
 
 func verifySignature(verifier Verifier, input string, signature []byte) (bool, error) {

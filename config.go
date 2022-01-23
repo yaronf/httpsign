@@ -3,6 +3,7 @@ package httpsign
 import (
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // SignConfig contains additional configuration for the signer.
@@ -10,6 +11,8 @@ type SignConfig struct {
 	signAlg         bool
 	signCreated     bool
 	fakeCreated     int64
+	expires         int64
+	nonce           string
 	requestResponse struct{ name, signature string }
 }
 
@@ -19,6 +22,8 @@ func NewSignConfig() *SignConfig {
 		signAlg:     true,
 		signCreated: true,
 		fakeCreated: 0,
+		expires:     0,
+		nonce:       "",
 	}
 }
 
@@ -41,6 +46,20 @@ func (c *SignConfig) setFakeCreated(ts int64) *SignConfig {
 	return c
 }
 
+// setExpires adds an "expires" parameter containing an expiration deadline, as Unix time.
+// Default: 0 (do not add the parameter)
+func (c *SignConfig) setExpires(expires int64) *SignConfig {
+	c.expires = expires
+	return c
+}
+
+// setNonce adds a "nonce" string parameter whose content should be unique per signed message.
+// Default: empty string (do not add the parameter)
+func (c *SignConfig) setNonce(nonce string) *SignConfig {
+	c.nonce = nonce
+	return c
+}
+
 // SetRequestResponse allows the server to indicate signature name and signature that
 // it had received from a client and include it in the signature input.
 func (c *SignConfig) SetRequestResponse(name, signature string) *SignConfig {
@@ -51,12 +70,57 @@ func (c *SignConfig) SetRequestResponse(name, signature string) *SignConfig {
 
 // VerifyConfig contains additional configuration for the verifier.
 type VerifyConfig struct {
+	verifyCreated bool
+	notNewerThan  time.Duration
+	notOlderThan  time.Duration
+	verifyAlg     bool
+	allowedAlgs   []string
+}
+
+// SetAllowedAlgs defines what are the allowed values of the "alg" parameter.
+// This is useful if the actual algorithm used in verification is taken from the message - not a recommended practice.
+// Default: all supported asymmetric algorithms.
+func (v *VerifyConfig) SetAllowedAlgs(allowedAlgs []string) *VerifyConfig {
+	v.allowedAlgs = allowedAlgs
+	return v
+}
+
+// SetNotNewerThan sets the window for messages that appear to be newer than the current time,
+// which can only happen if clocks are out of sync. Default: 1,000 ms.
+func (v *VerifyConfig) SetNotNewerThan(notNewerThan time.Duration) *VerifyConfig {
+	v.notNewerThan = notNewerThan
+	return v
+}
+
+// SetNotOlderThan sets the window for messages that are older than the current time,
+// because of network latency. Default: 10,000 ms.
+func (v *VerifyConfig) SetNotOlderThan(notOlderThan time.Duration) *VerifyConfig {
+	v.notOlderThan = notOlderThan
+	return v
+}
+
+// SetVerifyCreated indicates that the "created" parameter must be within some time window,
+// defined by NotNewerThan and NotOlderThan. Default: true.
+func (v *VerifyConfig) SetVerifyCreated(verifyCreated bool) *VerifyConfig {
+	v.verifyCreated = verifyCreated
+	return v
+}
+
+// SetVerifyAlg indicates that the "alg" parameter exist. Use SetAllowedAlgs to specify allowed values.
+// Default: false.
+func (v *VerifyConfig) SetVerifyAlg(verifyAlg bool) *VerifyConfig {
+	v.verifyCreated = verifyAlg
+	return v
 }
 
 // NewVerifyConfig generates a default configuration.
 func NewVerifyConfig() *VerifyConfig {
 	return &VerifyConfig{
-		// TODO populate VerifyConfig
+		verifyCreated: true,
+		notNewerThan:  1_000 * time.Millisecond,
+		notOlderThan:  10_000 * time.Millisecond,
+		verifyAlg:     false,
+		allowedAlgs:   []string{"rsa-v1_5-sha256", "rsa-pss-sha512", "ecdsa-p256-sha256"},
 	}
 }
 

@@ -143,6 +143,17 @@ Content-Length: 18
 {"hello": "world"}
 `
 
+var httpres3 = `HTTP/1.1 200 OK
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Content-Type: application/json
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+Signature: sig7=:n8RKXkj0iseWDmC6PNSQ1GX2R9650v+lhbb6rTGoSrSSx18zmn6fPOtBx48/WffYLO0n1RHHf9scvNGAgGq52Q==:
+Signature-Input: sig7=("content-type" "digest" "content-length");keyid="my-key"
+Content-Length: 18
+
+{"hello": "world"}
+`
+
 var rsaPubKey = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyD6Hrh5mV16s/jQngCF1
 IfpzLuJTraeqJFlNESsvbeNMcA4dQjU/LMX2XA3vyF7nOyleTisdmzFZb9TLoC1H
@@ -530,7 +541,7 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig(), fields)
+	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
@@ -584,7 +595,7 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot read public key: %v", err)
 	}
-	verifier, err := NewRSAPSSVerifier("test-key-rsa-pss", pubKey, NewVerifyConfig(), fields)
+	verifier, err := NewRSAPSSVerifier("test-key-rsa-pss", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
@@ -614,7 +625,7 @@ func TestSignAndVerifyRSA(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot read public key: %v", err)
 	}
-	verifier, err := NewRSAVerifier("test-key-rsa", pubKey, nil, fields)
+	verifier, err := NewRSAVerifier("test-key-rsa", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
@@ -647,7 +658,7 @@ func TestSignAndVerifyP256(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot read public key: %v", err)
 	}
-	verifier, err := NewP256Verifier("test-key-p256", pubKey, nil, fields)
+	verifier, err := NewP256Verifier("test-key-p256", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
@@ -722,7 +733,8 @@ func TestSignResponse(t *testing.T) {
 }
 
 func ExampleVerifyRequest() {
-	verifier, _ := NewHMACSHA256Verifier("my-shared-secret", bytes.Repeat([]byte{0x77}, 64), nil,
+	config := NewVerifyConfig().SetVerifyCreated(false) // for testing only
+	verifier, _ := NewHMACSHA256Verifier("my-shared-secret", bytes.Repeat([]byte{0x77}, 64), config,
 		HeaderList([]string{"@authority", "date", "@method"}))
 	reqStr := `GET /foo HTTP/1.1
 Host: example.org
@@ -769,7 +781,7 @@ func TestVerifyRequest(t *testing.T) {
 					if err != nil {
 						t.Errorf("cannot parse public key: %v", err)
 					}
-					verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey, nil, *NewFields())
+					verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
 					return *verifier
 				})(),
 				req: readRequest(httpreq1pssSelective),
@@ -786,7 +798,7 @@ func TestVerifyRequest(t *testing.T) {
 					if err != nil {
 						t.Errorf("cannot parse public key: %v", err)
 					}
-					verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey, nil, *NewFields())
+					verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
 					return *verifier
 				})(),
 				req: readRequest(httpreq1pssFull),
@@ -803,7 +815,7 @@ func TestVerifyRequest(t *testing.T) {
 					if err != nil {
 						t.Errorf("cannot parse public key: %v", err)
 					}
-					verifier, _ := NewP256Verifier("test-key-ecc-p256", pubKey, nil, *NewFields())
+					verifier, _ := NewP256Verifier("test-key-ecc-p256", pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
 					return *verifier
 				})(),
 				req: readRequest(httpreq1p256),
@@ -852,7 +864,77 @@ func makeRSAVerifier(t *testing.T, fields Fields) Verifier {
 		if err != nil {
 			t.Errorf("cannot parse public key: %v", err)
 		}
-		verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey, nil, fields)
+		verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 		return *verifier
 	})()
+}
+
+func TestRequestKeyID(t *testing.T) {
+	type args struct {
+		signatureName string
+		req           *http.Request
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			args: args{
+				signatureName: "sig1",
+				req:           readRequest(httpreq1p256),
+			},
+			want:    "test-key-ecc-p256",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := RequestKeyID(tt.args.signatureName, tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("RequestKeyID() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("RequestKeyID() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResponseKeyID(t *testing.T) {
+	type args struct {
+		signatureName string
+		res           *http.Response
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			args: args{
+				signatureName: "sig7",
+				res:           readResponse(httpres3),
+			},
+			want:    "my-key",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ResponseKeyID(tt.args.signatureName, tt.args.res)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ResponseKeyID() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("ResponseKeyID() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
