@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 var httpreq1 = `POST /foo?param=value&pet=dog HTTP/1.1
@@ -339,7 +340,7 @@ func parseECPublicKeyFromPemStr(pemString string) (*ecdsa.PublicKey, error) {
 }
 
 func ExampleSignRequest() {
-	config := NewSignConfig().SignCreated(false) // SignCreated should be "true" to protect against replay attacks
+	config := NewSignConfig().SignCreated(false).SetNonce("BADCAB") // SignCreated should be "true" to protect against replay attacks
 	fields := HeaderList([]string{"@authority", "date", "@method"})
 	signer, _ := NewHMACSHA256Signer("my-shared-secret", bytes.Repeat([]byte{0x77}, 64), config, fields)
 	reqStr := `GET /foo HTTP/1.1
@@ -352,8 +353,8 @@ Cache-Control: max-age=60
 	signatureInput, signature, _ := SignRequest("sig77", *signer, req)
 	fmt.Printf("Signature-Input: %s\n", signatureInput)
 	fmt.Printf("Signature:       %s", signature)
-	// Output: Signature-Input: sig77=("@authority" "date" "@method");alg="hmac-sha256";keyid="my-shared-secret"
-	//Signature:       sig77=:3e9KqLP62NHfHY5OMG4036+U6tvBowZF35ALzTjpsf0=:
+	// Output: Signature-Input: sig77=("@authority" "date" "@method");nonce="BADCAB";alg="hmac-sha256";keyid="my-shared-secret"
+	//Signature:       sig77=:BBxhfE6GoDVcohZvc+pT448u7GAK7EjJYTu+i26YZW0=:
 }
 
 func TestSignRequest(t *testing.T) {
@@ -553,6 +554,40 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 	}
 }
 
+func TestCreated(t *testing.T) {
+	testOnce := func(t *testing.T, createdTime int64, wantSuccess bool) {
+		fields := HeaderList([]string{"@status", "date", "content-type"})
+		signatureName := "sigres"
+		key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+		signConfig := NewSignConfig().SignCreated(true).setFakeCreated(createdTime)
+		signer, _ := NewHMACSHA256Signer("test-shared-secret", key, signConfig, fields)
+		res := readResponse(httpres2)
+		sigInput, sig, _ := SignResponse(signatureName, *signer, res)
+
+		res2 := readResponse(httpres2)
+		res2.Header.Add("Signature", sig)
+		res2.Header.Add("Signature-Input", sigInput)
+		verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig(), fields)
+		if err != nil {
+			t.Errorf("could not generate verifier: %s", err)
+		}
+		_, err = VerifyResponse(signatureName, *verifier, res2)
+		if wantSuccess && err != nil {
+			t.Errorf("verification error: %s", err)
+		}
+		if !wantSuccess && err == nil {
+			t.Errorf("expected verification to fail")
+		}
+	}
+	now := time.Now().Unix() // the window is in ms, but "created" granularity is in sec!
+	testInWindow := func(t *testing.T) { testOnce(t, now, true) }
+	testOlder := func(t *testing.T) { testOnce(t, now-20_000, false) }
+	testNewer := func(t *testing.T) { testOnce(t, now+3_000, false) }
+	t.Run("in window", testInWindow)
+	t.Run("older", testOlder)
+	t.Run("newer", testNewer)
+}
+
 func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	fields := HeaderList([]string{"@status", "date", "content-type"})
 	signatureName := "sigres"
@@ -657,7 +692,7 @@ func TestSignAndVerifyP256(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot read public key: %v", err)
 	}
-	verifier, err := NewP256Verifier("test-key-p256", pubKey, NewVerifyConfig().SetVerifyCreated(false).SetVerifyAlg(true), fields)
+	verifier, err := NewP256Verifier("test-key-p256", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
@@ -868,16 +903,17 @@ func makeRSAVerifier(t *testing.T, fields Fields) Verifier {
 	})()
 }
 
-func TestRequestKeyID(t *testing.T) {
+func TestRequestDetails(t *testing.T) {
 	type args struct {
 		signatureName string
 		req           *http.Request
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
+		name      string
+		args      args
+		wantKeyID string
+		wantAlg   string
+		wantErr   bool
 	}{
 		{
 			name: "happy path",
@@ -885,34 +921,39 @@ func TestRequestKeyID(t *testing.T) {
 				signatureName: "sig1",
 				req:           readRequest(httpreq1p256),
 			},
-			want:    "test-key-ecc-p256",
-			wantErr: false,
+			wantKeyID: "test-key-ecc-p256",
+			wantAlg:   "",
+			wantErr:   false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := RequestKeyID(tt.args.signatureName, tt.args.req)
+			gotKeyID, gotAlg, err := RequestDetails(tt.args.signatureName, tt.args.req)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("RequestKeyID() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("RequestDetails() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("RequestKeyID() got = %v, want %v", got, tt.want)
+			if gotKeyID != tt.wantKeyID {
+				t.Errorf("RequestDetails() gotKeyID = %v, want %v", gotKeyID, tt.wantKeyID)
+			}
+			if gotAlg != tt.wantAlg {
+				t.Errorf("RequestDetails() gotAlg = %v, want %v", gotAlg, tt.wantAlg)
 			}
 		})
 	}
 }
 
-func TestResponseKeyID(t *testing.T) {
+func TestResponseDetails(t *testing.T) {
 	type args struct {
 		signatureName string
 		res           *http.Response
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
+		name      string
+		args      args
+		wantKeyID string
+		wantAlg   string
+		wantErr   bool
 	}{
 		{
 			name: "happy path",
@@ -920,19 +961,23 @@ func TestResponseKeyID(t *testing.T) {
 				signatureName: "sig7",
 				res:           readResponse(httpres3),
 			},
-			want:    "my-key",
-			wantErr: false,
+			wantKeyID: "my-key",
+			wantAlg:   "",
+			wantErr:   false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ResponseKeyID(tt.args.signatureName, tt.args.res)
+			gotKeyID, gotAlg, err := ResponseDetails(tt.args.signatureName, tt.args.res)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ResponseKeyID() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ResponseDetails() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("ResponseKeyID() got = %v, want %v", got, tt.want)
+			if gotKeyID != tt.wantKeyID {
+				t.Errorf("ResponseDetails() gotKeyID = %v, want %v", gotKeyID, tt.wantKeyID)
+			}
+			if gotAlg != tt.wantAlg {
+				t.Errorf("ResponseDetails() gotAlg = %v, want %v", gotAlg, tt.wantAlg)
 			}
 		})
 	}

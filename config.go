@@ -46,16 +46,16 @@ func (c *SignConfig) setFakeCreated(ts int64) *SignConfig {
 	return c
 }
 
-// setExpires adds an "expires" parameter containing an expiration deadline, as Unix time.
+// SetExpires adds an "expires" parameter containing an expiration deadline, as Unix time.
 // Default: 0 (do not add the parameter)
-func (c *SignConfig) setExpires(expires int64) *SignConfig {
+func (c *SignConfig) SetExpires(expires int64) *SignConfig {
 	c.expires = expires
 	return c
 }
 
-// setNonce adds a "nonce" string parameter whose content should be unique per signed message.
+// SetNonce adds a "nonce" string parameter whose content should be unique per signed message.
 // Default: empty string (do not add the parameter)
-func (c *SignConfig) setNonce(nonce string) *SignConfig {
+func (c *SignConfig) SetNonce(nonce string) *SignConfig {
 	c.nonce = nonce
 	return c
 }
@@ -73,16 +73,8 @@ type VerifyConfig struct {
 	verifyCreated bool
 	notNewerThan  time.Duration
 	notOlderThan  time.Duration
-	verifyAlg     bool
 	allowedAlgs   []string
-}
-
-// SetAllowedAlgs defines what are the allowed values of the "alg" parameter.
-// This is useful if the actual algorithm used in verification is taken from the message - not a recommended practice.
-// Default: all supported asymmetric algorithms.
-func (v *VerifyConfig) SetAllowedAlgs(allowedAlgs []string) *VerifyConfig {
-	v.allowedAlgs = allowedAlgs
-	return v
+	rejectExpired bool
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,
@@ -106,10 +98,18 @@ func (v *VerifyConfig) SetVerifyCreated(verifyCreated bool) *VerifyConfig {
 	return v
 }
 
-// SetVerifyAlg indicates that the "alg" parameter exist. Use SetAllowedAlgs to specify allowed values.
-// Default: false.
-func (v *VerifyConfig) SetVerifyAlg(verifyAlg bool) *VerifyConfig {
-	v.verifyAlg = verifyAlg
+// SetRejectExpired indicates that expired messages (according to the "expires" parameter) must fail verification.
+// Default: true.
+func (v *VerifyConfig) SetRejectExpired(rejectExpired bool) *VerifyConfig {
+	v.rejectExpired = rejectExpired
+	return v
+}
+
+// SetAllowedAlgs defines the allowed values of the "alg" parameter.
+// This is useful if the actual algorithm used in verification is taken from the message - not a recommended practice.
+// Default: an empty list, signifying all values are accepted.
+func (v *VerifyConfig) SetAllowedAlgs(allowedAlgs []string) *VerifyConfig {
+	v.allowedAlgs = allowedAlgs
 	return v
 }
 
@@ -117,10 +117,10 @@ func (v *VerifyConfig) SetVerifyAlg(verifyAlg bool) *VerifyConfig {
 func NewVerifyConfig() *VerifyConfig {
 	return &VerifyConfig{
 		verifyCreated: true,
-		notNewerThan:  1_000 * time.Millisecond,
-		notOlderThan:  10_000 * time.Millisecond,
-		verifyAlg:     false,
-		allowedAlgs:   []string{"rsa-v1_5-sha256", "rsa-pss-sha512", "ecdsa-p256-sha256"},
+		notNewerThan:  2 * time.Second,
+		notOlderThan:  10 * time.Second,
+		rejectExpired: true,
+		allowedAlgs:   []string{},
 	}
 }
 

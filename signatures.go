@@ -157,55 +157,62 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) (
 	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, verifier.f)
 }
 
-// RequestKeyID parses a signed request and returns the key ID used in the given signature.
-func RequestKeyID(signatureName string, req *http.Request) (string, error) {
+// RequestDetails parses a signed request and returns the key ID and optionally the algorithm used in the given signature.
+func RequestDetails(signatureName string, req *http.Request) (keyID, alg string, err error) {
 	if req == nil {
-		return "", fmt.Errorf("nil request")
+		return "", "", fmt.Errorf("nil request")
 	}
 	if signatureName == "" {
-		return "", fmt.Errorf("empty signature name")
+		return "", "", fmt.Errorf("empty signature name")
 	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	return messageKeyID(signatureName, *parsedMessage)
 }
 
-// ResponseKeyID parses a signed response and returns the key ID used in the given signature.
-func ResponseKeyID(signatureName string, res *http.Response) (string, error) {
+// ResponseDetails parses a signed response and returns the key ID and optionally the algorithm used in the given signature.
+func ResponseDetails(signatureName string, res *http.Response) (keyID, alg string, err error) {
 	if res == nil {
-		return "", fmt.Errorf("nil response")
+		return "", "", fmt.Errorf("nil response")
 	}
 	if signatureName == "" {
-		return "", fmt.Errorf("empty signature name")
+		return "", "", fmt.Errorf("empty signature name")
 	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	return messageKeyID(signatureName, *parsedMessage)
 }
 
-func messageKeyID(signatureName string, parsedMessage parsedMessage) (string, error) {
+func messageKeyID(signatureName string, parsedMessage parsedMessage) (keyID, alg string, err error) {
 	si, found := parsedMessage.components[*fromHeaderName("signature-input")]
 	if !found {
-		return "", fmt.Errorf("missing \"signature-input\" header")
+		return "", "", fmt.Errorf("missing \"signature-input\" header")
 	}
 	signatureInput := si[0]
 	psi, err := parseSignatureInput(signatureInput, signatureName)
 	if err != nil {
-		return "", err
+		return
 	}
 	keyIDParam, ok := psi.params["keyid"]
 	if !ok {
-		return "", fmt.Errorf("missing \"keyid\" parameter")
+		return "", "", fmt.Errorf("missing \"keyid\" parameter")
 	}
-	keyID, ok := keyIDParam.(string)
+	keyID, ok = keyIDParam.(string)
 	if !ok {
-		return "", fmt.Errorf("malformed \"keyid\" parameter")
+		return "", "", fmt.Errorf("malformed \"keyid\" parameter")
 	}
-	return keyID, nil
+	algParam, ok := psi.params["alg"] // "alg" is optional
+	if ok {
+		alg, ok = algParam.(string)
+		if !ok {
+			return "", "", fmt.Errorf("malformed \"alg\" parameter")
+		}
+	}
+	return keyID, alg, nil
 }
 
 //
@@ -284,7 +291,7 @@ func applyVerificationPolicy(psi *psiSignature, config VerifyConfig) error {
 			return fmt.Errorf("message is too old, check for replay")
 		}
 	}
-	if config.verifyAlg && len(config.allowedAlgs) > 0 {
+	if len(config.allowedAlgs) > 0 {
 		algParam, ok := psi.params["alg"]
 		if !ok {
 			return fmt.Errorf("missing \"alg\" parameter")
@@ -301,6 +308,20 @@ func applyVerificationPolicy(psi *psiSignature, config VerifyConfig) error {
 		}
 		if !algFound {
 			return fmt.Errorf("\"alg\" parameter not allowed by policy")
+		}
+	}
+	if config.rejectExpired {
+		now := time.Now()
+		expiresParam, ok := psi.params["expires"]
+		if ok {
+			expires, ok := expiresParam.(int64)
+			if !ok {
+				return fmt.Errorf("malformed \"expires\" parameter")
+			}
+			expiresTime := time.Unix(expires, 0)
+			if now.After(expiresTime) {
+				return fmt.Errorf("expired signature")
+			}
 		}
 	}
 	return nil
