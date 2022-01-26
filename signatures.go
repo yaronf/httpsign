@@ -141,18 +141,18 @@ func addPseudoHeaders(message *parsedMessage, config SignConfig) {
 }
 
 //
-// VerifyRequest verifies a signed HTTP request. Returns true if verification was successful.
+// VerifyRequest verifies a signed HTTP request. Returns an error if verification failed for any reason, otherwise nil.
 //
-func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) (verified bool, err error) {
+func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) (err error) {
 	if req == nil {
-		return false, fmt.Errorf("nil request")
+		return fmt.Errorf("nil request")
 	}
 	if signatureName == "" {
-		return false, fmt.Errorf("empty signature name")
+		return fmt.Errorf("empty signature name")
 	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
-		return false, err
+		return err
 	}
 	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, verifier.f)
 }
@@ -216,60 +216,59 @@ func messageKeyID(signatureName string, parsedMessage parsedMessage) (keyID, alg
 }
 
 //
-// VerifyResponse verifies a signed HTTP response. Returns true if verification was successful.
+// VerifyResponse verifies a signed HTTP response. Returns an error if verification failed for any reason, otherwise nil.
 //
-func VerifyResponse(signatureName string, verifier Verifier, res *http.Response) (verified bool, err error) {
+func VerifyResponse(signatureName string, verifier Verifier, res *http.Response) (err error) {
 	if res == nil {
-		return false, fmt.Errorf("nil response")
+		return fmt.Errorf("nil response")
 	}
 	if signatureName == "" {
-		return false, fmt.Errorf("empty signature name")
+		return fmt.Errorf("empty signature name")
 	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
-		return false, err
+		return err
 	}
 	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, verifier.f)
 }
 
-func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) (bool, error) {
+func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) error {
 	wsi, found := message.components[*fromHeaderName("signature-input")]
 	if !found {
-		return false, fmt.Errorf("missing \"signature-input\" header")
+		return fmt.Errorf("missing \"signature-input\" header")
 	}
 	wantSignatureInput := wsi[0]
 	ws, found := message.components[*fromHeaderName("signature")]
 	if !found {
-		return false, fmt.Errorf("missing \"signature\" header")
+		return fmt.Errorf("missing \"signature\" header")
 	}
 	wantSignature := ws[0]
 	delete(message.components, *fromHeaderName("signature-input"))
 	delete(message.components, *fromHeaderName("signature"))
 	err := validateFields(fields)
 	if err != nil {
-		return false, err
+		return err
 	}
 	wantSigRaw, err := parseWantSignature(wantSignature, name)
 	if err != nil {
-		return false, err
+		return err
 	}
 	psiSig, err := parseSignatureInput(wantSignatureInput, name)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if !(psiSig.fields.contains(&fields)) {
-		return false, fmt.Errorf("actual signature does not cover all required fields")
+		return fmt.Errorf("actual signature does not cover all required fields")
 	}
 	err = applyVerificationPolicy(psiSig, config)
 	if err != nil {
-		return false, err
+		return err
 	}
 	signatureInput, err := generateSignatureInput(message, psiSig.fields, psiSig.origSigParams)
 	if err != nil {
-		return false, err
+		return err
 	}
-	verified, err := verifySignature(verifier, signatureInput, wantSigRaw)
-	return verified, err
+	return verifySignature(verifier, signatureInput, wantSigRaw)
 }
 
 func applyVerificationPolicy(psi *psiSignature, config VerifyConfig) error {
@@ -327,12 +326,12 @@ func applyVerificationPolicy(psi *psiSignature, config VerifyConfig) error {
 	return nil
 }
 
-func verifySignature(verifier Verifier, input string, signature []byte) (bool, error) {
+func verifySignature(verifier Verifier, input string, signature []byte) error {
 	verified, err := verifier.verify([]byte(input), signature)
-	if !verified && err == nil {
+	if !verified && (err == nil) {
 		err = fmt.Errorf("bad signature, check key or signature value")
 	}
-	return verified, err
+	return err
 }
 
 type psiSignature struct {

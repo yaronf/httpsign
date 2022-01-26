@@ -545,12 +545,9 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
-	verified, err := VerifyRequest(signatureName, *verifier, req)
+	err = VerifyRequest(signatureName, *verifier, req)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
-	}
-	if !verified {
-		t.Errorf("message did not pass verification")
 	}
 }
 
@@ -571,7 +568,7 @@ func TestCreated(t *testing.T) {
 		if err != nil {
 			t.Errorf("could not generate verifier: %s", err)
 		}
-		_, err = VerifyResponse(signatureName, *verifier, res2)
+		err = VerifyResponse(signatureName, *verifier, res2)
 		if wantSuccess && err != nil {
 			t.Errorf("verification error: %s", err)
 		}
@@ -603,12 +600,9 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
-	verified, err := VerifyResponse(signatureName, *verifier, res2)
+	err = VerifyResponse(signatureName, *verifier, res2)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
-	}
-	if !verified {
-		t.Errorf("message did not pass verification")
 	}
 }
 
@@ -633,12 +627,9 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
-	verified, err := VerifyRequest(signatureName, *verifier, req)
+	err = VerifyRequest(signatureName, *verifier, req)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
-	}
-	if !verified {
-		t.Errorf("message did not pass verification")
 	}
 }
 
@@ -663,12 +654,9 @@ func TestSignAndVerifyRSA(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
-	verified, err := VerifyRequest(signatureName, *verifier, req)
+	err = VerifyRequest(signatureName, *verifier, req)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
-	}
-	if !verified {
-		t.Errorf("message did not pass verification")
 	}
 }
 
@@ -696,12 +684,9 @@ func TestSignAndVerifyP256(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not generate verifier: %s", err)
 	}
-	verified, err := VerifyRequest(signatureName, *verifier, req)
+	err = VerifyRequest(signatureName, *verifier, req)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
-	}
-	if !verified {
-		t.Errorf("message did not pass verification")
 	}
 }
 
@@ -779,8 +764,8 @@ Signature:       sig77=:3e9KqLP62NHfHY5OMG4036+U6tvBowZF35ALzTjpsf0=:
 
 `
 	req, _ := http.ReadRequest(bufio.NewReader(strings.NewReader(reqStr)))
-	verified, _ := VerifyRequest("sig77", *verifier, req)
-	fmt.Printf("verified: %t", verified)
+	err := VerifyRequest("sig77", *verifier, req)
+	fmt.Printf("verified: %t", err == nil)
 	// Output: verified: true
 }
 
@@ -880,13 +865,10 @@ func TestVerifyRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := VerifyRequest(tt.args.signatureName, tt.args.verifier, tt.args.req)
+			err := VerifyRequest(tt.args.signatureName, tt.args.verifier, tt.args.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("VerifyRequest() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			if got != tt.want {
-				t.Errorf("VerifyRequest() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

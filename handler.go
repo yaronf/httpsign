@@ -134,8 +134,8 @@ func verifyServerRequest(w http.ResponseWriter, r *http.Request, config *Handler
 		config.reqNotVerified(w, r, fmt.Errorf("could not fetch a verifier, check key ID"))
 		return false
 	}
-	verified, err := VerifyRequest(sigName, *verifier, r)
-	if !verified {
+	err := VerifyRequest(sigName, *verifier, r)
+	if err != nil {
 		config.reqNotVerified(w, r, err)
 		return false
 	}

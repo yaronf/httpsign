@@ -61,7 +61,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	}
 
 	if c.verifier != nil {
-		_, err := VerifyResponse(c.sigName, *c.verifier, res)
+		err := VerifyResponse(c.sigName, *c.verifier, res)
 		if err != nil {
 			return nil, err
 		}
@@ -70,7 +70,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 		if err != nil {
 			return nil, err
 		}
-		_, err := VerifyResponse(sigName, *verifier, res)
+		err := VerifyResponse(sigName, *verifier, res)
 		if err != nil {
 			return nil, err
 		}

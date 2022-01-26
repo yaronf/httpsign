@@ -2,6 +2,7 @@ package httpsign
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -162,7 +163,8 @@ func defaultReqNotVerified(w http.ResponseWriter, _ *http.Request, err error) {
 	if err == nil { // should not happen
 		_, _ = fmt.Fprintf(w, "Unknown error")
 	}
-	_, _ = fmt.Fprintln(w, "Could not verify request signature: "+err.Error())
+	log.Println("Could not verify request signature: " + err.Error())
+	_, _ = fmt.Fprintln(w, "Could not verify request signature")
 }
 
 // SetReqNotVerified defines a callback to be called when a request fails to verify. The default
