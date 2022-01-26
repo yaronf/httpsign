@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 )
@@ -39,27 +38,25 @@ func Test_WrapHandler(t *testing.T) {
 	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), config))
 	defer ts.Close()
 
-	res, err := http.Get(ts.URL)
-	if err != nil {
-		log.Fatal(err)
-	}
-	_, err = io.ReadAll(res.Body)
-	res.Body.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if res.Status != "200 OK" {
-		t.Errorf("Bad status returned")
-	}
-
 	verifier, err := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), NewVerifyConfig(), *NewFields())
 	if err != nil {
-		log.Fatal(err)
+		t.Errorf("%v", err)
 	}
-	_, err = VerifyResponse("sig1", *verifier, res)
+	client := NewDefaultClient("sig1", nil, verifier, nil)
+	res, err := client.Get(ts.URL)
 	if err != nil {
-		log.Fatal(err)
+		t.Errorf("%v", err)
+	}
+	if res != nil {
+		_, err = io.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+
+		if res.Status != "200 OK" {
+			t.Errorf("Bad status returned")
+		}
 	}
 }
 
@@ -84,30 +81,16 @@ func ExampleWrapHandler_clientSigns() {
 	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), config))
 	defer ts.Close()
 
-	// HTTP client code
+	// HTTP client code, with a signer
 	signer, _ := NewHMACSHA256Signer("key", bytes.Repeat([]byte{0x99}, 64), nil,
 		*NewFields().AddHeader("content-type").AddQueryParam("pet").AddHeader("@method"))
 
-	client := &http.Client{}
+	client := NewDefaultClient("sig1", signer, nil, nil)
 	body := `{"hello": "world"}`
 	host := ts.URL // test server
 	path := "/foo?param=value&pet=dog"
-	req, _ := http.NewRequest("POST", "http://ignore.me", bufio.NewReader(strings.NewReader(body)))
-	req.RequestURI = "" // the http package wants this field to be unset for client responses, instead...
-	u, _ := url.Parse(host + path)
-	req.URL = u
-	req.Header.Set("Content-Type", "application/json")
+	res, _ := client.Post(host+path, "application/json", bufio.NewReader(strings.NewReader(body)))
 
-	// Request is ready, sign it
-	sigInput, sig, err := SignRequest("sig1", *signer, req)
-	if err != nil {
-		log.Fatalf("Failed to sign request: %v", err)
-	}
-	req.Header.Add("Signature", sig)
-	req.Header.Add("Signature-Input", sigInput)
-
-	// Send the request, receive response
-	res, _ := client.Do(req)
 	serverText, _ := io.ReadAll(res.Body)
 	res.Body.Close()
 
@@ -138,26 +121,25 @@ func ExampleWrapHandler_serverSigns() {
 	defer ts.Close()
 
 	// HTTP client code
-	res, err := http.Get(ts.URL)
+	verifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), NewVerifyConfig(), *NewFields())
+	client := NewDefaultClient("sig1", nil, verifier, nil)
+	res, err := client.Get(ts.URL)
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = io.ReadAll(res.Body)
+	serverText, err := io.ReadAll(res.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
 	res.Body.Close()
 
-	verifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), NewVerifyConfig(), *NewFields())
-	verified, _ := VerifyResponse("sig1", *verifier, res)
-
-	fmt.Println("verified: ", verified)
-	// output: verified:  true
+	fmt.Println("Server sent: ", string(serverText))
+	// output: Server sent:  Hello, client
 }
 
 // test various failures
 func TestWrapHandlerServerSigns(t *testing.T) {
-	serverSignsTestCase := func(t *testing.T, nilSigner, dontSignResponse, earlyExpires, noSigner, badKey, badAlgs bool, wantBody, wantStatus string) {
+	serverSignsTestCase := func(t *testing.T, nilSigner, dontSignResponse, earlyExpires, noSigner, badKey, badAlgs bool) {
 		// Callback to let the server locate its signing key and configuration
 		var signConfig *SignConfig
 		if !earlyExpires {
@@ -201,23 +183,6 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 		defer ts.Close()
 
 		// HTTP client code
-		res, err := http.Get(ts.URL)
-		if err != nil {
-			log.Fatal(err)
-		}
-		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		res.Body.Close()
-
-		if string(body) != wantBody {
-			t.Errorf("Status: got %s want %s", string(body), wantBody)
-		}
-		if res.Status != wantStatus {
-			t.Errorf("Status: got %s want %s", res.Status, wantStatus)
-		}
-
 		var key []byte
 		if !badKey {
 			key = bytes.Repeat([]byte{0}, 64)
@@ -229,35 +194,30 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 			verifyConfig = verifyConfig.SetAllowedAlgs([]string{"zuzu"})
 		}
 		verifier, _ := NewHMACSHA256Verifier("key", key, verifyConfig, *NewFields())
-		verified, _ := VerifyResponse("sig1", *verifier, res)
 
-		if verified {
-			t.Errorf("surprise! Verification successful")
+		client := NewDefaultClient("sig1", nil, verifier, nil)
+		_, err := client.Get(ts.URL)
+		if err == nil {
+			t.Errorf("Surprise! Signature validation was successful.")
 		}
 	}
 	nilSigner := func(t *testing.T) {
-		serverSignsTestCase(t, true, false, false, false, false, false, "Failed to sign response: could not fetch a signer\n",
-			"500 Internal Server Error")
+		serverSignsTestCase(t, true, false, false, false, false, false)
 	}
 	dontSignResponse := func(t *testing.T) {
-		serverSignsTestCase(t, false, true, false, false, false, false, "Hello, client\n",
-			"200 OK")
+		serverSignsTestCase(t, false, true, false, false, false, false)
 	}
 	earlyExpires := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, true, false, false, false, "Hello, client\n",
-			"200 OK")
+		serverSignsTestCase(t, false, false, true, false, false, false)
 	}
 	noSigner := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, false, true, false, false, "Failed to sign response: could not fetch a signer, check key ID\n",
-			"500 Internal Server Error")
+		serverSignsTestCase(t, false, false, false, true, false, false)
 	}
 	badKey := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, false, false, true, false, "Hello, client\n",
-			"200 OK")
+		serverSignsTestCase(t, false, false, false, false, true, false)
 	}
 	badAlgs := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, false, false, false, true, "Hello, client\n",
-			"200 OK")
+		serverSignsTestCase(t, false, false, false, false, false, true)
 	}
 	t.Run("nil signer", nilSigner)
 	t.Run("don't sign response", dontSignResponse)
