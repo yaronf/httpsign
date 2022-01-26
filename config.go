@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// SignConfig contains additional configuration for the signer.
+// SignConfig contains additional configuration for the Signer.
 type SignConfig struct {
 	signAlg         bool
 	signCreated     bool
@@ -69,7 +69,7 @@ func (c *SignConfig) SetRequestResponse(name, signature string) *SignConfig {
 	return c
 }
 
-// VerifyConfig contains additional configuration for the verifier.
+// VerifyConfig contains additional configuration for the Verifier.
 type VerifyConfig struct {
 	verifyCreated bool
 	notNewerThan  time.Duration
@@ -177,7 +177,7 @@ func (h *HandlerConfig) SetReqNotVerified(f func(w http.ResponseWriter, r *http.
 // SetFetchVerifier defines a callback that looks at the incoming request and provides
 // a Verifier structure. In the simplest case, the signature name is a constant, and the key ID
 // and key value are fetched based on the sender's identity, which in turn is gleaned
-// from a header or query parameter. If a verifier cannot be determined, the function should return verifier as nil.
+// from a header or query parameter. If a Verifier cannot be determined, the function should return Verifier as nil.
 func (h *HandlerConfig) SetFetchVerifier(f func(r *http.Request) (sigName string, verifier *Verifier)) *HandlerConfig {
 	h.fetchVerifier = f
 	return h
@@ -188,7 +188,7 @@ func (h *HandlerConfig) SetFetchVerifier(f func(r *http.Request) (sigName string
 // a Signer structure. In the simplest case, the signature name is a constant, and the key ID
 // and key value are fetched based on the sender's identity. To simplify this logic,
 // it is recommended to use the request's ctx (Context) member
-// to store this information. If a signer cannot be determined, the function should return signer as nil.
+// to store this information. If a Signer cannot be determined, the function should return Signer as nil.
 func (h *HandlerConfig) SetFetchSigner(f func(res http.Response, r *http.Request) (sigName string, signer *Signer)) *HandlerConfig {
 	h.fetchSigner = f
 	return h

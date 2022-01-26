@@ -7,21 +7,21 @@ import (
 )
 
 // Client represents an HTTP client that optionally signs requests and optionally verifies responses.
-// The signer may be nil to avoid signing, and so forth.
-// The fetchVerifier callback allows to generate a verifier based on the particular response.
-// Either verifier or fetchVerifier may be specified, but not both.
+// The Signer may be nil to avoid signing, and so forth.
+// The FetchVerifier callback allows to generate a Verifier based on the particular response.
+// Either Verifier or FetchVerifier may be specified, but not both.
 // The client embeds an http.Client, which may be http.DefaultClient or any other.
 type Client struct {
-	sigName       string
-	signer        *Signer
-	verifier      *Verifier
-	fetchVerifier func(res *http.Response, req *http.Request) (sigName string, verifier *Verifier)
+	SignatuerName string
+	Signer        *Signer
+	Verifier      *Verifier
+	FetchVerifier func(res *http.Response, req *http.Request) (sigName string, verifier *Verifier)
 	http.Client
 }
 
 // NewClient constructs a new client, with the flexibility of including a custom http.Client.
 func NewClient(sigName string, signer *Signer, verifier *Verifier, fetchVerifier func(res *http.Response, req *http.Request) (sigName string, verifier *Verifier), client http.Client) *Client {
-	return &Client{sigName: sigName, signer: signer, verifier: verifier, fetchVerifier: fetchVerifier, Client: client}
+	return &Client{SignatuerName: sigName, Signer: signer, Verifier: verifier, FetchVerifier: fetchVerifier, Client: client}
 }
 
 // NewDefaultClient constructs a new client, based on the http.DefaultClient.
@@ -33,8 +33,8 @@ func validateClient(c *Client) error {
 	if c == nil {
 		return fmt.Errorf("nil client")
 	}
-	if c.verifier != nil && c.fetchVerifier != nil {
-		return fmt.Errorf("at most one of \"verifier\" and \"fetchVerifier\" must be set")
+	if c.Verifier != nil && c.FetchVerifier != nil {
+		return fmt.Errorf("at most one of \"Verifier\" and \"FetchVerifier\" must be set")
 	}
 	return nil
 }
@@ -45,8 +45,8 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	if err := validateClient(c); err != nil {
 		return nil, err
 	}
-	if c.signer != nil {
-		sigInput, sig, err := SignRequest(c.sigName, *c.signer, req)
+	if c.Signer != nil {
+		sigInput, sig, err := SignRequest(c.SignatuerName, *c.Signer, req)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign request: %v", err)
 		}
@@ -60,13 +60,13 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 		return res, err
 	}
 
-	if c.verifier != nil {
-		err := VerifyResponse(c.sigName, *c.verifier, res)
+	if c.Verifier != nil {
+		err := VerifyResponse(c.SignatuerName, *c.Verifier, res)
 		if err != nil {
 			return nil, err
 		}
-	} else if c.fetchVerifier != nil {
-		sigName, verifier := c.fetchVerifier(res, req)
+	} else if c.FetchVerifier != nil {
+		sigName, verifier := c.FetchVerifier(res, req)
 		if err != nil {
 			return nil, err
 		}

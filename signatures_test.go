@@ -2,7 +2,6 @@ package httpsign
 
 import (
 	"bufio"
-	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
@@ -339,24 +338,6 @@ func parseECPublicKeyFromPemStr(pemString string) (*ecdsa.PublicKey, error) {
 	return k.(*ecdsa.PublicKey), nil
 }
 
-func ExampleSignRequest() {
-	config := NewSignConfig().SignCreated(false).SetNonce("BADCAB") // SignCreated should be "true" to protect against replay attacks
-	fields := HeaderList([]string{"@authority", "date", "@method"})
-	signer, _ := NewHMACSHA256Signer("my-shared-secret", bytes.Repeat([]byte{0x77}, 64), config, fields)
-	reqStr := `GET /foo HTTP/1.1
-Host: example.org
-Date: Tue, 20 Apr 2021 02:07:55 GMT
-Cache-Control: max-age=60
-
-`
-	req, _ := http.ReadRequest(bufio.NewReader(strings.NewReader(reqStr)))
-	signatureInput, signature, _ := SignRequest("sig77", *signer, req)
-	fmt.Printf("Signature-Input: %s\n", signatureInput)
-	fmt.Printf("Signature:       %s", signature)
-	// Output: Signature-Input: sig77=("@authority" "date" "@method");nonce="BADCAB";alg="hmac-sha256";keyid="my-shared-secret"
-	//Signature:       sig77=:BBxhfE6GoDVcohZvc+pT448u7GAK7EjJYTu+i26YZW0=:
-}
-
 func TestSignRequest(t *testing.T) {
 	type args struct {
 		signatureName string
@@ -543,7 +524,7 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 	req.Header.Add("Signature-Input", sigInput)
 	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
-		t.Errorf("could not generate verifier: %s", err)
+		t.Errorf("could not generate Verifier: %s", err)
 	}
 	err = VerifyRequest(signatureName, *verifier, req)
 	if err != nil {
@@ -566,7 +547,7 @@ func TestCreated(t *testing.T) {
 		res2.Header.Add("Signature-Input", sigInput)
 		verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig(), fields)
 		if err != nil {
-			t.Errorf("could not generate verifier: %s", err)
+			t.Errorf("could not generate Verifier: %s", err)
 		}
 		err = VerifyResponse(signatureName, *verifier, res2)
 		if wantSuccess && err != nil {
@@ -598,7 +579,7 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	res2.Header.Add("Signature-Input", sigInput)
 	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig(), fields)
 	if err != nil {
-		t.Errorf("could not generate verifier: %s", err)
+		t.Errorf("could not generate Verifier: %s", err)
 	}
 	err = VerifyResponse(signatureName, *verifier, res2)
 	if err != nil {
@@ -625,7 +606,7 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 	}
 	verifier, err := NewRSAPSSVerifier("test-key-rsa-pss", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
-		t.Errorf("could not generate verifier: %s", err)
+		t.Errorf("could not generate Verifier: %s", err)
 	}
 	err = VerifyRequest(signatureName, *verifier, req)
 	if err != nil {
@@ -652,7 +633,7 @@ func TestSignAndVerifyRSA(t *testing.T) {
 	}
 	verifier, err := NewRSAVerifier("test-key-rsa", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
-		t.Errorf("could not generate verifier: %s", err)
+		t.Errorf("could not generate Verifier: %s", err)
 	}
 	err = VerifyRequest(signatureName, *verifier, req)
 	if err != nil {
@@ -682,7 +663,7 @@ func TestSignAndVerifyP256(t *testing.T) {
 	}
 	verifier, err := NewP256Verifier("test-key-p256", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
-		t.Errorf("could not generate verifier: %s", err)
+		t.Errorf("could not generate Verifier: %s", err)
 	}
 	err = VerifyRequest(signatureName, *verifier, req)
 	if err != nil {
@@ -749,24 +730,6 @@ func TestSignResponse(t *testing.T) {
 			}
 		})
 	}
-}
-
-func ExampleVerifyRequest() {
-	config := NewVerifyConfig().SetVerifyCreated(false) // for testing only
-	verifier, _ := NewHMACSHA256Verifier("my-shared-secret", bytes.Repeat([]byte{0x77}, 64), config,
-		HeaderList([]string{"@authority", "date", "@method"}))
-	reqStr := `GET /foo HTTP/1.1
-Host: example.org
-Date: Tue, 20 Apr 2021 02:07:55 GMT
-Cache-Control: max-age=60
-Signature-Input: sig77=("@authority" "date" "@method");alg="hmac-sha256";keyid="my-shared-secret"
-Signature:       sig77=:3e9KqLP62NHfHY5OMG4036+U6tvBowZF35ALzTjpsf0=:
-
-`
-	req, _ := http.ReadRequest(bufio.NewReader(strings.NewReader(reqStr)))
-	err := VerifyRequest("sig77", *verifier, req)
-	fmt.Printf("verified: %t", err == nil)
-	// Output: verified: true
 }
 
 func TestVerifyRequest(t *testing.T) {

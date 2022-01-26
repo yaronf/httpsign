@@ -3,6 +3,7 @@ package httpsign
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -89,7 +90,10 @@ func TestClient_Get(t *testing.T) {
 		} else {
 			w.WriteHeader(404)
 		}
-		fmt.Fprintln(w, "Hey client, good to see ya")
+		_, err := fmt.Fprintln(w, "Hey client, good to see ya")
+		if err != nil {
+			log.Fatal("Server could not send response")
+		}
 	}
 	ts := httptest.NewServer(http.HandlerFunc(simpleHandler))
 	defer ts.Close()
@@ -97,10 +101,10 @@ func TestClient_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Client{
-				sigName:       tt.fields.sigName,
-				signer:        tt.fields.signer,
-				verifier:      tt.fields.verifier,
-				fetchVerifier: tt.fields.fetchVerifier,
+				SignatuerName: tt.fields.sigName,
+				Signer:        tt.fields.signer,
+				Verifier:      tt.fields.verifier,
+				FetchVerifier: tt.fields.fetchVerifier,
 				Client:        tt.fields.Client,
 			}
 			res, err := c.Get(ts.URL + tt.args.url)
@@ -159,10 +163,10 @@ func TestClient_Head(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Client{
-				sigName:       tt.fields.sigName,
-				signer:        tt.fields.signer,
-				verifier:      tt.fields.verifier,
-				fetchVerifier: tt.fields.fetchVerifier,
+				SignatuerName: tt.fields.sigName,
+				Signer:        tt.fields.signer,
+				Verifier:      tt.fields.verifier,
+				FetchVerifier: tt.fields.fetchVerifier,
 				Client:        tt.fields.Client,
 			}
 			res, err := c.Head(tt.args.url)

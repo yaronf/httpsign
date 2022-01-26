@@ -60,12 +60,12 @@ func signServerResponse(wrapped *wrappedResponseWriter, r *http.Request, config 
 		TLS:              nil,
 	}
 	if config.fetchSigner == nil {
-		sigFailed(wrapped.ResponseWriter, r, fmt.Errorf("could not fetch a signer"))
+		sigFailed(wrapped.ResponseWriter, r, fmt.Errorf("could not fetch a Signer"))
 		return false
 	}
 	sigName, signer := config.fetchSigner(response, r)
 	if signer == nil {
-		sigFailed(wrapped.ResponseWriter, r, fmt.Errorf("could not fetch a signer, check key ID"))
+		sigFailed(wrapped.ResponseWriter, r, fmt.Errorf("could not fetch a Signer, check key ID"))
 		return false
 	}
 	signatureInput, signature, err := SignResponse(sigName, *signer, &response)
@@ -126,12 +126,12 @@ func (w *wrappedResponseWriter) WriteHeader(code int) {
 
 func verifyServerRequest(w http.ResponseWriter, r *http.Request, config *HandlerConfig) bool {
 	if config.fetchVerifier == nil {
-		config.reqNotVerified(w, r, fmt.Errorf("could not fetch a verifier"))
+		config.reqNotVerified(w, r, fmt.Errorf("could not fetch a Verifier"))
 		return false
 	}
 	sigName, verifier := config.fetchVerifier(r)
 	if verifier == nil {
-		config.reqNotVerified(w, r, fmt.Errorf("could not fetch a verifier, check key ID"))
+		config.reqNotVerified(w, r, fmt.Errorf("could not fetch a Verifier, check key ID"))
 		return false
 	}
 	err := VerifyRequest(sigName, *verifier, r)

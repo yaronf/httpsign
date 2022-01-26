@@ -142,7 +142,7 @@ type Verifier struct {
 	f     Fields
 }
 
-// NewHMACSHA256Verifier generates a new verifier for HMAC-SHA256 signatures. Set config to nil for a default configuration.
+// NewHMACSHA256Verifier generates a new Verifier for HMAC-SHA256 signatures. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
 func NewHMACSHA256Verifier(keyID string, key []byte, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
@@ -163,7 +163,7 @@ func NewHMACSHA256Verifier(keyID string, key []byte, config *VerifyConfig, field
 	}, nil
 }
 
-// NewRSAVerifier generates a new verifier for RSA signatures. Set config to nil for a default configuration.
+// NewRSAVerifier generates a new Verifier for RSA signatures. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
 func NewRSAVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
@@ -181,7 +181,7 @@ func NewRSAVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, fiel
 	}, nil
 }
 
-// NewRSAPSSVerifier generates a new verifier for RSA-PSS signatures. Set config to nil for a default configuration.
+// NewRSAPSSVerifier generates a new Verifier for RSA-PSS signatures. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
 func NewRSAPSSVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
@@ -199,7 +199,7 @@ func NewRSAPSSVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, f
 	}, nil
 }
 
-// NewP256Verifier generates a new verifier for ECDSA (P-256) signatures. Set config to nil for a default configuration.
+// NewP256Verifier generates a new Verifier for ECDSA (P-256) signatures. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
 func NewP256Verifier(keyID string, key *ecdsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
