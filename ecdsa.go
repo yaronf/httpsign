@@ -10,6 +10,9 @@ import (
 // These functions extend the ecdsa package by adding raw, JWS-style signatures
 
 func ecdsaSignRaw(rd io.Reader, priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
+	if priv == nil {
+		return nil, fmt.Errorf("nil private key")
+	}
 	r, s, err := ecdsa.Sign(rd, priv, hash)
 	if err != nil {
 		return nil, err
@@ -31,6 +34,9 @@ func ecdsaSignRaw(rd io.Reader, priv *ecdsa.PrivateKey, hash []byte) ([]byte, er
 }
 
 func ecdsaVerifyRaw(pub *ecdsa.PublicKey, hash []byte, sig []byte) (bool, error) {
+	if pub == nil {
+		return false, fmt.Errorf("nil public key")
+	}
 	curve := pub.Params().Name
 	lr, ls, err := sigComponentLen(curve)
 	if err != nil {

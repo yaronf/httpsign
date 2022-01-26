@@ -60,7 +60,7 @@ func Test_WrapHandler(t *testing.T) {
 
 // test various failures
 func TestWrapHandlerServerSigns(t *testing.T) {
-	serverSignsTestCase := func(t *testing.T, nilSigner, dontSignResponse, earlyExpires, noSigner, badKey, badAlgs bool) {
+	serverSignsTestCase := func(t *testing.T, nilSigner, dontSignResponse, earlyExpires, noSigner, badKey, badAlgs, verifyRequest bool) {
 		// Callback to let the server locate its signing key and configuration
 		var signConfig *SignConfig
 		if !earlyExpires {
@@ -100,6 +100,13 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 		if dontSignResponse {
 			config = config.SetSignResponse(false)
 		}
+		if verifyRequest {
+			serverVerifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{9}, 64), NewVerifyConfig(), *NewFields())
+			config = config.SetFetchVerifier(func(r *http.Request) (sigName string, verifier *Verifier) {
+				return "sig333", serverVerifier
+			})
+			config = config.SetVerifyRequest(true) // override
+		}
 		ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), config))
 		defer ts.Close()
 
@@ -117,28 +124,31 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 		verifier, _ := NewHMACSHA256Verifier("key", key, verifyConfig, *NewFields())
 
 		client := NewDefaultClient("sig1", nil, verifier, nil)
-		_, err := client.Get(ts.URL)
-		if err == nil {
-			t.Errorf("Surprise! Signature validation was successful.")
+		res, err := client.Get(ts.URL)
+		if err == nil && res.StatusCode == 200 {
+			t.Errorf("Surprise! Server sent 200 OK and signature validation was successful.")
 		}
 	}
 	nilSigner := func(t *testing.T) {
-		serverSignsTestCase(t, true, false, false, false, false, false)
+		serverSignsTestCase(t, true, false, false, false, false, false, false)
 	}
 	dontSignResponse := func(t *testing.T) {
-		serverSignsTestCase(t, false, true, false, false, false, false)
+		serverSignsTestCase(t, false, true, false, false, false, false, false)
 	}
 	earlyExpires := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, true, false, false, false)
+		serverSignsTestCase(t, false, false, true, false, false, false, false)
 	}
 	noSigner := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, false, true, false, false)
+		serverSignsTestCase(t, false, false, false, true, false, false, false)
 	}
 	badKey := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, false, false, true, false)
+		serverSignsTestCase(t, false, false, false, false, true, false, false)
 	}
 	badAlgs := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, false, false, false, true)
+		serverSignsTestCase(t, false, false, false, false, false, true, false)
+	}
+	failVerify := func(t *testing.T) {
+		serverSignsTestCase(t, false, false, false, false, false, false, true)
 	}
 	t.Run("nil Signer", nilSigner)
 	t.Run("don't sign response", dontSignResponse)
@@ -146,6 +156,7 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 	t.Run("bad fetch Signer", noSigner)
 	t.Run("wrong verification key", badKey)
 	t.Run("failed algorithm check", badAlgs)
+	t.Run("failed request verification", failVerify)
 }
 
 func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler

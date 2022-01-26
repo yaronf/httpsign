@@ -1,7 +1,9 @@
 // Package httpsign signs HTTP requests and responses as defined in draft-ietf-httpbis-message-signatures.
 // See https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html.
 //
-// For client-side message signing, use SignRequest, VerifyResponse etc. For server-side operation,
+// For client-side message signing, use the Client wrapper. Alternatively, use SignRequest, VerifyResponse directly,
+// but this is more complicated.
+// For server-side operation,
 // WrapHandler installs a wrapper around a normal HTTP message handler.
 package httpsign
 

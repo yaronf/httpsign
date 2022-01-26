@@ -1,6 +1,8 @@
 package httpsign
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"reflect"
 	"strings"
 	"testing"
@@ -117,6 +119,62 @@ func TestSigner_sign(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("sign() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewRSASigner(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Errorf("failed to gen private key")
+	}
+	_ = privateKey.Public()
+
+	type args struct {
+		keyID  string
+		key    *rsa.PrivateKey
+		config *SignConfig
+		fields Fields
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *Signer
+		wantErr bool
+	}{
+		{
+			name: "empty key ID",
+			args: args{
+				keyID:  "",
+				key:    privateKey,
+				config: nil,
+				fields: nil,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "nil key",
+			args: args{
+				keyID:  "kk",
+				key:    nil,
+				config: NewSignConfig(),
+				fields: nil,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewRSASigner(tt.args.keyID, tt.args.key, tt.args.config, tt.args.fields)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewRSASigner() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewRSASigner() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

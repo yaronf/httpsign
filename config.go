@@ -168,7 +168,7 @@ func defaultReqNotVerified(w http.ResponseWriter, _ *http.Request, err error) {
 }
 
 // SetReqNotVerified defines a callback to be called when a request fails to verify. The default
-// callback sends a 401 status code with an error message that includes the error string.
+// callback sends a 401 status code with a generic error message.
 func (h *HandlerConfig) SetReqNotVerified(f func(w http.ResponseWriter, r *http.Request, err error)) *HandlerConfig {
 	h.reqNotVerified = f
 	return h

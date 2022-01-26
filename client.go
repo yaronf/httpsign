@@ -7,10 +7,10 @@ import (
 )
 
 // Client represents an HTTP client that optionally signs requests and optionally verifies responses.
-// The Signer may be nil to avoid signing, and so forth.
+// The Signer may be nil to avoid signing. Similarly, if both Verifier and FetchVerifier are nil, no verification takes place.
 // The FetchVerifier callback allows to generate a Verifier based on the particular response.
 // Either Verifier or FetchVerifier may be specified, but not both.
-// The client embeds an http.Client, which may be http.DefaultClient or any other.
+// The client embeds an http.Client, which in most cases can be http.DefaultClient.
 type Client struct {
 	SignatuerName string
 	Signer        *Signer
