@@ -29,7 +29,7 @@ func TestClient_Get(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "from Google",
+			name: "Happy path",
 			fields: fields{
 				sigName: "sig1",
 				signer: func() *Signer {
@@ -82,20 +82,29 @@ func TestClient_Get(t *testing.T) {
 			wantRes: "",
 			wantErr: true,
 		},
+		{
+			name: "bad fetch verifier",
+			fields: fields{
+				sigName: "sig1",
+				signer: func() *Signer {
+					signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64), NewSignConfig(), HeaderList([]string{"@method"}))
+					return signer
+				}(),
+				verifier: nil,
+				fetchVerifier: func(res *http.Response, req *http.Request) (sigName string, verifier *Verifier) {
+					return "name", nil
+				},
+				Client: *http.DefaultClient,
+			},
+			args: args{
+				url: "",
+			},
+			wantRes: "",
+			wantErr: true,
+		},
 	}
 
-	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
-		if r.RequestURI == "/" {
-			w.WriteHeader(200)
-		} else {
-			w.WriteHeader(404)
-		}
-		_, err := fmt.Fprintln(w, "Hey client, good to see ya")
-		if err != nil {
-			log.Fatal("Server could not send response")
-		}
-	}
-	ts := httptest.NewServer(http.HandlerFunc(simpleHandler))
+	ts := makeTestServer()
 	defer ts.Close()
 
 	for _, tt := range tests {
@@ -121,6 +130,22 @@ func TestClient_Get(t *testing.T) {
 			}
 		})
 	}
+}
+
+func makeTestServer() *httptest.Server {
+	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
+		if r.RequestURI == "/" {
+			w.WriteHeader(200)
+		} else {
+			w.WriteHeader(404)
+		}
+		_, err := fmt.Fprintln(w, "Hey client, good to see ya")
+		if err != nil {
+			log.Fatal("Server could not send response")
+		}
+	}
+	ts := httptest.NewServer(http.HandlerFunc(simpleHandler))
+	return ts
 }
 
 func TestClient_Head(t *testing.T) {
@@ -154,12 +179,16 @@ func TestClient_Head(t *testing.T) {
 				Client:        *http.DefaultClient,
 			},
 			args: args{
-				url: "https://www.google.com/",
+				url: "/",
 			},
 			wantRes: "200 OK",
 			wantErr: false,
 		},
 	}
+
+	ts := makeTestServer()
+	defer ts.Close()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Client{
@@ -169,7 +198,8 @@ func TestClient_Head(t *testing.T) {
 				FetchVerifier: tt.fields.fetchVerifier,
 				Client:        tt.fields.Client,
 			}
-			res, err := c.Head(tt.args.url)
+
+			res, err := c.Head(ts.URL + tt.args.url)
 			var gotRes string
 			if res != nil {
 				gotRes = res.Status

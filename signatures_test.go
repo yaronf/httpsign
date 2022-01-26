@@ -570,14 +570,15 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	fields := HeaderList([]string{"@status", "date", "content-type"})
 	signatureName := "sigres"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, nil, fields) // default config
+	config := NewSignConfig().SetExpires(999)                                   // should have expired long ago (but will be ignored by verifier)
+	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields) // default config
 	res := readResponse(httpres2)
 	sigInput, sig, _ := SignResponse(signatureName, *signer, res)
 
 	res2 := readResponse(httpres2)
 	res2.Header.Add("Signature", sig)
 	res2.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig(), fields)
+	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetRejectExpired(false), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}

@@ -10,10 +10,12 @@ import (
 )
 
 func ExampleClient_Get() {
-	// Set up a server
+	// Set up a test server
 	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		_, _ = fmt.Fprintf(w, "Hey client, you sent a signature with these parameters: %s\n", r.Header.Get("Signature-Input"))
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = fmt.Fprintf(w, "Hey client, you sent a signature with these parameters: %s\n",
+			r.Header.Get("Signature-Input"))
 	}
 	ts := httptest.NewServer(http.HandlerFunc(simpleHandler))
 	defer ts.Close()
@@ -23,9 +25,9 @@ func ExampleClient_Get() {
 	// don't do that in production.)
 	signer, _ := httpsign.NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64),
 		httpsign.NewSignConfig().SignCreated(false), httpsign.HeaderList([]string{"@method"}))
-	client := httpsign.NewDefaultClient("sig22", signer, nil, nil)
+	client := httpsign.NewDefaultClient("sig22", signer, nil, nil) // sign, don't verify
 
-	// Send an HTTP GET, get response
+	// Send an HTTP GET, get response -- signing and verification happen behind the scenes
 	res, _ := client.Get(ts.URL)
 
 	// Read the response

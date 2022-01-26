@@ -70,6 +70,9 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 		if err != nil {
 			return nil, err
 		}
+		if verifier == nil {
+			return nil, fmt.Errorf("fetchVerifier returned a nil verifier")
+		}
 		err := VerifyResponse(sigName, *verifier, res)
 		if err != nil {
 			return nil, err

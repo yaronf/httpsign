@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -145,4 +146,48 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 	t.Run("bad fetch Signer", noSigner)
 	t.Run("wrong verification key", badKey)
 	t.Run("failed algorithm check", badAlgs)
+}
+
+func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler
+	// Set up a test server
+	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = fmt.Fprintf(w, "Hey client, you sent a signature with these parameters: %s\n",
+			r.Header.Get("Signature-Input"))
+	}
+	verifyFailed := func(w http.ResponseWriter, r *http.Request, err error) {
+		w.WriteHeader(599)
+		if err == nil { // should not happen
+			t.Errorf("Test failed, handler received an error: %v", err)
+		}
+		log.Println("Could not verify request signature: " + err.Error())
+		_, _ = fmt.Fprintln(w, "Could not verify request signature")
+	}
+	fetchVerifier := func(r *http.Request) (string, *Verifier) {
+		sigName := "sig1"
+		verifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), nil,
+			HeaderList([]string{"@method"}))
+		return sigName, verifier
+	}
+	config := NewHandlerConfig().SetReqNotVerified(verifyFailed).SetFetchVerifier(fetchVerifier)
+	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), config))
+	defer ts.Close()
+
+	// Client code starts here
+	// Create a signer and a wrapped HTTP client (we set SignCreated to false to make the response deterministic,
+	// don't do that in production.)
+	signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64),
+		NewSignConfig().SignCreated(false), HeaderList([]string{"@method"}))
+	client := NewDefaultClient("sig22", signer, nil, nil) // sign, don't verify
+
+	// Send an HTTP GET, get response -- signing and verification happen behind the scenes
+	res, err := client.Get(ts.URL)
+	if err != nil {
+		t.Errorf("Get failed: %s", err)
+	}
+
+	if res.StatusCode != 599 {
+		t.Errorf("Verification did not fail?")
+	}
 }
