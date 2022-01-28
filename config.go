@@ -7,14 +7,16 @@ import (
 	"time"
 )
 
-// SignConfig contains additional configuration for the Signer.
+type requestResponse struct{ name, signature string }
+
+// SignConfig contains additional configuration for the signer.
 type SignConfig struct {
 	signAlg         bool
 	signCreated     bool
 	fakeCreated     int64
 	expires         int64
 	nonce           string
-	requestResponse struct{ name, signature string }
+	requestResponse *requestResponse
 }
 
 // NewSignConfig generates a default configuration.
@@ -64,18 +66,18 @@ func (c *SignConfig) SetNonce(nonce string) *SignConfig {
 // SetRequestResponse allows the server to indicate signature name and signature that
 // it had received from a client and include it in the signature input.
 func (c *SignConfig) SetRequestResponse(name, signature string) *SignConfig {
-	// TODO RequestResponse
-	c.requestResponse = struct{ name, signature string }{name, signature}
+	c.requestResponse = &requestResponse{name, signature}
 	return c
 }
 
-// VerifyConfig contains additional configuration for the Verifier.
+// VerifyConfig contains additional configuration for the verifier.
 type VerifyConfig struct {
-	verifyCreated bool
-	notNewerThan  time.Duration
-	notOlderThan  time.Duration
-	allowedAlgs   []string
-	rejectExpired bool
+	verifyCreated   bool
+	notNewerThan    time.Duration
+	notOlderThan    time.Duration
+	allowedAlgs     []string
+	rejectExpired   bool
+	requestResponse *requestResponse
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,
@@ -111,6 +113,17 @@ func (v *VerifyConfig) SetRejectExpired(rejectExpired bool) *VerifyConfig {
 // Default: an empty list, signifying all values are accepted.
 func (v *VerifyConfig) SetAllowedAlgs(allowedAlgs []string) *VerifyConfig {
 	v.allowedAlgs = allowedAlgs
+	return v
+}
+
+// SetRequestResponse allows the server to indicate signature name and signature that
+// it had received from a client and include it in the signature input. Here this is configured
+// on the client side when verifying the response.
+func (v *VerifyConfig) SetRequestResponse(name, signature string) *VerifyConfig {
+	v.requestResponse = &requestResponse{
+		name:      name,
+		signature: signature,
+	}
 	return v
 }
 

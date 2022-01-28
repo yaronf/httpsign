@@ -33,6 +33,9 @@ func NewHMACSHA256Signer(keyID string, key []byte, config *SignConfig, fields Fi
 	if config == nil {
 		config = NewSignConfig()
 	}
+	if fields == nil {
+		return nil, fmt.Errorf("fields must not be nil")
+	}
 	return &Signer{
 		keyID:  keyID,
 		key:    key,
@@ -53,6 +56,9 @@ func NewRSASigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fields 
 	}
 	if config == nil {
 		config = NewSignConfig()
+	}
+	if fields == nil {
+		return nil, fmt.Errorf("fields must not be nil")
 	}
 	return &Signer{
 		keyID:  keyID,
@@ -75,6 +81,9 @@ func NewRSAPSSSigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fiel
 	if config == nil {
 		config = NewSignConfig()
 	}
+	if fields == nil {
+		return nil, fmt.Errorf("fields must not be nil")
+	}
 	return &Signer{
 		keyID:  keyID,
 		key:    key,
@@ -95,6 +104,9 @@ func NewP256Signer(keyID string, key *ecdsa.PrivateKey, config *SignConfig, fiel
 	}
 	if config == nil {
 		config = NewSignConfig()
+	}
+	if fields == nil {
+		return nil, fmt.Errorf("fields must not be nil")
 	}
 	return &Signer{
 		keyID:  keyID,
@@ -135,11 +147,11 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 
 // Verifier includes a cryptographic key (typically a public key) and configuration of what needs to be verified.
 type Verifier struct {
-	keyID string
-	key   interface{}
-	alg   string
-	c     *VerifyConfig
-	f     Fields
+	keyID  string
+	key    interface{}
+	alg    string
+	config *VerifyConfig
+	fields Fields
 }
 
 // NewHMACSHA256Verifier generates a new Verifier for HMAC-SHA256 signatures. Set config to nil for a default configuration.
@@ -155,11 +167,11 @@ func NewHMACSHA256Verifier(keyID string, key []byte, config *VerifyConfig, field
 		config = NewVerifyConfig()
 	}
 	return &Verifier{
-		keyID: keyID,
-		key:   key,
-		alg:   "hmac-sha256",
-		c:     config,
-		f:     fields,
+		keyID:  keyID,
+		key:    key,
+		alg:    "hmac-sha256",
+		config: config,
+		fields: fields,
 	}, nil
 }
 
@@ -172,12 +184,15 @@ func NewRSAVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, fiel
 	if config == nil {
 		config = NewVerifyConfig()
 	}
+	if fields == nil {
+		return nil, fmt.Errorf("fields must not be nil")
+	}
 	return &Verifier{
-		keyID: keyID,
-		key:   key,
-		alg:   "rsa-v1_5-sha256",
-		c:     config,
-		f:     fields,
+		keyID:  keyID,
+		key:    key,
+		alg:    "rsa-v1_5-sha256",
+		config: config,
+		fields: fields,
 	}, nil
 }
 
@@ -190,12 +205,15 @@ func NewRSAPSSVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, f
 	if config == nil {
 		config = NewVerifyConfig()
 	}
+	if fields == nil {
+		return nil, fmt.Errorf("fields must not be nil")
+	}
 	return &Verifier{
-		keyID: keyID,
-		key:   key,
-		alg:   "rsa-pss-sha512",
-		c:     config,
-		f:     fields,
+		keyID:  keyID,
+		key:    key,
+		alg:    "rsa-pss-sha512",
+		config: config,
+		fields: fields,
 	}, nil
 }
 
@@ -208,12 +226,15 @@ func NewP256Verifier(keyID string, key *ecdsa.PublicKey, config *VerifyConfig, f
 	if config == nil {
 		config = NewVerifyConfig()
 	}
+	if fields == nil {
+		return nil, fmt.Errorf("fields must not be nil")
+	}
 	return &Verifier{
-		keyID: keyID,
-		key:   key,
-		alg:   "ecdsa-p256-sha256",
-		c:     config,
-		f:     fields,
+		keyID:  keyID,
+		key:    key,
+		alg:    "ecdsa-p256-sha256",
+		config: config,
+		fields: fields,
 	}, nil
 }
 

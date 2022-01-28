@@ -53,7 +53,11 @@ func generateSignature(name string, signer Signer, input string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%s=:%s:", name, base64.StdEncoding.EncodeToString(raw)), nil
+	return fmt.Sprintf("%s=%s", name, encodeBytes(raw)), nil
+}
+
+func encodeBytes(raw []byte) string {
+	return ":" + base64.StdEncoding.EncodeToString(raw) + ":"
 }
 
 func generateSignatureInput(message parsedMessage, fields Fields, params string) (string, error) {
@@ -110,6 +114,9 @@ func SignRequest(signatureName string, signer Signer, req *http.Request) (signat
 	if signatureName == "" {
 		return "", "", fmt.Errorf("empty signature name")
 	}
+	if signer.config.requestResponse != nil {
+		return "", "", fmt.Errorf("use request-response only to sign responses")
+	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
 		return "", "", err
@@ -131,15 +138,22 @@ func SignResponse(signatureName string, signer Signer, res *http.Response) (sign
 	if err != nil {
 		return "", "", err
 	}
-	addPseudoHeaders(parsedMessage, *signer.config)
-	return signMessage(*signer.config, signatureName, signer, *parsedMessage, signer.fields)
+	extendedFields := addPseudoHeaders(parsedMessage, signer.config.requestResponse, signer.fields)
+	return signMessage(*signer.config, signatureName, signer, *parsedMessage, extendedFields)
 }
 
-func addPseudoHeaders(message *parsedMessage, config SignConfig) {
-	if config.requestResponse.name != "" {
-		message.components[*fromHeaderName("@request-response")] = []string{config.requestResponse.signature}
-		// TODO and what about the name? (request-response)
+// Handle the special header-like @request-response
+func addPseudoHeaders(message *parsedMessage, rr *requestResponse, fields Fields) Fields {
+	if rr != nil {
+		rrfield := field{
+			name:      "@request-response",
+			flagName:  "key",
+			flagValue: rr.name,
+		}
+		message.components[rrfield] = []string{rr.signature}
+		return append(fields, rrfield)
 	}
+	return fields
 }
 
 //
@@ -152,11 +166,14 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) (
 	if signatureName == "" {
 		return fmt.Errorf("empty signature name")
 	}
+	if verifier.config.requestResponse != nil {
+		return fmt.Errorf("use request-response only to verify responses")
+	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
 		return err
 	}
-	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, verifier.f)
+	return verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, verifier.fields)
 }
 
 // RequestDetails parses a signed request and returns the key ID and optionally the algorithm used in the given signature.
@@ -187,6 +204,31 @@ func ResponseDetails(signatureName string, res *http.Response) (keyID, alg strin
 		return "", "", err
 	}
 	return messageKeyID(signatureName, *parsedMessage)
+}
+
+// GetRequestSignature returns the base64-encoded signature, parsed from a signed request.
+// This is useful for the request-response feature.
+func GetRequestSignature(req *http.Request, signatureName string) (string, error) {
+	if req == nil {
+		return "", fmt.Errorf("nil request")
+	}
+	if signatureName == "" {
+		return "", fmt.Errorf("empty signature name")
+	}
+	parsedMessage, err := parseRequest(req)
+	if err != nil {
+		return "", err
+	}
+	ws, found := parsedMessage.components[*fromHeaderName("signature")]
+	if !found {
+		return "", fmt.Errorf("missing \"signature\" header")
+	}
+	sigHeader := ws[0]
+	sigRaw, err := parseWantSignature(sigHeader, signatureName)
+	if err != nil {
+		return "", err
+	}
+	return encodeBytes(sigRaw), nil
 }
 
 func messageKeyID(signatureName string, parsedMessage parsedMessage) (keyID, alg string, err error) {
@@ -231,7 +273,8 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response)
 	if err != nil {
 		return err
 	}
-	return verifyMessage(*verifier.c, signatureName, verifier, *parsedMessage, verifier.f)
+	extendedFields := addPseudoHeaders(parsedMessage, verifier.config.requestResponse, verifier.fields)
+	return verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, extendedFields)
 }
 
 func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) error {

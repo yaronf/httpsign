@@ -1,6 +1,7 @@
 package httpsign
 
 import (
+	"fmt"
 	"github.com/dunglas/httpsfv"
 	"strings"
 )
@@ -12,6 +13,10 @@ type Fields []field
 type field struct {
 	name                string
 	flagName, flagValue string
+}
+
+func (f *field) String() string {
+	return fmt.Sprintf("%s;%s=\"%s\"", f.name, f.flagName, f.flagValue)
 }
 
 // HeaderList is a simple way to generate a Fields list, where only simple header names and specialty headers
