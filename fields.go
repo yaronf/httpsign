@@ -16,6 +16,9 @@ type field struct {
 }
 
 func (f *field) String() string {
+	if f.flagName == "" {
+		return f.name
+	}
 	return fmt.Sprintf("%s;%s=\"%s\"", f.name, f.flagName, f.flagValue)
 }
 
@@ -74,7 +77,13 @@ func (fs *Fields) AddQueryParam(qp string) *Fields {
 	return fs
 }
 
-// AddDictHeader indicates that a specific instance of a header is to be signed (TODO: unimplemented)
+func fromDictHeader(hdr, key string) *field {
+	h := strings.ToLower(hdr)
+	f := field{h, "key", key}
+	return &f
+}
+
+// AddDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified
 func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
 	k := strings.ToLower(key)
 	return fs.addHeaderAndFlag(hdr, "key", k)

@@ -27,7 +27,7 @@ func Test_WrapHandler(t *testing.T) {
 
 	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		w.Header().Set("bar", "baz")
+		w.Header().Set("bar", "baz and baz again")
 		fmt.Fprintln(w, "Hello, client")
 		fmt.Fprintln(w, "Hello again")
 	}

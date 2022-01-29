@@ -998,3 +998,32 @@ func TestRequestResponse(t *testing.T) {
 		t.Errorf("Could not verify response: %v", err)
 	}
 }
+
+func TestDictionary(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	res := readResponse(httpres2)
+	res.Header.Set("X-Dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
+	signer2, err := NewP256Signer("key10", priv, NewSignConfig(),
+		*NewFields().AddHeader("@status").AddDictHeader("x-dictionary", "a"))
+	if err != nil {
+		t.Errorf("Could not create signer")
+	}
+	sigInput2, sig2, err := SignResponse("sig2", *signer2, res)
+	if err != nil {
+		t.Errorf("Could not sign response: %v", err)
+	}
+	res.Header.Add("Signature-Input", sigInput2)
+	res.Header.Add("Signature", sig2)
+
+	// Client verifies response
+	verifier2, err := NewP256Verifier("key10", pub, NewVerifyConfig().SetVerifyCreated(false),
+		*NewFields().AddHeader("@status").AddDictHeader("x-dictionary", "a"))
+	if err != nil {
+		t.Errorf("Could not create verifier: %v", err)
+	}
+	err = VerifyResponse("sig2", *verifier2, res)
+	if err != nil {
+		t.Errorf("Could not verify response: %v", err)
+	}
+
+}

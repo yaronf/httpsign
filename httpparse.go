@@ -2,6 +2,7 @@ package httpsign
 
 import (
 	"fmt"
+	"github.com/dunglas/httpsfv"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -40,7 +41,10 @@ func parseRequest(req *http.Request) (*parsedMessage, error) {
 	}
 	components := components{}
 	generateReqSpecialtyComponents(req, components)
-	generateHeaderComponents(req.Header, components)
+	err = generateHeaderComponents(req.Header, components)
+	if err != nil {
+		return nil, err
+	}
 	values, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse query: %s", req.URL.RawQuery)
@@ -63,7 +67,10 @@ func parseResponse(res *http.Response) (*parsedMessage, error) {
 	}
 	components := components{}
 	generateResSpecialtyComponents(res, components)
-	generateHeaderComponents(res.Header, components)
+	err = generateHeaderComponents(res.Header, components)
+	if err != nil {
+		return nil, err
+	}
 
 	return &parsedMessage{components}, nil
 }
@@ -78,12 +85,35 @@ func validateMessageHeaders(header http.Header) error {
 	return nil
 }
 
-// TODO: dictionary headers
-func generateHeaderComponents(headers http.Header, components components) {
-	for key, val := range headers {
-		k := strings.ToLower(key)
-		components[*fromHeaderName(k)] = []string{foldFields(val)}
+func generateHeaderComponents(headers http.Header, components components) error {
+	for hdrName, val := range headers {
+		lower := strings.ToLower(hdrName)
+		dict, err := httpsfv.UnmarshalDictionary(val)
+		if err == nil { // dictionary
+			for _, name := range dict.Names() {
+				v, _ := dict.Get(name)
+				switch v.(type) {
+				case httpsfv.Item:
+					vv, err := httpsfv.Marshal(v.(httpsfv.Item))
+					if err != nil {
+						return fmt.Errorf("malformed dictionry member %s: %v", name, err)
+					}
+					components[*fromDictHeader(lower, name)] = []string{vv}
+				case httpsfv.InnerList:
+					vv, err := httpsfv.Marshal(v.(httpsfv.InnerList))
+					if err != nil {
+						return fmt.Errorf("malformed dictionry member %s: %v", name, err)
+					}
+					components[*fromDictHeader(lower, name)] = []string{vv}
+				default:
+					return fmt.Errorf("unexpected dictionary value")
+				}
+			}
+		} else {
+			components[*fromHeaderName(lower)] = []string{foldFields(val)}
+		}
 	}
+	return nil
 }
 
 func foldFields(fields []string) string {

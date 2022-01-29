@@ -57,13 +57,14 @@ func ExampleWrapHandler_serverSigns() {
 	fetchSigner := func(res http.Response, r *http.Request) (string, *httpsign.Signer) {
 		sigName := "sig1"
 		signer, _ := httpsign.NewHMACSHA256Signer("key", bytes.Repeat([]byte{0}, 64), nil,
-			httpsign.HeaderList([]string{"@status", "bar", "date"}))
+			httpsign.HeaderList([]string{"@status", "bar", "date", "content-type"}))
 		return sigName, signer
 	}
 
 	simpleHandler := func(w http.ResponseWriter, r *http.Request) { // this handler gets wrapped
 		w.WriteHeader(200)
-		w.Header().Set("bar", "baz")
+		w.Header().Set("bar", "some text here") // note: a single word in the header value would be interpreted is a trivial dictionary!
+		w.Header().Set("Content-Type", "text/plain")
 		fmt.Fprintln(w, "Hello, client")
 	}
 

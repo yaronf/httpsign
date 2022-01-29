@@ -10,6 +10,8 @@ import (
 // WrapHandler wraps a server's HTTP request handler so that the incoming request is verified
 // and the response is signed. Both operations are optional. If config is nil, the default
 // configuration is applied: requests are verified and responses are signed.
+// Note: unlike the standard net.http behavior, if you want the "Content-Type" header to be signed,
+// you should specify it explicitly.
 func WrapHandler(h http.Handler, config *HandlerConfig) http.Handler {
 	if config == nil {
 		config = NewHandlerConfig()

@@ -219,12 +219,15 @@ func GetRequestSignature(req *http.Request, signatureName string) (string, error
 	if err != nil {
 		return "", err
 	}
-	ws, found := parsedMessage.components[*fromHeaderName("signature")]
+	ws, found := parsedMessage.components[*fromDictHeader("signature", signatureName)]
 	if !found {
-		return "", fmt.Errorf("missing \"signature\" header")
+		return "", fmt.Errorf("missing \"signature\" header for \"%s\"", signatureName)
+	}
+	if len(ws) > 1 {
+		return "", fmt.Errorf("more than one \"signature\" value for \"%s\"", signatureName)
 	}
 	sigHeader := ws[0]
-	sigRaw, err := parseWantSignature(sigHeader, signatureName)
+	sigRaw, err := parseWantSignature(sigHeader)
 	if err != nil {
 		return "", err
 	}
@@ -232,9 +235,12 @@ func GetRequestSignature(req *http.Request, signatureName string) (string, error
 }
 
 func messageKeyID(signatureName string, parsedMessage parsedMessage) (keyID, alg string, err error) {
-	si, found := parsedMessage.components[*fromHeaderName("signature-input")]
+	si, found := parsedMessage.components[*fromDictHeader("signature-input", signatureName)]
 	if !found {
-		return "", "", fmt.Errorf("missing \"signature-input\" header")
+		return "", "", fmt.Errorf("missing \"signature-input\" header, or cannot find \"%s\"", signatureName)
+	}
+	if len(si) > 1 {
+		return "", "", fmt.Errorf("more than one \"signature-input\" for %s", signatureName)
 	}
 	signatureInput := si[0]
 	psi, err := parseSignatureInput(signatureInput, signatureName)
@@ -278,23 +284,29 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response)
 }
 
 func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) error {
-	wsi, found := message.components[*fromHeaderName("signature-input")]
+	wsi, found := message.components[*fromDictHeader("signature-input", name)]
 	if !found {
-		return fmt.Errorf("missing \"signature-input\" header")
+		return fmt.Errorf("missing \"signature-input\" header, or cannot find signature \"%s\"", name)
+	}
+	if len(wsi) > 1 {
+		return fmt.Errorf("multiple \"signature-header\" values for %s", name)
 	}
 	wantSignatureInput := wsi[0]
-	ws, found := message.components[*fromHeaderName("signature")]
+	ws, found := message.components[*fromDictHeader("signature", name)]
 	if !found {
 		return fmt.Errorf("missing \"signature\" header")
 	}
+	if len(ws) > 1 {
+		return fmt.Errorf("multiple \"signature\" values for %s", name)
+	}
 	wantSignature := ws[0]
-	delete(message.components, *fromHeaderName("signature-input"))
-	delete(message.components, *fromHeaderName("signature"))
+	delete(message.components, *fromDictHeader("signature-input", name))
+	delete(message.components, *fromDictHeader("signature", name))
 	err := validateFields(fields)
 	if err != nil {
 		return err
 	}
-	wantSigRaw, err := parseWantSignature(wantSignature, name)
+	wantSigRaw, err := parseWantSignature(wantSignature)
 	if err != nil {
 		return err
 	}
@@ -386,83 +398,59 @@ type psiSignature struct {
 	params        map[string]interface{}
 }
 
-type parsedSignatureInput struct {
-	signatures []psiSignature
-}
-
-func parseSignatureInput(input string, name string) (*psiSignature, error) {
-	psi := parsedSignatureInput{}
-	sigs, err := httpsfv.UnmarshalDictionary([]string{input})
+func parseSignatureInput(input string, sigName string) (*psiSignature, error) {
+	sigs, err := httpsfv.UnmarshalDictionary([]string{sigName + "=" + input}) // yes this is a hack, there is no UnmarshalInnerList
 	if err != nil {
-		return nil, fmt.Errorf("could not parse Signature-Input as list: %w", err)
+		return nil, fmt.Errorf("could not parse Signature-Input as dictionary: %w", err)
 	}
-	for _, name := range sigs.Names() {
-		memberForName, ok := sigs.Get(name)
-		if !ok {
-			return nil, fmt.Errorf("could not parse Signature-Input for signature %s", name)
-		}
-		fieldsList, ok := memberForName.(httpsfv.InnerList)
-		osp, err := httpsfv.Marshal(fieldsList) // undocumented functionality
-		if err != nil {
-			return nil, fmt.Errorf("could not marshal inner list: %w", err)
-		}
-		if !ok {
-			return nil, fmt.Errorf("Signature-Input: signature %s does not have an inner list", name)
-		}
-		var f Fields
-		for _, ff := range fieldsList.Items {
-			fname, ok := ff.Value.(string)
-			if !ok {
-				return nil, fmt.Errorf("Signature-Input: value is not a string")
-			}
-			if ff.Params == nil || len(ff.Params.Names()) == 0 {
-				f = append(f, *fromHeaderName(fname))
-			} else {
-				if len(ff.Params.Names()) > 1 {
-					return nil, fmt.Errorf("more than one param for \"%s\"", fname)
-				}
-				flagNames := ff.Params.Names()
-				flagName := flagNames[0]
-				flagValue, _ := ff.Params.Get(flagName)
-				fv := flagValue.(string)
-				f = append(f, field{
-					name:      fname,
-					flagName:  flagName,
-					flagValue: fv,
-				})
-			}
-		}
-		params := map[string]interface{}{}
-		ps := fieldsList.Params
-		for _, p := range (*ps).Names() {
-			pp, ok := ps.Get(p)
-			if !ok {
-				return nil, fmt.Errorf("could not read param \"%s\"", p)
-			}
-			params[p] = pp
-		}
-		psi.signatures = append(psi.signatures, psiSignature{name, osp, f, params})
-	}
-	for _, s := range psi.signatures {
-		if s.signatureName == name {
-			return &s, nil
-		}
-	}
-	return nil, fmt.Errorf("couldn't find signature input for \"%s\"", name)
-}
-
-func parseWantSignature(wantSignature string, name string) ([]byte, error) {
-	parsedSignature, err := httpsfv.UnmarshalDictionary([]string{wantSignature})
+	memberForName, _ := sigs.Get(sigName)
+	fieldsList, ok := memberForName.(httpsfv.InnerList)
+	osp, err := httpsfv.Marshal(fieldsList) // undocumented functionality
 	if err != nil {
-		return nil, fmt.Errorf("could not parse signature field: %w", err)
+		return nil, fmt.Errorf("could not marshal inner list: %w", err)
 	}
-	wantSigValue, found := parsedSignature.Get(name)
-	if !found {
-		return nil, fmt.Errorf("could not find signature \"%s\"", name)
-	}
-	wantSigItem, ok := wantSigValue.(httpsfv.Item)
 	if !ok {
-		return nil, fmt.Errorf("unexpected value in signature field")
+		return nil, fmt.Errorf("Signature-Input: signature %s does not have an inner list", sigName)
+	}
+	var f Fields
+	for _, ff := range fieldsList.Items {
+		fname, ok := ff.Value.(string)
+		if !ok {
+			return nil, fmt.Errorf("Signature-Input: value is not a string")
+		}
+		if ff.Params == nil || len(ff.Params.Names()) == 0 {
+			f = append(f, *fromHeaderName(fname))
+		} else {
+			if len(ff.Params.Names()) > 1 {
+				return nil, fmt.Errorf("more than one param for \"%s\"", fname)
+			}
+			flagNames := ff.Params.Names()
+			flagName := flagNames[0]
+			flagValue, _ := ff.Params.Get(flagName)
+			fv := flagValue.(string)
+			f = append(f, field{
+				name:      fname,
+				flagName:  flagName,
+				flagValue: fv,
+			})
+		}
+	}
+	params := map[string]interface{}{}
+	ps := fieldsList.Params
+	for _, p := range (*ps).Names() {
+		pp, ok := ps.Get(p)
+		if !ok {
+			return nil, fmt.Errorf("could not read param \"%s\"", p)
+		}
+		params[p] = pp
+	}
+	return &psiSignature{sigName, osp, f, params}, nil
+}
+
+func parseWantSignature(wantSignature string) ([]byte, error) {
+	wantSigItem, err := httpsfv.UnmarshalItem([]string{wantSignature})
+	if err != nil {
+		return nil, fmt.Errorf("unexpected value in signature field: %s", err)
 	}
 	wantSigRaw, ok := wantSigItem.Value.([]byte)
 	if !ok {
