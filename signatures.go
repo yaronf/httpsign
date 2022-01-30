@@ -310,24 +310,40 @@ func verifyMessage(config VerifyConfig, name string, verifier Verifier, message 
 }
 
 func applyVerificationPolicy(psi *psiSignature, config VerifyConfig) error {
-	if config.verifyCreated {
+	err := applyPolicyCreated(psi, config)
+	if err != nil {
+		return err
+	}
+	err2 := applyPolicyAlgs(psi, config)
+	if err2 != nil {
+		return err2
+	}
+	err3 := applyPolicyExpired(psi, config)
+	if err3 != nil {
+		return err3
+	}
+	return nil
+}
+
+func applyPolicyExpired(psi *psiSignature, config VerifyConfig) error {
+	if config.rejectExpired {
 		now := time.Now()
-		createdParam, ok := psi.params["created"]
-		if !ok {
-			return fmt.Errorf("missing \"created\" parameter")
-		}
-		created, ok := createdParam.(int64)
-		if !ok {
-			return fmt.Errorf("malformed \"created\" parameter")
-		}
-		createdTime := time.Unix(created, 0)
-		if createdTime.After(now.Add(config.notNewerThan)) {
-			return fmt.Errorf("message appears to be too new, check for clock skew")
-		}
-		if createdTime.Add(config.notOlderThan).Before(now) {
-			return fmt.Errorf("message is too old, check for replay")
+		expiresParam, ok := psi.params["expires"]
+		if ok {
+			expires, ok := expiresParam.(int64)
+			if !ok {
+				return fmt.Errorf("malformed \"expires\" parameter")
+			}
+			expiresTime := time.Unix(expires, 0)
+			if now.After(expiresTime) {
+				return fmt.Errorf("expired signature")
+			}
 		}
 	}
+	return nil
+}
+
+func applyPolicyAlgs(psi *psiSignature, config VerifyConfig) error {
 	if len(config.allowedAlgs) > 0 {
 		algParam, ok := psi.params["alg"]
 		if !ok {
@@ -347,18 +363,26 @@ func applyVerificationPolicy(psi *psiSignature, config VerifyConfig) error {
 			return fmt.Errorf("\"alg\" parameter not allowed by policy")
 		}
 	}
-	if config.rejectExpired {
+	return nil
+}
+
+func applyPolicyCreated(psi *psiSignature, config VerifyConfig) error {
+	if config.verifyCreated {
 		now := time.Now()
-		expiresParam, ok := psi.params["expires"]
-		if ok {
-			expires, ok := expiresParam.(int64)
-			if !ok {
-				return fmt.Errorf("malformed \"expires\" parameter")
-			}
-			expiresTime := time.Unix(expires, 0)
-			if now.After(expiresTime) {
-				return fmt.Errorf("expired signature")
-			}
+		createdParam, ok := psi.params["created"]
+		if !ok {
+			return fmt.Errorf("missing \"created\" parameter")
+		}
+		created, ok := createdParam.(int64)
+		if !ok {
+			return fmt.Errorf("malformed \"created\" parameter")
+		}
+		createdTime := time.Unix(created, 0)
+		if createdTime.After(now.Add(config.notNewerThan)) {
+			return fmt.Errorf("message appears to be too new, check for clock skew")
+		}
+		if createdTime.Add(config.notOlderThan).Before(now) {
+			return fmt.Errorf("message is too old, check for replay")
 		}
 	}
 	return nil
