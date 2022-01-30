@@ -17,7 +17,7 @@ import (
 
 func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage parsedMessage,
 	fields Fields) (sigInputHeader string, signature string, err error) {
-	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, fields)
+	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, signer.foreignSigner, fields)
 	if err != nil {
 		return "", "", err
 	}
@@ -65,7 +65,7 @@ func generateSignatureInput(message parsedMessage, fields Fields, params string)
 	return inp, nil
 }
 
-func generateSigParams(config *SignConfig, keyID, alg string, fields Fields) (string, error) {
+func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner interface{}, fields Fields) (string, error) {
 	p := httpsfv.NewParams()
 	var createdTime int64
 	if config.fakeCreated != 0 {
@@ -83,6 +83,9 @@ func generateSigParams(config *SignConfig, keyID, alg string, fields Fields) (st
 		p.Add("nonce", config.nonce)
 	}
 	if config.signAlg {
+		if foreignSigner != nil {
+			return "", fmt.Errorf("cannot use the alg parameter with a JWS signer")
+		}
 		p.Add("alg", alg)
 	}
 	p.Add("keyid", keyID)

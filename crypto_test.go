@@ -187,7 +187,7 @@ func TestForeignSigner(t *testing.T) {
 		t.Errorf("Failed to generate keypair: %v", err)
 	}
 
-	config := NewSignConfig().setFakeCreated(1618884475)
+	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
 	signatureName := "sig1"
 	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
 	signer, err := NewJWSSigner(jwa.ES256, "key1", priv, config, fields)
