@@ -12,16 +12,11 @@ import (
 	"fmt"
 	"github.com/dunglas/httpsfv"
 	"net/http"
-	"strings"
 	"time"
 )
 
 func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage parsedMessage,
 	fields Fields) (sigInputHeader string, signature string, err error) {
-	err = validateFields(fields)
-	if err != nil {
-		return "", "", err
-	}
 	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, fields)
 	if err != nil {
 		return "", "", err
@@ -36,16 +31,6 @@ func signMessage(config SignConfig, signatureName string, signer Signer, parsedM
 		return "", "", err
 	}
 	return sigInputHeader, signature, nil
-}
-
-func validateFields(fields Fields) error {
-	for _, f := range fields {
-		if f.name != strings.ToLower(f.name) {
-			return fmt.Errorf("field \"%s\" is not lowercase", f.name)
-		}
-		// Note that using "signature" and "signature-input" is allowed
-	}
-	return nil
 }
 
 func generateSignature(name string, signer Signer, input string) (string, error) {
@@ -302,10 +287,6 @@ func verifyMessage(config VerifyConfig, name string, verifier Verifier, message 
 	wantSignature := ws[0]
 	delete(message.components, *fromDictHeader("signature-input", name))
 	delete(message.components, *fromDictHeader("signature", name))
-	err := validateFields(fields)
-	if err != nil {
-		return err
-	}
 	wantSigRaw, err := parseWantSignature(wantSignature)
 	if err != nil {
 		return err

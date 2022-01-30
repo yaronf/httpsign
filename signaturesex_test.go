@@ -11,7 +11,7 @@ import (
 
 func ExampleSignRequest() {
 	config := httpsign.NewSignConfig().SignCreated(false).SetNonce("BADCAB") // SignCreated should be "true" to protect against replay attacks
-	fields := httpsign.HeaderList([]string{"@authority", "date", "@method"})
+	fields := httpsign.HeaderList([]string{"@authority", "Date", "@method"})
 	signer, _ := httpsign.NewHMACSHA256Signer("my-shared-secret", bytes.Repeat([]byte{0x77}, 64), config, fields)
 	reqStr := `GET /foo HTTP/1.1
 Host: example.org
@@ -30,7 +30,7 @@ Cache-Control: max-age=60
 func ExampleVerifyRequest() {
 	config := httpsign.NewVerifyConfig().SetVerifyCreated(false) // for testing only
 	verifier, _ := httpsign.NewHMACSHA256Verifier("my-shared-secret", bytes.Repeat([]byte{0x77}, 64), config,
-		httpsign.HeaderList([]string{"@authority", "date", "@method"}))
+		httpsign.HeaderList([]string{"@authority", "Date", "@method"}))
 	reqStr := `GET /foo HTTP/1.1
 Host: example.org
 Date: Tue, 20 Apr 2021 02:07:55 GMT

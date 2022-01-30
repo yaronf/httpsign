@@ -10,19 +10,22 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
+	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jws"
 )
 
 // Signer includes a cryptographic key and configuration of what needs to be signed.
 type Signer struct {
-	keyID  string
-	key    interface{}
-	alg    string
-	config *SignConfig
-	fields Fields
+	keyID         string
+	key           interface{}
+	alg           string
+	config        *SignConfig
+	fields        Fields
+	foreignSigner interface{}
 }
 
 // NewHMACSHA256Signer returns a new Signer structure. Key must be at least 64 bytes long.
-// Field names must be all lowercase, config may be nil for a default configuration.
+// Config may be nil for a default configuration.
 func NewHMACSHA256Signer(keyID string, key []byte, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil || len(key) < 64 {
 		return nil, fmt.Errorf("key must be at least 64 bytes long")
@@ -46,7 +49,7 @@ func NewHMACSHA256Signer(keyID string, key []byte, config *SignConfig, fields Fi
 }
 
 // NewRSASigner returns a new Signer structure. Key is an RSA private key.
-// Field names must be all lowercase, config may be nil for a default configuration.
+// Config may be nil for a default configuration.
 func NewRSASigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
@@ -70,7 +73,7 @@ func NewRSASigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fields 
 }
 
 // NewRSAPSSSigner returns a new Signer structure. Key is an RSA private key.
-// Field names must be all lowercase, config may be nil for a default configuration.
+// Config may be nil for a default configuration.
 func NewRSAPSSSigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
@@ -94,7 +97,7 @@ func NewRSAPSSSigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fiel
 }
 
 // NewP256Signer returns a new Signer structure. Key is an elliptic curve P-256 private key.
-// Field names must be all lowercase, config may be nil for a default configuration.
+// Config may be nil for a default configuration.
 func NewP256Signer(keyID string, key *ecdsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
@@ -117,7 +120,38 @@ func NewP256Signer(keyID string, key *ecdsa.PrivateKey, config *SignConfig, fiel
 	}, nil
 }
 
+// NewJWSSigner creates a generic signer for JWS algorithms, using the go-jwx package. The particular key type for each algorithm
+// is documented in that package.
+// Config may be nil for a default configuration.
+func NewJWSSigner(alg jwa.SignatureAlgorithm, keyID string, key interface{}, config *SignConfig, fields Fields) (*Signer, error) {
+	if alg == jwa.NoSignature {
+		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
+	}
+	jwsSigner, err := jws.NewSigner(alg)
+	if err != nil {
+		return nil, err
+	}
+	return &Signer{
+		keyID:         keyID,
+		key:           key,
+		alg:           string(alg),
+		config:        config,
+		fields:        fields,
+		foreignSigner: jwsSigner,
+	}, nil
+}
+
 func (s Signer) sign(buff []byte) ([]byte, error) {
+	if s.foreignSigner != nil {
+		switch signer := s.foreignSigner.(type) {
+		case jws.Signer:
+			{
+				return signer.Sign(buff, s.key)
+			}
+		default:
+			return nil, fmt.Errorf("expected jws.Signer, got %T", s.foreignSigner)
+		}
+	}
 	switch s.alg {
 	case "hmac-sha256":
 		mac := hmac.New(sha256.New, s.key.([]byte))
@@ -147,11 +181,12 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 
 // Verifier includes a cryptographic key (typically a public key) and configuration of what needs to be verified.
 type Verifier struct {
-	keyID  string
-	key    interface{}
-	alg    string
-	config *VerifyConfig
-	fields Fields
+	keyID           string
+	key             interface{}
+	alg             string
+	config          *VerifyConfig
+	fields          Fields
+	foreignVerifier interface{}
 }
 
 // NewHMACSHA256Verifier generates a new Verifier for HMAC-SHA256 signatures. Set config to nil for a default configuration.
@@ -238,7 +273,38 @@ func NewP256Verifier(keyID string, key *ecdsa.PublicKey, config *VerifyConfig, f
 	}, nil
 }
 
+// NewJWSVerifier creates a generic verifier for JWS algorithms, using the go-jwx package. The particular key type for each algorithm
+// is documented in that package. Set config to nil for a default configuration.
+// Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
+func NewJWSVerifier(alg jwa.SignatureAlgorithm, key interface{}, keyID string, config *VerifyConfig, fields Fields) (*Verifier, error) {
+	verifier, err := jws.NewVerifier(alg)
+	if err != nil {
+		return nil, err
+	}
+	return &Verifier{
+		keyID:           keyID,
+		key:             key,
+		alg:             string(alg),
+		config:          config,
+		fields:          fields,
+		foreignVerifier: verifier,
+	}, nil
+}
+
 func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
+	if v.foreignVerifier != nil {
+		switch verifier := v.foreignVerifier.(type) {
+		case jws.Verifier:
+			err := verifier.Verify(buff, sig, v.key)
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		default:
+			return false, fmt.Errorf("expected jws.Verifier, got %T", v.foreignVerifier)
+		}
+	}
+
 	switch v.alg {
 	case "hmac-sha256":
 		mac := hmac.New(sha256.New, v.key.([]byte))

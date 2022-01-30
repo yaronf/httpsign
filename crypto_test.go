@@ -3,6 +3,7 @@ package httpsign
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"github.com/lestrrat-go/jwx/jwa"
 	"reflect"
 	"strings"
 	"testing"
@@ -177,5 +178,35 @@ func TestNewRSASigner(t *testing.T) {
 				t.Errorf("NewRSASigner() got = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestForeignSigner(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	if err != nil {
+		t.Errorf("Failed to generate keypair: %v", err)
+	}
+
+	config := NewSignConfig().setFakeCreated(1618884475)
+	signatureName := "sig1"
+	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
+	signer, err := NewJWSSigner(jwa.ES256, "key1", priv, config, fields)
+	if err != nil {
+		t.Errorf("Failed to create JWS signer")
+	}
+	req := readRequest(httpreq2)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	if err != nil {
+		t.Errorf("signature failed: %v", err)
+	}
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewJWSVerifier(jwa.ES256, pub, "key1", NewVerifyConfig().SetVerifyCreated(false), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	err = VerifyRequest(signatureName, *verifier, req)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
 	}
 }

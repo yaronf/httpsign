@@ -651,7 +651,7 @@ func TestSignAndVerifyP256(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot read private key")
 	}
-	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
+	fields := *NewFields().AddHeader("@method").AddHeader("Date").AddHeader("Content-Type").AddQueryParam("pet")
 	signer, _ := NewP256Signer("test-key-p256", prvKey, config, fields)
 	req := readRequest(httpreq2)
 	sigInput, sig, err := SignRequest(signatureName, *signer, req)
