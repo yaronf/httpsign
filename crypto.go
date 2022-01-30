@@ -389,7 +389,7 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 	case "ed25519":
 		verified := ed25519.Verify(*v.key.(*ed25519.PublicKey), buff, sig)
 		if !verified {
-			return false, fmt.Errorf("Ed25519 verification failed")
+			return false, fmt.Errorf("failed Ed25519 verification")
 		}
 		return true, nil
 	default:

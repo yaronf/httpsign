@@ -2,6 +2,7 @@ package httpsign
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -36,7 +37,8 @@ func WrapHandler(h http.Handler, config *HandlerConfig) http.Handler {
 // This error case is not optional, as it's always a server bug
 func sigFailed(w http.ResponseWriter, _ *http.Request, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
-	_, _ = fmt.Fprintln(w, "Failed to sign response: "+err.Error())
+	log.Printf("Failed to sign response: %v\n", err)
+	_, _ = fmt.Fprintln(w, "Failed to sign response.")
 }
 
 // This needs to happen exactly at the point when the response headers (other than status!) had been written,

@@ -536,7 +536,7 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 }
 
 func TestCreated(t *testing.T) {
-	testOnce := func(t *testing.T, createdTime int64, wantSuccess bool) {
+	testOnceWithConfig := func(t *testing.T, createdTime int64, verifyConfig *VerifyConfig, wantSuccess bool) {
 		fields := HeaderList([]string{"@status", "date", "content-type"})
 		signatureName := "sigres"
 		key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
@@ -548,7 +548,7 @@ func TestCreated(t *testing.T) {
 		res2 := readResponse(httpres2)
 		res2.Header.Add("Signature", sig)
 		res2.Header.Add("Signature-Input", sigInput)
-		verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig(), fields)
+		verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, verifyConfig, fields)
 		if err != nil {
 			t.Errorf("could not generate Verifier: %s", err)
 		}
@@ -560,13 +560,32 @@ func TestCreated(t *testing.T) {
 			t.Errorf("expected verification to fail")
 		}
 	}
+	testOnce := func(t *testing.T, createdTime int64, wantSuccess bool) {
+		testOnceWithConfig(t, createdTime, nil, wantSuccess)
+	}
 	now := time.Now().Unix() // the window is in ms, but "created" granularity is in sec!
 	testInWindow := func(t *testing.T) { testOnce(t, now, true) }
 	testOlder := func(t *testing.T) { testOnce(t, now-20_000, false) }
 	testNewer := func(t *testing.T) { testOnce(t, now+3_000, false) }
+	testOldWindow1 := func(t *testing.T) {
+		testOnceWithConfig(t, now-20_000, NewVerifyConfig().SetNotOlderThan(19_000*time.Second), false)
+	}
+	testOldWindow2 := func(t *testing.T) {
+		testOnceWithConfig(t, now-20_000, NewVerifyConfig().SetNotOlderThan(21_000*time.Second), true)
+	}
+	testNewWindow1 := func(t *testing.T) {
+		testOnceWithConfig(t, now+15_000, NewVerifyConfig().SetNotNewerThan(16_000*time.Second), true)
+	}
+	testNewWindow2 := func(t *testing.T) {
+		testOnceWithConfig(t, now+15_000, NewVerifyConfig().SetNotNewerThan(14_000*time.Second), false)
+	}
 	t.Run("in window", testInWindow)
 	t.Run("older", testOlder)
 	t.Run("newer", testNewer)
+	t.Run("older, smaller than window", testOldWindow1)
+	t.Run("older, larger than window", testOldWindow2)
+	t.Run("newer, smaller than window", testNewWindow1)
+	t.Run("newer, larger than window", testNewWindow2)
 }
 
 func TestSignAndVerifyResponseHMAC(t *testing.T) {

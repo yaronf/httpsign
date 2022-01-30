@@ -28,8 +28,8 @@ func Test_WrapHandler(t *testing.T) {
 	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Header().Set("bar", "baz and baz again")
-		fmt.Fprintln(w, "Hello, client")
-		fmt.Fprintln(w, "Hello again")
+		_, _ = fmt.Fprintln(w, "Hello, client")
+		_, _ = fmt.Fprintln(w, "Hello again")
 	}
 	config := NewHandlerConfig().SetFetchVerifier(fetchVerifier).SetVerifyRequest(false).
 		SetFetchSigner(fetchSigner)
@@ -47,7 +47,7 @@ func Test_WrapHandler(t *testing.T) {
 	}
 	if res != nil {
 		_, err = io.ReadAll(res.Body)
-		res.Body.Close()
+		_ = res.Body.Close()
 		if err != nil {
 			t.Errorf("%v", err)
 		}
@@ -80,8 +80,8 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 
 		simpleHandler := func(w http.ResponseWriter, r *http.Request) { // this handler gets wrapped
 			w.WriteHeader(200)
-			w.Header().Set("bar", "baz")
-			fmt.Fprintln(w, "Hello, client")
+			w.Header().Set("bar", "baz me")
+			_, _ = fmt.Fprintln(w, "Hello, client")
 		}
 
 		// Configure the wrapper and set it up
