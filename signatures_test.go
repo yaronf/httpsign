@@ -1046,6 +1046,7 @@ func TestRequestResponse(t *testing.T) {
 func TestDictionary(t *testing.T) {
 	priv, pub, err := genP256KeyPair()
 	res := readResponse(httpres2)
+	res.Header.Set("X-Dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
 	signer2, err := NewP256Signer("key10", priv, NewSignConfig(),
 		*NewFields().AddHeader("@status").AddDictHeader("x-dictionary", "a"))
 	if err != nil {
