@@ -1,10 +1,12 @@
 HTTP Message Signatures, implementing [draft-ietf-httpbis-message-signatures-07](https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html).
 
-### Notes And Missing Features
+This is a nearly feature-complete implementation of draft -07, including all test vectors.
+
+### Notes and Missing Features
 * The `Accept-Signature` header.
 * Inclusion of `Signature` and `Signature-Input` as trailers is optional and is not yet implemented.
 * Extracting specialty components from the "related request".
-* In responses, the `Content-Type` header is only signed if set explicitly by the server. This is different, but arguably more secure, than the normal net.http behavior.
+* In responses, when using the "wrapped handler" feature, the `Content-Type` header is only signed if set explicitly by the server. This is different, but arguably more secure, than the normal `net.http` behavior.
 * Multiple Signatures (Sec. 4.3).
 * The `sf` parameter, and in particular behavior when it is *not* given.
 
