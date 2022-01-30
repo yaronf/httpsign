@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
@@ -120,6 +121,41 @@ func NewP256Signer(keyID string, key *ecdsa.PrivateKey, config *SignConfig, fiel
 	}, nil
 }
 
+// NewEd25519Signer returns a new Signer structure. Key is an EdDSA Curve 25519 private key.
+// Config may be nil for a default configuration.
+func NewEd25519Signer(keyID string, key *ed25519.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
+	if keyID == "" {
+		return nil, fmt.Errorf("keyID must not be empty")
+	}
+	if config == nil {
+		config = NewSignConfig()
+	}
+	if fields == nil {
+		return nil, fmt.Errorf("fields must not be nil")
+	}
+	return &Signer{
+		keyID:  keyID,
+		key:    key,
+		alg:    "ed25519",
+		config: config,
+		fields: fields,
+	}, nil
+}
+
+// NewEd25519SignerFromSeed returns a new Signer structure. Key is an EdDSA Curve 25519 private key,
+// a 32 byte buffer according to RFC 8032.
+// Config may be nil for a default configuration.
+func NewEd25519SignerFromSeed(keyID string, seed *[]byte, config *SignConfig, fields Fields) (*Signer, error) {
+	if seed == nil || len(*seed) != ed25519.SeedSize {
+		return nil, fmt.Errorf("seed must not be nil, and must have length %d", ed25519.SeedSize)
+	}
+	key := ed25519.NewKeyFromSeed(*seed)
+	return NewEd25519Signer(keyID, &key, config, fields)
+}
+
 // NewJWSSigner creates a generic signer for JWS algorithms, using the go-jwx package. The particular key type for each algorithm
 // is documented in that package.
 // Config may be nil for a default configuration.
@@ -174,6 +210,8 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 	case "ecdsa-p256-sha256":
 		hashed := sha256.Sum256(buff)
 		return ecdsaSignRaw(rand.Reader, s.key.(*ecdsa.PrivateKey), hashed[:])
+	case "ed25519":
+		return ed25519.Sign(*s.key.(*ed25519.PrivateKey), buff), nil
 	default:
 		return nil, fmt.Errorf("sign: unknown algorithm \"%s\"", s.alg)
 	}
@@ -273,6 +311,27 @@ func NewP256Verifier(keyID string, key *ecdsa.PublicKey, config *VerifyConfig, f
 	}, nil
 }
 
+// NewEd25519Verifier generates a new Verifier for EdDSA Curve 25519 signatures. Set config to nil for a default configuration.
+// Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
+func NewEd25519Verifier(keyID string, key *ed25519.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
+	if config == nil {
+		config = NewVerifyConfig()
+	}
+	if fields == nil {
+		return nil, fmt.Errorf("fields must not be nil")
+	}
+	return &Verifier{
+		keyID:  keyID,
+		key:    key,
+		alg:    "ed25519",
+		config: config,
+		fields: fields,
+	}, nil
+}
+
 // NewJWSVerifier creates a generic verifier for JWS algorithms, using the go-jwx package. The particular key type for each algorithm
 // is documented in that package. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
@@ -327,7 +386,12 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 	case "ecdsa-p256-sha256":
 		hashed := sha256.Sum256(buff)
 		return ecdsaVerifyRaw(v.key.(*ecdsa.PublicKey), hashed[:], sig)
-		//		return ecdsa.VerifyASN1(v.key.(*ecdsa.PublicKey), hashed[:], sig), nil
+	case "ed25519":
+		verified := ed25519.Verify(*v.key.(*ed25519.PublicKey), buff, sig)
+		if !verified {
+			return false, fmt.Errorf("Ed25519 verification failed")
+		}
+		return true, nil
 	default:
 		return false, fmt.Errorf("verify: unknown algorithm \"%s\"", v.alg)
 	}

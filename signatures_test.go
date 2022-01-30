@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -665,6 +666,49 @@ func TestSignAndVerifyP256(t *testing.T) {
 		t.Errorf("cannot read public key: %v", err)
 	}
 	verifier, err := NewP256Verifier("test-key-p256", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	err = VerifyRequest(signatureName, *verifier, req)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
+func TestSignAndVerifyEdDSA(t *testing.T) {
+	pubKey1, prvKey1, err := ed25519.GenerateKey(nil) // Need some tweaking for RFC 8032 keys, see package doc
+	if err != nil {
+		t.Errorf("cannot generate keypair: %s", err)
+	}
+	config := NewSignConfig().setFakeCreated(1618884475)
+	fields := *NewFields().AddHeader("@method").AddHeader("Date").AddHeader("Content-Type").AddQueryParam("pet")
+	signer1, _ := NewEd25519Signer("test-key-ed25519", &prvKey1, config, fields)
+
+	signAndVerifyEdDSA(t, signer1, pubKey1, fields)
+
+	seed2 := make([]byte, ed25519.SeedSize)
+	_, err = rand.Read(seed2)
+	if err != nil {
+		t.Errorf("rand failed?")
+	}
+	prvKey2 := ed25519.NewKeyFromSeed(seed2)
+	pubKey2 := prvKey2.Public().(ed25519.PublicKey)
+
+	signer2, _ := NewEd25519SignerFromSeed("test-key-ed25519", &seed2, config, fields)
+
+	signAndVerifyEdDSA(t, signer2, pubKey2, fields)
+}
+
+func signAndVerifyEdDSA(t *testing.T, signer *Signer, pubKey ed25519.PublicKey, fields Fields) {
+	signatureName := "sig1"
+	req := readRequest(httpreq2)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	if err != nil {
+		t.Errorf("signature failed: %v", err)
+	}
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewEd25519Verifier("test-key-ed25519", &pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
