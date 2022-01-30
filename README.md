@@ -7,7 +7,6 @@ This is a nearly feature-complete implementation of draft -07, including all tes
 * Inclusion of `Signature` and `Signature-Input` as trailers is optional and is not yet implemented.
 * Extracting specialty components from the "related request". See [related issue](https://github.com/httpwg/http-extensions/issues/1905).
 * In responses, when using the "wrapped handler" feature, the `Content-Type` header is only signed if set explicitly by the server. This is different, but arguably more secure, than the normal `net.http` behavior.
-* Multiple Signatures (Sec. 4.3).
 * The `sf` parameter, and in particular behavior when it is *not* given.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/yaronf/httpsign.svg)](https://pkg.go.dev/github.com/yaronf/httpsign)

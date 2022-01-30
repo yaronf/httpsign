@@ -1046,7 +1046,6 @@ func TestRequestResponse(t *testing.T) {
 func TestDictionary(t *testing.T) {
 	priv, pub, err := genP256KeyPair()
 	res := readResponse(httpres2)
-	res.Header.Set("X-Dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
 	signer2, err := NewP256Signer("key10", priv, NewSignConfig(),
 		*NewFields().AddHeader("@status").AddDictHeader("x-dictionary", "a"))
 	if err != nil {
@@ -1069,5 +1068,40 @@ func TestDictionary(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not verify response: %v", err)
 	}
+}
 
+func TestMultipleSignatures(t *testing.T) {
+	priv1, _, err := genP256KeyPair() // no pub, no verify
+	res := readResponse(httpres2)
+	signer1, err := NewP256Signer("key10", priv1, NewSignConfig().SignCreated(false), HeaderList([]string{"Content-Type", "Digest"}))
+	if err != nil {
+		t.Errorf("Could not create signer")
+	}
+	sigInput1, sig1, err := SignResponse("sig2", *signer1, res)
+	if err != nil {
+		t.Errorf("Could not sign response: %v", err)
+	}
+	res.Header.Add("Signature-Input", sigInput1)
+	res.Header.Add("Signature", sig1)
+
+	priv2, _, err := genP256KeyPair() // no pub, no verify
+	signer2, err := NewP256Signer("key20", priv2, NewSignConfig().SignCreated(false), *NewFields().AddDictHeader("Signature", "sig2"))
+	if err != nil {
+		t.Errorf("Could not create signer")
+	}
+	sigInput2, sig2, err := SignResponse("proxy_sig", *signer2, res)
+	if err != nil {
+		t.Errorf("Proxy could not sign response: %v", err)
+	}
+	res.Header.Add("Signature-Input", sigInput2)
+	res.Header.Add("Signature", sig2)
+	wantSigInput := "sig2=(\"content-type\" \"digest\");alg=\"ecdsa-p256-sha256\";keyid=\"key10\",proxy_sig=(\"signature\";key=\"sig2\");alg=\"ecdsa-p256-sha256\";keyid=\"key20\""
+	gotSigInput := fold(res.Header.Values("Signature-Input"))
+	if gotSigInput != wantSigInput {
+		t.Errorf("Signature-Header, want %s, got %s", wantSigInput, gotSigInput)
+	}
+}
+
+func fold(vs []string) string {
+	return strings.Join(vs, ",")
 }
