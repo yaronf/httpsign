@@ -25,7 +25,7 @@ func (f *field) String() string {
 // HeaderList is a simple way to generate a Fields list, where only simple header names and specialty headers
 // are needed.
 func HeaderList(hs []string) Fields {
-	f := []field{}
+	var f []field
 	for _, h := range hs {
 		hd := strings.ToLower(h) // loop variable scope pitfall!
 		f = append(f, field{hd, "", ""})
@@ -85,8 +85,9 @@ func fromDictHeader(hdr, key string) *field {
 
 // AddDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified
 func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
-	k := strings.ToLower(key)
-	return fs.addHeaderAndFlag(hdr, "key", k)
+	f := fromDictHeader(hdr, key)
+	*fs = append(*fs, *f)
+	return fs
 }
 
 func (f field) asSignatureInput() (string, error) {

@@ -1052,7 +1052,15 @@ func TestRequestResponse(t *testing.T) {
 	res.Header.Add("Signature", sig2)
 
 	// Client verifies response
-	verifier2, err := NewP256Verifier("key10", pub2, NewVerifyConfig().SetRequestResponse("sig1", sig1Value).SetVerifyCreated(false), HeaderList([]string{"@status"}))
+	verifier2, err := NewP256Verifier("key10", pub2, NewVerifyConfig().SetRequestResponse("sigxx", sig1Value).SetVerifyCreated(false), HeaderList([]string{"@status"}))
+	if err != nil {
+		t.Errorf("Could not create second verifier: %v", err)
+	}
+	err = VerifyResponse("sig2", *verifier2, res)
+	if err == nil {
+		t.Errorf("Verification should have failed, wrong sig name in SetRequestResponse")
+	}
+	verifier2, err = NewP256Verifier("key10", pub2, NewVerifyConfig().SetRequestResponse("sig1", sig1Value).SetVerifyCreated(false), HeaderList([]string{"@status"}))
 	if err != nil {
 		t.Errorf("Could not create second verifier: %v", err)
 	}

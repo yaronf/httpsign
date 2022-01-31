@@ -11,7 +11,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/dunglas/httpsfv"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -46,23 +48,78 @@ func encodeBytes(raw []byte) string {
 }
 
 func generateSignatureInput(message parsedMessage, fields Fields, params string) (string, error) {
-	mf, err := matchFields(message.components, fields)
-	if err != nil {
-		return "", err
-	}
 	inp := ""
-	for _, c := range mf {
-		f, err := c.f.asSignatureInput()
+	for _, c := range fields {
+		f, err := c.asSignatureInput()
 		if err != nil {
-			return "", fmt.Errorf("could not marshal %v", c.f)
+			return "", fmt.Errorf("could not marshal %v", f)
 		}
-		for _, v := range c.v {
+		fieldValues, err := generateFieldValues(c, message)
+		if err != nil {
+			return "", err
+		}
+		for _, v := range fieldValues {
 			inp += fmt.Sprintf("%s: %s\n", f, v)
 		}
 	}
 	inp += fmt.Sprintf("\"%s\": %s", "@signature-params", params)
-	// log.Println("inp:", "\n"+inp)
+	log.Println("inp:", "\n"+inp) // TODO!
 	return inp, nil
+}
+
+func generateFieldValues(f field, message parsedMessage) ([]string, error) {
+	if f.flagName == "" {
+		if strings.HasPrefix(f.name, "@") { // derived component
+			return []string{message.derived[f.name]}, nil
+		}
+		vv, found := message.headers[f.name] // normal header, cannot use "Values" on lowercased header name
+		if !found {
+			return nil, fmt.Errorf("header %s not found", f.name)
+		}
+		return []string{foldFields(vv)}, nil
+	}
+	if f.name == "@query-params" && f.flagName == "name" {
+		vals, found := message.qParams[f.flagValue]
+		if !found {
+			return nil, fmt.Errorf("query parameter %s not found", f.flagValue)
+		}
+		return vals, nil
+	}
+	if f.flagName == "key" { // dictionary header
+		return message.getDictHeader(f.name, f.flagValue)
+	}
+	return nil, fmt.Errorf("unrecognized field %s", f)
+}
+
+func (message *parsedMessage) getDictHeader(hdr, member string) ([]string, error) {
+	vals, found := message.headers[hdr]
+	if !found {
+		return nil, fmt.Errorf("dictionary header %s not found", hdr)
+	}
+	dict, err := httpsfv.UnmarshalDictionary(vals)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse dictionary for %s", hdr)
+	}
+	v, found := dict.Get(member)
+	if !found {
+		return nil, fmt.Errorf("cannot find member %s of dictionary %s", member, hdr)
+	}
+	switch v.(type) {
+	case httpsfv.Item:
+		vv, err := httpsfv.Marshal(v.(httpsfv.Item))
+		if err != nil {
+			return nil, fmt.Errorf("malformed dictionry member %s: %v", hdr, err)
+		}
+		return []string{vv}, nil
+	case httpsfv.InnerList:
+		vv, err := httpsfv.Marshal(v.(httpsfv.InnerList))
+		if err != nil {
+			return nil, fmt.Errorf("malformed dictionry member %s: %v", hdr, err)
+		}
+		return []string{vv}, nil
+	default:
+		return nil, fmt.Errorf("unexpected dictionary value")
+	}
 }
 
 func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner interface{}, fields Fields) (string, error) {
@@ -126,23 +183,23 @@ func SignResponse(signatureName string, signer Signer, res *http.Response) (sign
 	if err != nil {
 		return "", "", err
 	}
-	extendedFields := addPseudoHeaders(parsedMessage, signer.config.requestResponse, signer.fields)
-	return signMessage(*signer.config, signatureName, signer, *parsedMessage, extendedFields)
+	//	extendedFields := addPseudoHeaders(parsedMessage, signer.config.requestResponse, signer.fields)
+	return signMessage(*signer.config, signatureName, signer, *parsedMessage, signer.fields)
 }
 
 // Handle the special header-like @request-response
-func addPseudoHeaders(message *parsedMessage, rr *requestResponse, fields Fields) Fields {
-	if rr != nil {
-		rrfield := field{
-			name:      "@request-response",
-			flagName:  "key",
-			flagValue: rr.name,
-		}
-		message.components[rrfield] = []string{rr.signature}
-		return append(fields, rrfield)
-	}
-	return fields
-}
+//func addPseudoHeaders(message *parsedMessage, rr *requestResponse, fields Fields) Fields {
+//	if rr != nil {
+//		rrfield := field{
+//			name:      "@request-response",
+//			flagName:  "key",
+//			flagValue: rr.name,
+//		}
+//		message.components[rrfield] = []string{rr.signature}
+//		return append(fields, rrfield)
+//	}
+//	return fields
+//}
 
 //
 // VerifyRequest verifies a signed HTTP request. Returns an error if verification failed for any reason, otherwise nil.
@@ -207,8 +264,8 @@ func GetRequestSignature(req *http.Request, signatureName string) (string, error
 	if err != nil {
 		return "", err
 	}
-	ws, found := parsedMessage.components[*fromDictHeader("signature", signatureName)]
-	if !found {
+	ws, err := parsedMessage.getDictHeader("signature", signatureName)
+	if err != nil {
 		return "", fmt.Errorf("missing \"signature\" header for \"%s\"", signatureName)
 	}
 	if len(ws) > 1 {
@@ -223,8 +280,8 @@ func GetRequestSignature(req *http.Request, signatureName string) (string, error
 }
 
 func messageKeyID(signatureName string, parsedMessage parsedMessage) (keyID, alg string, err error) {
-	si, found := parsedMessage.components[*fromDictHeader("signature-input", signatureName)]
-	if !found {
+	si, err := parsedMessage.getDictHeader("signature-input", signatureName)
+	if err != nil {
 		return "", "", fmt.Errorf("missing \"signature-input\" header, or cannot find \"%s\"", signatureName)
 	}
 	if len(si) > 1 {
@@ -267,29 +324,29 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response)
 	if err != nil {
 		return err
 	}
-	extendedFields := addPseudoHeaders(parsedMessage, verifier.config.requestResponse, verifier.fields)
-	return verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, extendedFields)
+	// extendedFields := addPseudoHeaders(parsedMessage, verifier.config.requestResponse, verifier.fields)
+	return verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, verifier.fields)
 }
 
 func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) error {
-	wsi, found := message.components[*fromDictHeader("signature-input", name)]
-	if !found {
+	wsi, err := message.getDictHeader("signature-input", name)
+	if err != nil {
 		return fmt.Errorf("missing \"signature-input\" header, or cannot find signature \"%s\"", name)
 	}
 	if len(wsi) > 1 {
 		return fmt.Errorf("multiple \"signature-header\" values for %s", name)
 	}
 	wantSignatureInput := wsi[0]
-	ws, found := message.components[*fromDictHeader("signature", name)]
-	if !found {
+	ws, err := message.getDictHeader("signature", name)
+	if err != nil {
 		return fmt.Errorf("missing \"signature\" header")
 	}
 	if len(ws) > 1 {
 		return fmt.Errorf("multiple \"signature\" values for %s", name)
 	}
 	wantSignature := ws[0]
-	delete(message.components, *fromDictHeader("signature-input", name))
-	delete(message.components, *fromDictHeader("signature", name))
+	//delete(message.components, *fromDictHeader("signature-input", name))
+	//delete(message.components, *fromDictHeader("signature", name))
 	wantSigRaw, err := parseWantSignature(wantSignature)
 	if err != nil {
 		return err

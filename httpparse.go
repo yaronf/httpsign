@@ -2,7 +2,6 @@ package httpsign
 
 import (
 	"fmt"
-	"github.com/dunglas/httpsfv"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -10,28 +9,13 @@ import (
 )
 
 // some fields (specifically, query params) may appear more than once, and those occurrences are ordered.
-type components map[field][]string
+type components map[string]string
 
 type parsedMessage struct {
-	components components
-}
-
-type fvPair struct {
-	f field
-	v []string
-}
-
-func matchFields(comps components, fields Fields) ([]fvPair, error) {
-	// Components for signature are ordered, thus an array of pairs and not a map
-	matched := make([]fvPair, 0)
-	for _, f := range fields {
-		if v, found := comps[f]; found {
-			matched = append(matched, fvPair{f, v})
-		} else {
-			return nil, fmt.Errorf("missing component \"%s\"", f.name)
-		}
-	}
-	return matched, nil
+	derived components
+	url     *url.URL
+	headers http.Header
+	qParams url.Values
 }
 
 func parseRequest(req *http.Request) (*parsedMessage, error) {
@@ -39,25 +23,19 @@ func parseRequest(req *http.Request) (*parsedMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	components := components{}
-	generateReqSpecialtyComponents(req, components)
-	err = generateHeaderComponents(req.Header, components)
-	if err != nil {
-		return nil, err
-	}
 	values, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse query: %s", req.URL.RawQuery)
 	}
-	generateQueryParams(values, components)
-
-	return &parsedMessage{components}, nil
+	return &parsedMessage{derived: generateReqDerivedComponents(req), url: req.URL, headers: normalizeHeaderNames(req.Header), qParams: values}, nil
 }
 
-func generateQueryParams(v map[string][]string, components components) {
-	for name, values := range v {
-		components[*fromQueryParam(name)] = values
+func normalizeHeaderNames(header http.Header) http.Header {
+	var t http.Header = http.Header{}
+	for k, v := range header {
+		t[strings.ToLower(k)] = v
 	}
+	return t
 }
 
 func parseResponse(res *http.Response) (*parsedMessage, error) {
@@ -65,14 +43,8 @@ func parseResponse(res *http.Response) (*parsedMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	components := components{}
-	generateResSpecialtyComponents(res, components)
-	err = generateHeaderComponents(res.Header, components)
-	if err != nil {
-		return nil, err
-	}
 
-	return &parsedMessage{components}, nil
+	return &parsedMessage{derived: generateResDerivedComponents(res), url: nil, headers: normalizeHeaderNames(res.Header)}, nil
 }
 
 func validateMessageHeaders(header http.Header) error {
@@ -80,37 +52,6 @@ func validateMessageHeaders(header http.Header) error {
 	for k := range header {
 		if strings.HasPrefix(k, "@") {
 			return fmt.Errorf("potentially malicious header detected \"%s\"", k)
-		}
-	}
-	return nil
-}
-
-func generateHeaderComponents(headers http.Header, components components) error {
-	for hdrName, val := range headers {
-		lower := strings.ToLower(hdrName)
-		dict, err := httpsfv.UnmarshalDictionary(val)
-		if err == nil { // dictionary
-			for _, name := range dict.Names() {
-				v, _ := dict.Get(name)
-				switch v.(type) {
-				case httpsfv.Item:
-					vv, err := httpsfv.Marshal(v.(httpsfv.Item))
-					if err != nil {
-						return fmt.Errorf("malformed dictionry member %s: %v", name, err)
-					}
-					components[*fromDictHeader(lower, name)] = []string{vv}
-				case httpsfv.InnerList:
-					vv, err := httpsfv.Marshal(v.(httpsfv.InnerList))
-					if err != nil {
-						return fmt.Errorf("malformed dictionry member %s: %v", name, err)
-					}
-					components[*fromDictHeader(lower, name)] = []string{vv}
-				default:
-					return fmt.Errorf("unexpected dictionary value")
-				}
-			}
-		} else {
-			components[*fromHeaderName(lower)] = []string{foldFields(val)}
 		}
 	}
 	return nil
@@ -125,10 +66,11 @@ func foldFields(fields []string) string {
 }
 
 func specialtyComponent(name, v string, components components) {
-	components[*fromHeaderName(name)] = []string{v}
+	components[name] = v
 }
 
-func generateReqSpecialtyComponents(req *http.Request, components components) {
+func generateReqDerivedComponents(req *http.Request) components {
+	components := components{}
 	specialtyComponent("@method", scMethod(req), components)
 	theURL := req.URL
 	specialtyComponent("@target-uri", scTargetURI(theURL), components)
@@ -138,6 +80,7 @@ func generateReqSpecialtyComponents(req *http.Request, components components) {
 	specialtyComponent("@request-target", scRequestTarget(theURL), components)
 	specialtyComponent("@query", scQuery(theURL), components)
 	// @request-response does not belong here
+	return components
 }
 
 func scPath(theURL *url.URL) string {
@@ -171,8 +114,10 @@ func scMethod(req *http.Request) string {
 	return req.Method
 }
 
-func generateResSpecialtyComponents(res *http.Response, components components) {
+func generateResDerivedComponents(res *http.Response) components {
+	components := components{}
 	specialtyComponent("@status", scStatus(res), components)
+	return components
 }
 
 func scStatus(res *http.Response) string {
