@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"github.com/lestrrat-go/jwx/jwa"
+	"github.com/lestrrat-go/jwx/jws"
 	"reflect"
 	"strings"
 	"testing"
@@ -208,5 +209,146 @@ func TestForeignSigner(t *testing.T) {
 	err = VerifyRequest(signatureName, *verifier, req)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
+	}
+}
+
+func makeRSAPrivateKey() *rsa.PrivateKey {
+	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
+	return priv
+}
+func TestNewRSASigner1(t *testing.T) {
+	type args struct {
+		keyID  string
+		key    *rsa.PrivateKey
+		config *SignConfig
+		fields Fields
+	}
+	key := makeRSAPrivateKey()
+	tests := []struct {
+		name    string
+		args    args
+		want    *Signer
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			args: args{
+				keyID:  "key100",
+				key:    key,
+				config: nil,
+				fields: *NewFields(),
+			},
+			want: &Signer{
+				keyID:         "key100",
+				key:           key,
+				alg:           "rsa-v1_5-sha256",
+				config:        NewSignConfig(),
+				fields:        Fields{},
+				foreignSigner: nil,
+			},
+			wantErr: false,
+		},
+		{
+			name: "nil fields",
+			args: args{
+				keyID:  "key100",
+				key:    key,
+				config: nil,
+				fields: nil,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewRSASigner(tt.args.keyID, tt.args.key, tt.args.config, tt.args.fields)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewRSASigner() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewRSASigner() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewJWSVerifier(t *testing.T) {
+	type args struct {
+		alg    jwa.SignatureAlgorithm
+		key    interface{}
+		keyID  string
+		config *VerifyConfig
+		fields Fields
+	}
+	verifier, _ := jws.NewVerifier("HS256")
+	tests := []struct {
+		name    string
+		args    args
+		want    *Verifier
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			args: args{
+				alg:    jwa.SignatureAlgorithm("HS256"),
+				key:    "1234",
+				keyID:  "key200",
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want: &Verifier{
+				keyID:           "key200",
+				key:             "1234",
+				alg:             "HS256",
+				config:          NewVerifyConfig(),
+				fields:          *NewFields(),
+				foreignVerifier: verifier,
+			},
+			wantErr: false,
+		},
+		{
+			name: "none",
+			args: args{
+				alg:    jwa.NoSignature,
+				key:    "1234",
+				keyID:  "key200",
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "bad verifier",
+			args: args{
+				alg:    jwa.SignatureAlgorithm("bad"),
+				key:    "1234",
+				keyID:  "key200",
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewJWSVerifier(tt.args.alg, tt.args.key, tt.args.keyID, tt.args.config, tt.args.fields)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewJWSVerifier() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != nil {
+				got.foreignVerifier = nil
+			}
+			if tt.want != nil {
+				tt.want.foreignVerifier = nil
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewJWSVerifier() got = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

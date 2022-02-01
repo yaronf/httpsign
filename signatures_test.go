@@ -2,6 +2,7 @@ package httpsign
 
 import (
 	"bufio"
+	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -485,6 +486,11 @@ func makeRSAPSSSigner(t *testing.T, config SignConfig, fields Fields) Signer {
 	return *signer
 }
 
+func makeHMACSigner(config SignConfig, fields Fields) Signer {
+	signer, _ := NewHMACSHA256Signer("test-key-hmac", bytes.Repeat([]byte{0x33}, 64), &config, fields)
+	return *signer
+}
+
 // Do not test for a particular signature: for non-deterministic methods
 func TestSignRequestDiscardSig(t *testing.T) {
 	type args struct {
@@ -566,6 +572,27 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 	err = VerifyRequest(signatureName, *verifier, req)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
+	}
+}
+
+func TestSignAndVerifyHMACBad(t *testing.T) {
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+	fields := HeaderList([]string{"@authority", "date", "content-type"})
+	signatureName := "sig1"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+	req := readRequest(httpreq1)
+	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	badkey := append(key, byte(0x77))
+	verifier, err := NewHMACSHA256Verifier("test-shared-secret", badkey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	err = VerifyRequest(signatureName, *verifier, req)
+	if err == nil {
+		t.Errorf("verification should have failed")
 	}
 }
 
@@ -1169,4 +1196,105 @@ func TestMultipleSignatures(t *testing.T) {
 
 func fold(vs []string) string {
 	return strings.Join(vs, ",")
+}
+
+var dict1 = `GET /foo?param=value&pet=dog&pet=snake&bar=baz HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Example-Dictionary:  a=1,    b=2;x=1;y=2,   c=(a   b   c)
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+
+`
+
+var dict2 = `GET /foo?param=value&pet=dog&pet=snake&bar=baz HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Example-Dictionary:  a=1    
+Example-Dictionary:      b=2;x=1;y=2,   c=(a   b   c)
+Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
+
+`
+
+var httpreq4 = `GET /foo?param=value&pet=dog&pet=snake&bar=baz HTTP/1.1
+Host: www.example.com
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+X-OWS-Header:   Leading and trailing whitespace.
+X-Obs-Fold-Header: Obsolete
+    line folding.
+Cache-Control: max-age=60
+Cache-Control:    must-revalidate
+Example-Dictionary:  a=1,    b=2;x=1;y=2,   c=(a   b   c)
+
+`
+
+func Test_signRequestDebug(t *testing.T) {
+	type args struct {
+		signatureName string
+		signer        Signer
+		req           *http.Request
+	}
+	tests := []struct {
+		name                     string
+		args                     args
+		wantSignatureInputHeader string
+		wantSignature            string
+		wantSignatureInput       string
+		wantErr                  bool
+	}{
+		{
+			name: "normal header, sec. 2.1.1",
+			args: args{
+				signatureName: "sig1",
+				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), HeaderList([]string{"example-dictionary"})),
+				req:           readRequest(dict1),
+			},
+			wantSignatureInputHeader: "sig1=(\"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:AZTloqb5fzK7SCR5cB4E+b0ljviAMgWzutocEnGlN7g=:",
+			wantSignatureInput:       "\"example-dictionary\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:                  false,
+		},
+		{
+			name: "cross-line header, trim",
+			args: args{
+				signatureName: "sig1",
+				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), HeaderList([]string{"example-dictionary"})),
+				req:           readRequest(dict2),
+			},
+			wantSignatureInputHeader: "sig1=(\"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:haRjFgaeI6YgscKXzGgDgruWsKDMW9RLZW1R55OCcmA=:",
+			wantSignatureInput:       "\"example-dictionary\": a=1, b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:                  false,
+		},
+		{
+			name: "various headers, Sec. 2.1",
+			args: args{
+				signatureName: "sig1",
+				signer: makeHMACSigner(*NewSignConfig().SignCreated(false),
+					HeaderList([]string{"X-OWS-Header", "X-Obs-Fold-Header", "Cache-Control", "Example-Dictionary"})),
+				req: readRequest(httpreq4),
+			},
+			wantSignatureInputHeader: "sig1=(\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:4a5PQFe7Z3Cx5b8uX4hNx56zenxuJ2/dA9nl/wDSuzo=:",
+			wantSignatureInput:       "\"x-ows-header\": Leading and trailing whitespace.\n\"x-obs-fold-header\": Obsolete line folding.\n\"cache-control\": max-age=60, must-revalidate\n\"example-dictionary\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:                  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotSignatureInputHeader, gotSignature, gotSignatureInput, err := signRequestDebug(tt.args.signatureName, tt.args.signer, tt.args.req)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("signRequestDebug() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotSignatureInputHeader != tt.wantSignatureInputHeader {
+				t.Errorf("signRequestDebug() gotSignatureInputHeader = %v, want %v", gotSignatureInputHeader, tt.wantSignatureInputHeader)
+			}
+			if gotSignature != tt.wantSignature {
+				t.Errorf("signRequestDebug() gotSignature = %v, want %v", gotSignature, tt.wantSignature)
+			}
+			if gotSignatureInput != tt.wantSignatureInput {
+				t.Errorf("signRequestDebug() gotSignatureInput = %v, want %v", gotSignatureInput, tt.wantSignatureInput)
+			}
+		})
+	}
 }

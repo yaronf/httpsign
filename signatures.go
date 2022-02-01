@@ -1,8 +1,8 @@
 // Package httpsign signs HTTP requests and responses as defined in draft-ietf-httpbis-message-signatures.
 // See https://www.ietf.org/archive/id/draft-ietf-httpbis-message-signatures-07.html.
 //
-// For client-side message signing, use the Client wrapper. Alternatively, use SignRequest, VerifyResponse directly,
-// but this is more complicated.
+// For client-side message signing and verification, use the Client wrapper.
+// Alternatively, use SignRequest, VerifyResponse directly, but this is more complicated.
 // For server-side operation,
 // WrapHandler installs a wrapper around a normal HTTP message handler.
 package httpsign
@@ -17,21 +17,21 @@ import (
 )
 
 func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage parsedMessage,
-	fields Fields) (sigInputHeader string, signature string, err error) {
+	fields Fields) (signatureInputHeader, signature, signatureInput string, err error) {
 	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, signer.foreignSigner, fields)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
-	sigInputHeader = fmt.Sprintf("%s=%s", signatureName, sigParams)
-	signatureInput, err := generateSignatureInput(parsedMessage, fields, sigParams)
+	signatureInputHeader = fmt.Sprintf("%s=%s", signatureName, sigParams)
+	signatureInput, err = generateSignatureInput(parsedMessage, fields, sigParams)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	signature, err = generateSignature(signatureName, signer, signatureInput)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
-	return sigInputHeader, signature, nil
+	return signatureInputHeader, signature, signatureInput, nil
 }
 
 func generateSignature(name string, signer Signer, input string) (string, error) {
@@ -155,19 +155,25 @@ func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner inte
 //
 // SignRequest signs an HTTP request. Returns the Signature-Input and the Signature header values.
 //
-func SignRequest(signatureName string, signer Signer, req *http.Request) (signatureInput, signature string, err error) {
+func SignRequest(signatureName string, signer Signer, req *http.Request) (signatureInputHeader, signature string, err error) {
+	signatureInputHeader, signature, _, err = signRequestDebug(signatureName, signer, req)
+	return
+}
+
+// Same as SignRequest, but also returns the raw signature input string
+func signRequestDebug(signatureName string, signer Signer, req *http.Request) (signatureInputHeader, signature, signatureInput string, err error) {
 	if req == nil {
-		return "", "", fmt.Errorf("nil request")
+		return "", "", "", fmt.Errorf("nil request")
 	}
 	if signatureName == "" {
-		return "", "", fmt.Errorf("empty signature name")
+		return "", "", "", fmt.Errorf("empty signature name")
 	}
 	if signer.config.requestResponse != nil {
-		return "", "", fmt.Errorf("use request-response only to sign responses")
+		return "", "", "", fmt.Errorf("use request-response only to sign responses")
 	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	return signMessage(*signer.config, signatureName, signer, *parsedMessage, signer.fields)
 }
@@ -187,7 +193,8 @@ func SignResponse(signatureName string, signer Signer, res *http.Response) (sign
 		return "", "", err
 	}
 	extendedFields := addPseudoHeaders(parsedMessage, signer.config.requestResponse, signer.fields)
-	return signMessage(*signer.config, signatureName, signer, *parsedMessage, extendedFields)
+	signatureInput, signature, _, err = signMessage(*signer.config, signatureName, signer, *parsedMessage, extendedFields)
+	return
 }
 
 // Handle the special header-like @request-response

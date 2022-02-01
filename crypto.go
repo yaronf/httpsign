@@ -336,6 +336,9 @@ func NewEd25519Verifier(keyID string, key *ed25519.PublicKey, config *VerifyConf
 // is documented in that package. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
 func NewJWSVerifier(alg jwa.SignatureAlgorithm, key interface{}, keyID string, config *VerifyConfig, fields Fields) (*Verifier, error) {
+	if alg == jwa.NoSignature {
+		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
+	}
 	verifier, err := jws.NewVerifier(alg)
 	if err != nil {
 		return nil, err

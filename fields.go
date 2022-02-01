@@ -10,6 +10,7 @@ import (
 // cases, NewFields followed by a chain of Add... methods.
 type Fields []field
 
+// The SFV representation of a field is name;flagName="flagValue"
 type field struct {
 	name                string
 	flagName, flagValue string
@@ -27,8 +28,7 @@ func (f *field) String() string {
 func HeaderList(hs []string) Fields {
 	var f []field
 	for _, h := range hs {
-		hd := strings.ToLower(h) // loop variable scope pitfall!
-		f = append(f, field{hd, "", ""})
+		f = append(f, *fromHeaderName(h))
 	}
 	return f
 }
@@ -52,21 +52,9 @@ func (fs *Fields) AddHeader(hdr string) *Fields {
 	return fs
 }
 
-// addHeaderAndFlag appends a header name, a flag and a value. This eventually results
-// in the signature input "header-name";name="val"
-func (fs *Fields) addHeaderAndFlag(hdr, flagName, flagValue string) *Fields {
-	h := strings.ToLower(hdr)
-	fn := strings.ToLower(flagName)
-	fv := flagValue
-	*fs = append(*fs, field{h, fn, fv})
-	return fs
-}
-
 func fromQueryParam(qp string) *field {
 	q := strings.ToLower(qp)
-	name := "@query-params"
-	flagName := "name"
-	f := field{name, flagName, q}
+	f := field{"@query-params", "name", q}
 	return &f
 }
 
