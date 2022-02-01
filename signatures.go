@@ -11,7 +11,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/dunglas/httpsfv"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -63,14 +62,18 @@ func generateSignatureInput(message parsedMessage, fields Fields, params string)
 		}
 	}
 	inp += fmt.Sprintf("\"%s\": %s", "@signature-params", params)
-	log.Println("inp:", "\n"+inp) // TODO!
+	// log.Println("inp:", "\n"+inp)
 	return inp, nil
 }
 
 func generateFieldValues(f field, message parsedMessage) ([]string, error) {
 	if f.flagName == "" {
 		if strings.HasPrefix(f.name, "@") { // derived component
-			return []string{message.derived[f.name]}, nil
+			vv, found := message.derived[f.name]
+			if !found {
+				return nil, fmt.Errorf("derived header %s not found", f.name)
+			}
+			return []string{vv}, nil
 		}
 		vv, found := message.headers[f.name] // normal header, cannot use "Values" on lowercased header name
 		if !found {
@@ -183,23 +186,24 @@ func SignResponse(signatureName string, signer Signer, res *http.Response) (sign
 	if err != nil {
 		return "", "", err
 	}
-	//	extendedFields := addPseudoHeaders(parsedMessage, signer.config.requestResponse, signer.fields)
-	return signMessage(*signer.config, signatureName, signer, *parsedMessage, signer.fields)
+	extendedFields := addPseudoHeaders(parsedMessage, signer.config.requestResponse, signer.fields)
+	return signMessage(*signer.config, signatureName, signer, *parsedMessage, extendedFields)
 }
 
 // Handle the special header-like @request-response
-//func addPseudoHeaders(message *parsedMessage, rr *requestResponse, fields Fields) Fields {
-//	if rr != nil {
-//		rrfield := field{
-//			name:      "@request-response",
-//			flagName:  "key",
-//			flagValue: rr.name,
-//		}
-//		message.components[rrfield] = []string{rr.signature}
-//		return append(fields, rrfield)
-//	}
-//	return fields
-//}
+func addPseudoHeaders(message *parsedMessage, rr *requestResponse, fields Fields) Fields {
+	if rr != nil {
+		rrfield := field{
+			name:      "@request-response",
+			flagName:  "key",
+			flagValue: rr.name,
+		}
+		message.headers.Add("@request-response", rr.name+"="+rr.signature)
+
+		return append(fields, rrfield)
+	}
+	return fields
+}
 
 //
 // VerifyRequest verifies a signed HTTP request. Returns an error if verification failed for any reason, otherwise nil.
@@ -324,8 +328,8 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response)
 	if err != nil {
 		return err
 	}
-	// extendedFields := addPseudoHeaders(parsedMessage, verifier.config.requestResponse, verifier.fields)
-	return verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, verifier.fields)
+	extendedFields := addPseudoHeaders(parsedMessage, verifier.config.requestResponse, verifier.fields)
+	return verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, extendedFields)
 }
 
 func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) error {

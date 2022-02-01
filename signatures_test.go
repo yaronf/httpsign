@@ -372,6 +372,40 @@ func TestSignRequest(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "missing derived field",
+			args: args{
+				signatureName: "sig1",
+				signer: (func() Signer {
+					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+					fields := HeaderList([]string{"@authorityxx", "date", "content-type"})
+					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+					return *signer
+				})(),
+				req: readRequest(httpreq1),
+			},
+			want:    "",
+			want1:   "",
+			wantErr: true,
+		},
+		{
+			name: "missing header",
+			args: args{
+				signatureName: "sig1",
+				signer: (func() Signer {
+					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+					fields := HeaderList([]string{"@authority", "date-not-really", "content-type"})
+					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+					return *signer
+				})(),
+				req: readRequest(httpreq1),
+			},
+			want:    "",
+			want1:   "",
+			wantErr: true,
+		},
+		{
 			name: "sign request: nil request",
 			args: args{
 				signatureName: "sig1",
