@@ -67,7 +67,7 @@ func generateSignatureInput(message parsedMessage, fields Fields, params string)
 }
 
 func generateFieldValues(f field, message parsedMessage) ([]string, error) {
-	if f.flagName == "" {
+	if f.flagName == "" || f.flagName == "sf" {
 		if strings.HasPrefix(f.name, "@") { // derived component
 			vv, found := message.derived[f.name]
 			if !found {
@@ -75,11 +75,7 @@ func generateFieldValues(f field, message parsedMessage) ([]string, error) {
 			}
 			return []string{vv}, nil
 		}
-		vv, found := message.headers[f.name] // normal header, cannot use "Values" on lowercased header name
-		if !found {
-			return nil, fmt.Errorf("header %s not found", f.name)
-		}
-		return []string{foldFields(vv)}, nil
+		return message.getHeader(f.name, f.flagName == "sf")
 	}
 	if f.name == "@query-params" && f.flagName == "name" {
 		vals, found := message.qParams[f.flagValue]
@@ -92,6 +88,25 @@ func generateFieldValues(f field, message parsedMessage) ([]string, error) {
 		return message.getDictHeader(f.name, f.flagValue)
 	}
 	return nil, fmt.Errorf("unrecognized field %s", f)
+}
+
+func (message *parsedMessage) getHeader(hdr string, structured bool) ([]string, error) {
+	vv, found := message.headers[hdr] // normal header, cannot use "Values" on lowercased header name
+	if !found {
+		return nil, fmt.Errorf("header %s not found", hdr)
+	}
+	if !structured {
+		return []string{foldFields(vv)}, nil
+	}
+	sfv, err := httpsfv.UnmarshalDictionary(vv)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal %s, possibly not a structured field: %w", hdr, err)
+	}
+	s, err := httpsfv.Marshal(sfv)
+	if err != nil {
+		return nil, fmt.Errorf("could not re-marshal %s", hdr)
+	}
+	return []string{s}, nil
 }
 
 func (message *parsedMessage) getDictHeader(hdr, member string) ([]string, error) {

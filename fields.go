@@ -11,6 +11,8 @@ import (
 type Fields []field
 
 // The SFV representation of a field is name;flagName="flagValue"
+// Note that this is a subset of SFV, we only support string-valued params, and only one param
+// per field for now.
 type field struct {
 	name                string
 	flagName, flagValue string
@@ -83,16 +85,35 @@ func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
 	return fs
 }
 
-func (f field) asSignatureInput() (string, error) {
+func fromStructuredField(hdr string) *field {
+	h := strings.ToLower(hdr)
+	f := field{h, "sf", ""}
+	return &f
+}
+
+// AddStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941
+func (fs *Fields) AddStructuredField(hdr string) *Fields {
+	f := fromStructuredField(hdr)
+	*fs = append(*fs, *f)
+	return fs
+}
+
+func (f field) toItem() httpsfv.Item {
 	p := httpsfv.NewParams()
-	if f.flagName != "" {
+	if f.flagName == "sf" { //special case
+		p.Add(f.flagName, true)
+	} else if f.flagName != "" {
 		p.Add(f.flagName, f.flagValue)
 	}
 	i := httpsfv.Item{
 		Value:  f.name,
 		Params: p,
 	}
-	s, err := httpsfv.Marshal(i)
+	return i
+}
+
+func (f field) asSignatureInput() (string, error) {
+	s, err := httpsfv.Marshal(f.toItem())
 	return s, err
 }
 
@@ -102,19 +123,7 @@ func (fs *Fields) asSignatureInput(p *httpsfv.Params) (string, error) {
 		Params: httpsfv.NewParams(),
 	}
 	for _, f := range *fs {
-		if f.flagName == "" {
-			il.Items = append(il.Items, httpsfv.Item{
-				Value:  f.name,
-				Params: httpsfv.NewParams(),
-			})
-		} else {
-			p := httpsfv.NewParams()
-			p.Add(f.flagName, f.flagValue)
-			il.Items = append(il.Items, httpsfv.Item{
-				Value:  f.name,
-				Params: p,
-			})
-		}
+		il.Items = append(il.Items, f.toItem())
 	}
 	il.Params = p
 	s, err := httpsfv.Marshal(il)

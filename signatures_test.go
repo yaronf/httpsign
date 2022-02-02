@@ -1258,6 +1258,18 @@ func Test_signRequestDebug(t *testing.T) {
 			wantErr:                  false,
 		},
 		{
+			name: "normal header as SFV, sec. 2.1.1",
+			args: args{
+				signatureName: "sig1",
+				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), *NewFields().AddStructuredField("example-dictionary")),
+				req:           readRequest(dict1),
+			},
+			wantSignatureInputHeader: "sig1=(\"example-dictionary\";sf);alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:Ts9x90TxYoMYiGHgSysuJdOI26mL7Tzg310l9FdYt7I=:",
+			wantSignatureInput:       "\"example-dictionary\";sf: a=1, b=2;x=1;y=2, c=(a b c)\n\"@signature-params\": (\"example-dictionary\";sf);alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:                  false,
+		},
+		{
 			name: "cross-line header, trim",
 			args: args{
 				signatureName: "sig1",
@@ -1280,6 +1292,19 @@ func Test_signRequestDebug(t *testing.T) {
 			wantSignatureInputHeader: "sig1=(\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
 			wantSignature:            "sig1=:4a5PQFe7Z3Cx5b8uX4hNx56zenxuJ2/dA9nl/wDSuzo=:",
 			wantSignatureInput:       "\"x-ows-header\": Leading and trailing whitespace.\n\"x-obs-fold-header\": Obsolete line folding.\n\"cache-control\": max-age=60, must-revalidate\n\"example-dictionary\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:                  false,
+		},
+		{
+			name: "reserialized dictionary headers, Sec. 2.1.2",
+			args: args{
+				signatureName: "sig1",
+				signer: makeHMACSigner(*NewSignConfig().SignCreated(false),
+					*NewFields().AddHeaders("Cache-Control").AddDictHeader("Example-Dictionary", "a").AddDictHeader("Example-Dictionary", "b").AddDictHeader("Example-Dictionary", "c")),
+				req: readRequest(httpreq4),
+			},
+			wantSignatureInputHeader: "sig1=(\"cache-control\" \"example-dictionary\";key=\"a\" \"example-dictionary\";key=\"b\" \"example-dictionary\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:8ahOKeLf89H5O4bjk1PU6Hl/X48KUO7fxyG8l/sxOJE=:",
+			wantSignatureInput:       "\"cache-control\": max-age=60, must-revalidate\n\"example-dictionary\";key=\"a\": 1\n\"example-dictionary\";key=\"b\": 2;x=1;y=2\n\"example-dictionary\";key=\"c\": (a b c)\n\"@signature-params\": (\"cache-control\" \"example-dictionary\";key=\"a\" \"example-dictionary\";key=\"b\" \"example-dictionary\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
 			wantErr:                  false,
 		},
 	}
