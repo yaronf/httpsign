@@ -14,14 +14,14 @@ func Test_WrapHandler(t *testing.T) {
 	fetchVerifier := func(r *http.Request) (string, *Verifier) {
 		sigName := "sig1"
 		verifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), nil,
-			HeaderList([]string{"@method"}))
+			Headers("@method"))
 		return sigName, verifier
 	}
 
 	fetchSigner := func(res http.Response, r *http.Request) (string, *Signer) {
 		sigName := "sig1"
 		signer, _ := NewHMACSHA256Signer("key", bytes.Repeat([]byte{0}, 64), nil,
-			HeaderList([]string{"@status", "bar", "date"}))
+			Headers("@status", "bar", "date"))
 		return sigName, signer
 	}
 
@@ -71,7 +71,7 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 		fetchSigner := func(res http.Response, r *http.Request) (string, *Signer) {
 			sigName := "sig1"
 			signer, _ := NewHMACSHA256Signer("key", bytes.Repeat([]byte{0}, 64), signConfig,
-				HeaderList([]string{"@status", "bar", "date"}))
+				Headers("@status", "bar", "date"))
 			return sigName, signer
 		}
 		badFetchSigner := func(res http.Response, r *http.Request) (string, *Signer) {
@@ -178,7 +178,7 @@ func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler
 	fetchVerifier := func(r *http.Request) (string, *Verifier) {
 		sigName := "sig1"
 		verifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), nil,
-			HeaderList([]string{"@method"}))
+			Headers("@method"))
 		return sigName, verifier
 	}
 	config := NewHandlerConfig().SetReqNotVerified(verifyFailed).SetFetchVerifier(fetchVerifier)
@@ -189,7 +189,7 @@ func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler
 	// Create a signer and a wrapped HTTP client (we set SignCreated to false to make the response deterministic,
 	// don't do that in production.)
 	signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64),
-		NewSignConfig().SignCreated(false), HeaderList([]string{"@method"}))
+		NewSignConfig().SignCreated(false), Headers("@method"))
 	client := NewDefaultClient("sig22", signer, nil, nil) // sign, don't verify
 
 	// Send an HTTP GET, get response -- signing and verification happen behind the scenes

@@ -24,7 +24,7 @@ func ExampleClient_Get() {
 	// Create a signer and a wrapped HTTP client (we set SignCreated to false to make the response deterministic,
 	// don't do that in production.)
 	signer, _ := httpsign.NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64),
-		httpsign.NewSignConfig().SignCreated(false), httpsign.HeaderList([]string{"@method"}))
+		httpsign.NewSignConfig().SignCreated(false), httpsign.Headers("@method"))
 	client := httpsign.NewDefaultClient("sig22", signer, nil, nil) // sign, don't verify
 
 	// Send an HTTP GET, get response -- signing and verification happen behind the scenes

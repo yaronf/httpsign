@@ -17,7 +17,7 @@ func ExampleWrapHandler_clientSigns() {
 	fetchVerifier := func(r *http.Request) (string, *httpsign.Verifier) {
 		sigName := "sig1"
 		verifier, _ := httpsign.NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0x99}, 64), nil,
-			httpsign.HeaderList([]string{"@method"}))
+			httpsign.Headers("@method"))
 		return sigName, verifier
 	}
 
@@ -57,7 +57,7 @@ func ExampleWrapHandler_serverSigns() {
 	fetchSigner := func(res http.Response, r *http.Request) (string, *httpsign.Signer) {
 		sigName := "sig1"
 		signer, _ := httpsign.NewHMACSHA256Signer("key", bytes.Repeat([]byte{0}, 64), nil,
-			httpsign.HeaderList([]string{"@status", "bar", "date", "content-type"}))
+			httpsign.Headers("@status", "bar", "date", "content-type"))
 		return sigName, signer
 	}
 

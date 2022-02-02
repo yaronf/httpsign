@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Fields is a list of fields to be signed. To initialize, use HeaderList or for more complex
+// Fields is a list of fields to be signed. To initialize, use Headers or for more complex
 // cases, NewFields followed by a chain of Add... methods.
 type Fields []field
 
@@ -23,14 +23,19 @@ func (f *field) String() string {
 	return fmt.Sprintf("%s;%s=\"%s\"", f.name, f.flagName, f.flagValue)
 }
 
-// HeaderList is a simple way to generate a Fields list, where only simple header names and specialty headers
+// Headers is a simple way to generate a Fields list, where only simple header names and derived headers
 // are needed.
-func HeaderList(hs []string) Fields {
-	var f []field
+func Headers(hs ...string) Fields {
+	fs := NewFields()
+	return *fs.AddHeaders(hs...)
+}
+
+// AddHeaders adds a list of simple or derived header names
+func (fs *Fields) AddHeaders(hs ...string) *Fields {
 	for _, h := range hs {
-		f = append(f, *fromHeaderName(h))
+		*fs = append(*fs, *fromHeaderName(h))
 	}
-	return f
+	return fs
 }
 
 // NewFields return an empty list of fields

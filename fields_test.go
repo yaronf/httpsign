@@ -18,7 +18,7 @@ func TestFields_asSignatureInput(t *testing.T) {
 	}{
 		{
 			name: "Just headers",
-			fs:   HeaderList([]string{"hdr1", "hdr2", "@Hdr3"}),
+			fs:   Headers("hdr1", "hdr2", "@Hdr3"),
 			args: args{
 				p: httpsfv.NewParams(),
 			},

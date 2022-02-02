@@ -361,7 +361,7 @@ func TestSignRequest(t *testing.T) {
 				signatureName: "sig1",
 				signer: (func() Signer {
 					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
-					fields := HeaderList([]string{"@authority", "date", "content-type"})
+					fields := Headers("@authority", "date", "content-type")
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
 					return *signer
@@ -378,7 +378,7 @@ func TestSignRequest(t *testing.T) {
 				signatureName: "sig1",
 				signer: (func() Signer {
 					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
-					fields := HeaderList([]string{"@authorityxx", "date", "content-type"})
+					fields := Headers("@authorityxx", "date", "content-type")
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
 					return *signer
@@ -395,7 +395,7 @@ func TestSignRequest(t *testing.T) {
 				signatureName: "sig1",
 				signer: (func() Signer {
 					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
-					fields := HeaderList([]string{"@authority", "date-not-really", "content-type"})
+					fields := Headers("@authority", "date-not-really", "content-type")
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
 					return *signer
@@ -557,7 +557,7 @@ func readResponse(s string) *http.Response {
 
 func TestSignAndVerifyHMAC(t *testing.T) {
 	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
-	fields := HeaderList([]string{"@authority", "date", "content-type"})
+	fields := Headers("@authority", "date", "content-type")
 	signatureName := "sig1"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
@@ -577,7 +577,7 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 
 func TestSignAndVerifyHMACBad(t *testing.T) {
 	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
-	fields := HeaderList([]string{"@authority", "date", "content-type"})
+	fields := Headers("@authority", "date", "content-type")
 	signatureName := "sig1"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
@@ -598,7 +598,7 @@ func TestSignAndVerifyHMACBad(t *testing.T) {
 
 func TestCreated(t *testing.T) {
 	testOnceWithConfig := func(t *testing.T, createdTime int64, verifyConfig *VerifyConfig, wantSuccess bool) {
-		fields := HeaderList([]string{"@status", "date", "content-type"})
+		fields := Headers("@status", "date", "content-type")
 		signatureName := "sigres"
 		key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 		signConfig := NewSignConfig().SignCreated(true).setFakeCreated(createdTime)
@@ -650,7 +650,7 @@ func TestCreated(t *testing.T) {
 }
 
 func TestSignAndVerifyResponseHMAC(t *testing.T) {
-	fields := HeaderList([]string{"@status", "date", "content-type"})
+	fields := Headers("@status", "date", "content-type")
 	signatureName := "sigres"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
 	config := NewSignConfig().SetExpires(999)                                   // should have expired long ago (but will be ignored by verifier)
@@ -673,7 +673,7 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 
 func TestSignAndVerifyRSAPSS(t *testing.T) {
 	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
-	fields := HeaderList([]string{"@authority", "date", "content-type"})
+	fields := Headers("@authority", "date", "content-type")
 	signatureName := "sig1"
 	prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
 	if err != nil {
@@ -700,7 +700,7 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 
 func TestSignAndVerifyRSA(t *testing.T) {
 	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
-	fields := HeaderList([]string{"@authority", "date", "content-type"})
+	fields := Headers("@authority", "date", "content-type")
 	signatureName := "sig1"
 	prvKey, err := parseRsaPrivateKeyFromPemStr(rsaPrvKey)
 	if err != nil {
@@ -817,7 +817,8 @@ func TestSignResponse(t *testing.T) {
 				signatureName: "sig1",
 				signer: (func() Signer {
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, NewSignConfig().setFakeCreated(1618889999), HeaderList([]string{"@status", "date", "content-type"}))
+					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, NewSignConfig().setFakeCreated(1618889999), Headers(
+						"@status", "date", "content-type"))
 					return *signer
 				})(),
 				res: readResponse(httpres1),
@@ -832,7 +833,10 @@ func TestSignResponse(t *testing.T) {
 				signatureName: "sig1",
 				signer: (func() Signer {
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, NewSignConfig().setFakeCreated(1618889999), HeaderList([]string{"@status", "date", "content-type"}))
+					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, NewSignConfig().setFakeCreated(1618889999), Headers(
+
+						"@status", "date", "content-type",
+					))
 					return *signer
 				})(),
 				res: nil,
@@ -1071,7 +1075,7 @@ func TestRequestResponse(t *testing.T) {
 		t.Errorf("Could not generate P-256 keypair")
 	}
 	req := readRequest(httpreq2)
-	signer1, err := NewP256Signer("key9", priv1, NewSignConfig(), HeaderList([]string{"@request-target"}))
+	signer1, err := NewP256Signer("key9", priv1, NewSignConfig(), Headers("@request-target"))
 	if err != nil {
 		t.Errorf("Could not create signer")
 	}
@@ -1083,7 +1087,7 @@ func TestRequestResponse(t *testing.T) {
 	req.Header.Add("Signature", sig1)
 
 	// Server verifies request and signs response
-	verifier1, err := NewP256Verifier("key9", pub1, NewVerifyConfig(), HeaderList([]string{"@request-target"}))
+	verifier1, err := NewP256Verifier("key9", pub1, NewVerifyConfig(), Headers("@request-target"))
 	if err != nil {
 		t.Errorf("Could not create verifier: %v", err)
 	}
@@ -1101,7 +1105,7 @@ func TestRequestResponse(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse sig1")
 	}
-	signer2, err := NewP256Signer("key10", priv2, NewSignConfig().SetRequestResponse("sig1", sig1Value), HeaderList([]string{"@status"}))
+	signer2, err := NewP256Signer("key10", priv2, NewSignConfig().SetRequestResponse("sig1", sig1Value), Headers("@status"))
 	if err != nil {
 		t.Errorf("Could not create signer")
 	}
@@ -1113,7 +1117,7 @@ func TestRequestResponse(t *testing.T) {
 	res.Header.Add("Signature", sig2)
 
 	// Client verifies response
-	verifier2, err := NewP256Verifier("key10", pub2, NewVerifyConfig().SetRequestResponse("sigxx", sig1Value).SetVerifyCreated(false), HeaderList([]string{"@status"}))
+	verifier2, err := NewP256Verifier("key10", pub2, NewVerifyConfig().SetRequestResponse("sigxx", sig1Value).SetVerifyCreated(false), Headers("@status"))
 	if err != nil {
 		t.Errorf("Could not create second verifier: %v", err)
 	}
@@ -1121,7 +1125,7 @@ func TestRequestResponse(t *testing.T) {
 	if err == nil {
 		t.Errorf("Verification should have failed, wrong sig name in SetRequestResponse")
 	}
-	verifier2, err = NewP256Verifier("key10", pub2, NewVerifyConfig().SetRequestResponse("sig1", sig1Value).SetVerifyCreated(false), HeaderList([]string{"@status"}))
+	verifier2, err = NewP256Verifier("key10", pub2, NewVerifyConfig().SetRequestResponse("sig1", sig1Value).SetVerifyCreated(false), Headers("@status"))
 	if err != nil {
 		t.Errorf("Could not create second verifier: %v", err)
 	}
@@ -1165,7 +1169,7 @@ func TestDictionary(t *testing.T) {
 func TestMultipleSignatures(t *testing.T) {
 	priv1, _, err := genP256KeyPair() // no pub, no verify
 	res := readResponse(httpres2)
-	signer1, err := NewP256Signer("key10", priv1, NewSignConfig().SignCreated(false), HeaderList([]string{"Content-Type", "Digest"}))
+	signer1, err := NewP256Signer("key10", priv1, NewSignConfig().SignCreated(false), Headers("Content-Type", "Digest"))
 	if err != nil {
 		t.Errorf("Could not create signer")
 	}
@@ -1245,7 +1249,7 @@ func Test_signRequestDebug(t *testing.T) {
 			name: "normal header, sec. 2.1.1",
 			args: args{
 				signatureName: "sig1",
-				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), HeaderList([]string{"example-dictionary"})),
+				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), Headers("example-dictionary")),
 				req:           readRequest(dict1),
 			},
 			wantSignatureInputHeader: "sig1=(\"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
@@ -1257,7 +1261,7 @@ func Test_signRequestDebug(t *testing.T) {
 			name: "cross-line header, trim",
 			args: args{
 				signatureName: "sig1",
-				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), HeaderList([]string{"example-dictionary"})),
+				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), Headers("example-dictionary")),
 				req:           readRequest(dict2),
 			},
 			wantSignatureInputHeader: "sig1=(\"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
@@ -1270,7 +1274,7 @@ func Test_signRequestDebug(t *testing.T) {
 			args: args{
 				signatureName: "sig1",
 				signer: makeHMACSigner(*NewSignConfig().SignCreated(false),
-					HeaderList([]string{"X-OWS-Header", "X-Obs-Fold-Header", "Cache-Control", "Example-Dictionary"})),
+					Headers("X-OWS-Header", "X-Obs-Fold-Header", "Cache-Control", "Example-Dictionary")),
 				req: readRequest(httpreq4),
 			},
 			wantSignatureInputHeader: "sig1=(\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
