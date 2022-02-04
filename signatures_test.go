@@ -372,11 +372,15 @@ func parseEdDSAPrivateKeyFromPemStr(pemEncodedPK string) (ed25519.PrivateKey, er
 
 	// taken from crypto/x509/pkcs8.go
 	type pkcs8 struct {
-		Version    int
-		Algo       pkix.AlgorithmIdentifier
-		SeedStruct []byte
+		Version           int
+		Algo              pkix.AlgorithmIdentifier
+		SeedStructWrapper []byte
 		// optional attributes omitted.
 	}
+
+	type seedInner []byte // This appears to be an openssl bug: the seed octet string is wrapped
+	// inside another octet string
+
 	var privKey pkcs8
 	if _, err := asn1.Unmarshal(block.Bytes, &privKey); err != nil {
 		return nil, err
@@ -385,10 +389,15 @@ func parseEdDSAPrivateKeyFromPemStr(pemEncodedPK string) (ed25519.PrivateKey, er
 	if !privKey.Algo.Algorithm.Equal(oidEd25519) {
 		return nil, fmt.Errorf("unknown algorithm")
 	}
-	if len(privKey.SeedStruct)-2 != ed25519.SeedSize {
+
+	var seed seedInner
+	_, err := asn1.Unmarshal(privKey.SeedStructWrapper, &seed) // double trouble
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal inner asn.1 octet string")
+	}
+	if len(seed) != ed25519.SeedSize {
 		return nil, fmt.Errorf("seed is malformed")
 	}
-	seed := privKey.SeedStruct[2 : 2+ed25519.SeedSize] // Go for some reason ignores the Octet String tag and length bytes
 	prv := ed25519.NewKeyFromSeed(seed)
 	return prv, nil
 }
