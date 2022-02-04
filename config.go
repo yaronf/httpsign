@@ -78,6 +78,7 @@ type VerifyConfig struct {
 	allowedAlgs     []string
 	rejectExpired   bool
 	requestResponse *requestResponse
+	verifyKeyID     bool
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,
@@ -127,6 +128,14 @@ func (v *VerifyConfig) SetRequestResponse(name, signature string) *VerifyConfig 
 	return v
 }
 
+// SetVerifyKeyID defines how to verify the keyid parameter, if one exists. If this value is set,
+// the signature verifies only if the value is the same as was specified in the Verifier structure.
+// Default: true
+func (v *VerifyConfig) SetVerifyKeyID(verify bool) *VerifyConfig {
+	v.verifyKeyID = verify
+	return v
+}
+
 // NewVerifyConfig generates a default configuration.
 func NewVerifyConfig() *VerifyConfig {
 	return &VerifyConfig{
@@ -135,6 +144,7 @@ func NewVerifyConfig() *VerifyConfig {
 		notOlderThan:  10 * time.Second,
 		rejectExpired: true,
 		allowedAlgs:   []string{},
+		verifyKeyID:   true,
 	}
 }
 

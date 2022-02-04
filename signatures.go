@@ -116,7 +116,7 @@ func (message *parsedMessage) getDictHeader(hdr, member string) ([]string, error
 	}
 	dict, err := httpsfv.UnmarshalDictionary(vals)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse dictionary for %s", hdr)
+		return nil, fmt.Errorf("cannot parse dictionary for %s: %w", hdr, err)
 	}
 	v, found := dict.Get(member)
 	if !found {
@@ -308,7 +308,7 @@ func GetRequestSignature(req *http.Request, signatureName string) (string, error
 func messageKeyID(signatureName string, parsedMessage parsedMessage) (keyID, alg string, err error) {
 	si, err := parsedMessage.getDictHeader("signature-input", signatureName)
 	if err != nil {
-		return "", "", fmt.Errorf("missing \"signature-input\" header, or cannot find \"%s\"", signatureName)
+		return "", "", fmt.Errorf("missing \"signature-input\" header, or cannot find \"%s\": %w", signatureName, err)
 	}
 	if len(si) > 1 {
 		return "", "", fmt.Errorf("more than one \"signature-input\" for %s", signatureName)
@@ -357,7 +357,7 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response)
 func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) error {
 	wsi, err := message.getDictHeader("signature-input", name)
 	if err != nil {
-		return fmt.Errorf("missing \"signature-input\" header, or cannot find signature \"%s\"", name)
+		return fmt.Errorf("missing \"signature-input\" header, or cannot find signature \"%s\": %w", name, err)
 	}
 	if len(wsi) > 1 {
 		return fmt.Errorf("multiple \"signature-header\" values for %s", name)
@@ -384,7 +384,7 @@ func verifyMessage(config VerifyConfig, name string, verifier Verifier, message 
 	if !(psiSig.fields.contains(&fields)) {
 		return fmt.Errorf("actual signature does not cover all required fields")
 	}
-	err = applyVerificationPolicy(psiSig, config)
+	err = applyVerificationPolicy(verifier, psiSig, config)
 	if err != nil {
 		return err
 	}
@@ -395,7 +395,7 @@ func verifyMessage(config VerifyConfig, name string, verifier Verifier, message 
 	return verifySignature(verifier, signatureInput, wantSigRaw)
 }
 
-func applyVerificationPolicy(psi *psiSignature, config VerifyConfig) error {
+func applyVerificationPolicy(verifier Verifier, psi *psiSignature, config VerifyConfig) error {
 	err := applyPolicyCreated(psi, config)
 	if err != nil {
 		return err
@@ -407,6 +407,26 @@ func applyVerificationPolicy(psi *psiSignature, config VerifyConfig) error {
 	err3 := applyPolicyExpired(psi, config)
 	if err3 != nil {
 		return err3
+	}
+	err4 := applyPolicyOthers(verifier, psi, config)
+	if err4 != nil {
+		return err4
+	}
+	return nil
+}
+
+func applyPolicyOthers(verifier Verifier, psi *psiSignature, config VerifyConfig) error {
+	if config.verifyKeyID {
+		keyidParam, ok := psi.params["keyid"]
+		if ok {
+			keyID, ok := keyidParam.(string)
+			if !ok {
+				return fmt.Errorf("malformed \"keyid\" parameter")
+			}
+			if keyID != verifier.keyID {
+				return fmt.Errorf("wrong keyid \"%s\"", keyID)
+			}
+		}
 	}
 	return nil
 }
