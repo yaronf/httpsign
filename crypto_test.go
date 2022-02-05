@@ -151,7 +151,7 @@ func TestNewRSASigner(t *testing.T) {
 				keyID:  "",
 				key:    privateKey,
 				config: nil,
-				fields: nil,
+				fields: *NewFields(),
 			},
 			want:    nil,
 			wantErr: true,
@@ -162,7 +162,7 @@ func TestNewRSASigner(t *testing.T) {
 				keyID:  "kk",
 				key:    nil,
 				config: NewSignConfig(),
-				fields: nil,
+				fields: *NewFields(),
 			},
 			want:    nil,
 			wantErr: true,
@@ -247,17 +247,6 @@ func TestNewRSASigner1(t *testing.T) {
 				foreignSigner: nil,
 			},
 			wantErr: false,
-		},
-		{
-			name: "nil fields",
-			args: args{
-				keyID:  "key100",
-				key:    key,
-				config: nil,
-				fields: nil,
-			},
-			want:    nil,
-			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

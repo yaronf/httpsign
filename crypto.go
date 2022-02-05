@@ -37,9 +37,6 @@ func NewHMACSHA256Signer(keyID string, key []byte, config *SignConfig, fields Fi
 	if config == nil {
 		config = NewSignConfig()
 	}
-	if fields == nil {
-		return nil, fmt.Errorf("fields must not be nil")
-	}
 	return &Signer{
 		keyID:  keyID,
 		key:    key,
@@ -60,9 +57,6 @@ func NewRSASigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fields 
 	}
 	if config == nil {
 		config = NewSignConfig()
-	}
-	if fields == nil {
-		return nil, fmt.Errorf("fields must not be nil")
 	}
 	return &Signer{
 		keyID:  keyID,
@@ -85,9 +79,6 @@ func NewRSAPSSSigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fiel
 	if config == nil {
 		config = NewSignConfig()
 	}
-	if fields == nil {
-		return nil, fmt.Errorf("fields must not be nil")
-	}
 	return &Signer{
 		keyID:  keyID,
 		key:    key,
@@ -109,9 +100,6 @@ func NewP256Signer(keyID string, key *ecdsa.PrivateKey, config *SignConfig, fiel
 	if config == nil {
 		config = NewSignConfig()
 	}
-	if fields == nil {
-		return nil, fmt.Errorf("fields must not be nil")
-	}
 	return &Signer{
 		keyID:  keyID,
 		key:    key,
@@ -132,9 +120,6 @@ func NewEd25519Signer(keyID string, key *ed25519.PrivateKey, config *SignConfig,
 	}
 	if config == nil {
 		config = NewSignConfig()
-	}
-	if fields == nil {
-		return nil, fmt.Errorf("fields must not be nil")
 	}
 	return &Signer{
 		keyID:  keyID,
@@ -257,9 +242,6 @@ func NewRSAVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, fiel
 	if config == nil {
 		config = NewVerifyConfig()
 	}
-	if fields == nil {
-		return nil, fmt.Errorf("fields must not be nil")
-	}
 	return &Verifier{
 		keyID:  keyID,
 		key:    key,
@@ -277,9 +259,6 @@ func NewRSAPSSVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, f
 	}
 	if config == nil {
 		config = NewVerifyConfig()
-	}
-	if fields == nil {
-		return nil, fmt.Errorf("fields must not be nil")
 	}
 	return &Verifier{
 		keyID:  keyID,
@@ -299,9 +278,6 @@ func NewP256Verifier(keyID string, key *ecdsa.PublicKey, config *VerifyConfig, f
 	if config == nil {
 		config = NewVerifyConfig()
 	}
-	if fields == nil {
-		return nil, fmt.Errorf("fields must not be nil")
-	}
 	return &Verifier{
 		keyID:  keyID,
 		key:    key,
@@ -319,9 +295,6 @@ func NewEd25519Verifier(keyID string, key *ed25519.PublicKey, config *VerifyConf
 	}
 	if config == nil {
 		config = NewVerifyConfig()
-	}
-	if fields == nil {
-		return nil, fmt.Errorf("fields must not be nil")
 	}
 	return &Verifier{
 		keyID:  keyID,

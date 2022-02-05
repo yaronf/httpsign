@@ -131,11 +131,11 @@ func TestClient_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Client{
-				SignatuerName: tt.fields.sigName,
-				Signer:        tt.fields.signer,
-				Verifier:      tt.fields.verifier,
-				FetchVerifier: tt.fields.fetchVerifier,
-				Client:        tt.fields.Client,
+				signatureName: tt.fields.sigName,
+				signer:        tt.fields.signer,
+				verifier:      tt.fields.verifier,
+				fetchVerifier: tt.fields.fetchVerifier,
+				client:        tt.fields.Client,
 			}
 			res, err := c.Get(ts.URL + tt.args.url)
 			var gotRes string
@@ -213,11 +213,11 @@ func TestClient_Head(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Client{
-				SignatuerName: tt.fields.sigName,
-				Signer:        tt.fields.signer,
-				Verifier:      tt.fields.verifier,
-				FetchVerifier: tt.fields.fetchVerifier,
-				Client:        tt.fields.Client,
+				signatureName: tt.fields.sigName,
+				signer:        tt.fields.signer,
+				verifier:      tt.fields.verifier,
+				fetchVerifier: tt.fields.fetchVerifier,
+				client:        tt.fields.Client,
 			}
 
 			res, err := c.Head(ts.URL + tt.args.url)

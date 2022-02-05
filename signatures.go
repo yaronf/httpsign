@@ -48,7 +48,7 @@ func encodeBytes(raw []byte) string {
 
 func generateSignatureInput(message parsedMessage, fields Fields, params string) (string, error) {
 	inp := ""
-	for _, c := range fields {
+	for _, c := range fields.f {
 		f, err := c.asSignatureInput()
 		if err != nil {
 			return "", fmt.Errorf("could not marshal %v", f)
@@ -222,7 +222,8 @@ func addPseudoHeaders(message *parsedMessage, rr *requestResponse, fields Fields
 		}
 		message.headers.Add("@request-response", rr.name+"="+rr.signature)
 
-		return append(fields, rrfield)
+		fields.f = append(fields.f, rrfield)
+		return fields
 	}
 	return fields
 }
@@ -530,7 +531,7 @@ func parseSignatureInput(input string, sigName string) (*psiSignature, error) {
 			return nil, fmt.Errorf("Signature-Input: value is not a string")
 		}
 		if ff.Params == nil || len(ff.Params.Names()) == 0 {
-			f = append(f, *fromHeaderName(fname))
+			f.f = append(f.f, *fromHeaderName(fname))
 		} else {
 			if len(ff.Params.Names()) > 1 {
 				return nil, fmt.Errorf("more than one param for \"%s\"", fname)
@@ -539,7 +540,7 @@ func parseSignatureInput(input string, sigName string) (*psiSignature, error) {
 			flagName := flagNames[0]
 			flagValue, _ := ff.Params.Get(flagName)
 			fv := flagValue.(string)
-			f = append(f, field{
+			f.f = append(f.f, field{
 				name:      fname,
 				flagName:  flagName,
 				flagValue: fv,

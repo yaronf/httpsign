@@ -8,7 +8,9 @@ import (
 
 // Fields is a list of fields to be signed. To initialize, use Headers or for more complex
 // cases, NewFields followed by a chain of Add... methods.
-type Fields []field
+type Fields struct {
+	f []field
+}
 
 // The SFV representation of a field is name;flagName="flagValue"
 // Note that this is a subset of SFV, we only support string-valued params, and only one param
@@ -35,7 +37,7 @@ func Headers(hs ...string) Fields {
 // AddHeaders adds a list of simple or derived header names
 func (fs *Fields) AddHeaders(hs ...string) *Fields {
 	for _, h := range hs {
-		*fs = append(*fs, *fromHeaderName(h))
+		fs.f = append(fs.f, *fromHeaderName(h))
 	}
 	return fs
 }
@@ -55,7 +57,7 @@ func fromHeaderName(hdr string) *field {
 // AddHeader appends a bare header name, e.g. "cache-control"
 func (fs *Fields) AddHeader(hdr string) *Fields {
 	f := fromHeaderName(hdr)
-	*fs = append(*fs, *f)
+	fs.f = append(fs.f, *f)
 	return fs
 }
 
@@ -68,7 +70,7 @@ func fromQueryParam(qp string) *field {
 // AddQueryParam indicates a request for a specific query parameter to be signed
 func (fs *Fields) AddQueryParam(qp string) *Fields {
 	f := fromQueryParam(qp)
-	*fs = append(*fs, *f)
+	fs.f = append(fs.f, *f)
 	return fs
 }
 
@@ -81,7 +83,7 @@ func fromDictHeader(hdr, key string) *field {
 // AddDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified
 func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
 	f := fromDictHeader(hdr, key)
-	*fs = append(*fs, *f)
+	fs.f = append(fs.f, *f)
 	return fs
 }
 
@@ -94,7 +96,7 @@ func fromStructuredField(hdr string) *field {
 // AddStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941
 func (fs *Fields) AddStructuredField(hdr string) *Fields {
 	f := fromStructuredField(hdr)
-	*fs = append(*fs, *f)
+	fs.f = append(fs.f, *f)
 	return fs
 }
 
@@ -122,7 +124,7 @@ func (fs *Fields) asSignatureInput(p *httpsfv.Params) (string, error) {
 		Items:  []httpsfv.Item{},
 		Params: httpsfv.NewParams(),
 	}
-	for _, f := range *fs {
+	for _, f := range fs.f {
 		il.Items = append(il.Items, f.toItem())
 	}
 	il.Params = p
@@ -133,8 +135,8 @@ func (fs *Fields) asSignatureInput(p *httpsfv.Params) (string, error) {
 //  contains verifies that all required fields are in the given list of fields (yes, this is O(n^2))
 func (fs *Fields) contains(requiredFields *Fields) bool {
 outer:
-	for _, f1 := range *requiredFields {
-		for _, f2 := range *fs {
+	for _, f1 := range requiredFields.f {
+		for _, f2 := range fs.f {
 			if f1 == f2 {
 				continue outer
 			}

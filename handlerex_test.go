@@ -33,7 +33,7 @@ func ExampleWrapHandler_clientSigns() {
 	ts := httptest.NewServer(httpsign.WrapHandler(http.HandlerFunc(simpleHandler), config))
 	defer ts.Close()
 
-	// HTTP client code, with a Signer
+	// HTTP client code, with a signer
 	signer, _ := httpsign.NewHMACSHA256Signer("key", bytes.Repeat([]byte{0x99}, 64), nil,
 		*httpsign.NewFields().AddHeader("content-type").AddQueryParam("pet").AddHeader("@method"))
 
