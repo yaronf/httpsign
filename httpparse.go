@@ -27,7 +27,18 @@ func parseRequest(req *http.Request) (*parsedMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse query: %s", req.URL.RawQuery)
 	}
-	return &parsedMessage{derived: generateReqDerivedComponents(req), url: req.URL, headers: normalizeHeaderNames(req.Header), qParams: values}, nil
+	url := req.URL
+	if url.Host == "" {
+		url.Host = req.Host
+	}
+	if url.Scheme == "" {
+		if req.TLS == nil {
+			url.Scheme = "http"
+		} else {
+			url.Scheme = "https"
+		}
+	}
+	return &parsedMessage{derived: generateReqDerivedComponents(req), url: url, headers: normalizeHeaderNames(req.Header), qParams: values}, nil
 }
 
 func normalizeHeaderNames(header http.Header) http.Header {

@@ -171,7 +171,8 @@ func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner inte
 // SignRequest signs an HTTP request. Returns the Signature-Input and the Signature header values.
 //
 func SignRequest(signatureName string, signer Signer, req *http.Request) (signatureInputHeader, signature string, err error) {
-	signatureInputHeader, signature, _, err = signRequestDebug(signatureName, signer, req)
+	signatureInputHeader, signature, signatureInput, err := signRequestDebug(signatureName, signer, req)
+	_ = signatureInput
 	return
 }
 
@@ -230,20 +231,24 @@ func addPseudoHeaders(message *parsedMessage, rr *requestResponse, fields Fields
 
 //
 // VerifyRequest verifies a signed HTTP request. Returns an error if verification failed for any reason, otherwise nil.
-//
-func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) (err error) {
+func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) error {
+	_, err := verifyRequestDebug(signatureName, verifier, req)
+	return err
+}
+
+func verifyRequestDebug(signatureName string, verifier Verifier, req *http.Request) (signatureInput string, err error) {
 	if req == nil {
-		return fmt.Errorf("nil request")
+		return "", fmt.Errorf("nil request")
 	}
 	if signatureName == "" {
-		return fmt.Errorf("empty signature name")
+		return "", fmt.Errorf("empty signature name")
 	}
 	if verifier.config.requestResponse != nil {
-		return fmt.Errorf("use request-response only to verify responses")
+		return "", fmt.Errorf("use request-response only to verify responses")
 	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	return verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, verifier.fields)
 }
@@ -352,48 +357,47 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response)
 		return err
 	}
 	extendedFields := addPseudoHeaders(parsedMessage, verifier.config.requestResponse, verifier.fields)
-	return verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, extendedFields)
+	_, err = verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, extendedFields)
+	return err
 }
 
-func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) error {
+func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) (string, error) {
 	wsi, err := message.getDictHeader("signature-input", name)
 	if err != nil {
-		return fmt.Errorf("missing \"signature-input\" header, or cannot find signature \"%s\": %w", name, err)
+		return "", fmt.Errorf("missing \"signature-input\" header, or cannot find signature \"%s\": %w", name, err)
 	}
 	if len(wsi) > 1 {
-		return fmt.Errorf("multiple \"signature-header\" values for %s", name)
+		return "", fmt.Errorf("multiple \"signature-header\" values for %s", name)
 	}
 	wantSignatureInput := wsi[0]
 	ws, err := message.getDictHeader("signature", name)
 	if err != nil {
-		return fmt.Errorf("missing \"signature\" header")
+		return "", fmt.Errorf("missing \"signature\" header")
 	}
 	if len(ws) > 1 {
-		return fmt.Errorf("multiple \"signature\" values for %s", name)
+		return "", fmt.Errorf("multiple \"signature\" values for %s", name)
 	}
 	wantSignature := ws[0]
-	//delete(message.components, *fromDictHeader("signature-input", name))
-	//delete(message.components, *fromDictHeader("signature", name))
 	wantSigRaw, err := parseWantSignature(wantSignature)
 	if err != nil {
-		return err
+		return "", err
 	}
 	psiSig, err := parseSignatureInput(wantSignatureInput, name)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if !(psiSig.fields.contains(&fields)) {
-		return fmt.Errorf("actual signature does not cover all required fields")
+		return "", fmt.Errorf("actual signature does not cover all required fields")
 	}
 	err = applyVerificationPolicy(verifier, psiSig, config)
 	if err != nil {
-		return err
+		return "", err
 	}
 	signatureInput, err := generateSignatureInput(message, psiSig.fields, psiSig.origSigParams)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return verifySignature(verifier, signatureInput, wantSigRaw)
+	return signatureInput, verifySignature(verifier, signatureInput, wantSigRaw)
 }
 
 func applyVerificationPolicy(verifier Verifier, psi *psiSignature, config VerifyConfig) error {
