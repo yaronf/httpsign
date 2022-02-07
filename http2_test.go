@@ -3,6 +3,7 @@ package httpsign
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"github.com/andreyvit/diff"
 	"io"
 	"net/http"
@@ -13,13 +14,18 @@ import (
 	"text/template"
 )
 
-var httpreq5 = ``
-
 var wantFields = `"kuku": my awesome header
 "@query": ?k1=v1&k2
 "@method": GET
-"@target-uri": http://127.0.0.1:{{.Port}}/?k1=v1&k2
-"@signature-params": ("kuku" "@query" "@method" "@target-uri");alg="hmac-sha256";keyid="key1"`
+"@target-uri": {{.Scheme}}://127.0.0.1:{{.Port}}/path?k1=v1&k2
+"@authority": 127.0.0.1:{{.Port}}
+"@scheme": {{.Scheme}}
+"@target-uri": {{.Scheme}}://127.0.0.1:{{.Port}}/path?k1=v1&k2
+"@path": /path
+"@query": ?k1=v1&k2
+"@query-params";name="k1": v1
+"@query-params";name="k2": 
+"@signature-params": ("kuku" "@query" "@method" "@target-uri" "@authority" "@scheme" "@target-uri" "@path" "@query" "@query-params";name="k1" "@query-params";name="k2");alg="hmac-sha256";keyid="key1"`
 
 func execTemplate(t template.Template, name string, data interface{}) (string, error) {
 	buf := &bytes.Buffer{}
@@ -38,11 +44,17 @@ func newClientRequest(t *testing.T, method, url, body string) *http.Request {
 
 var ts *httptest.Server // global, so can be used *inside* the server, too
 
-func TestHTTP11(t *testing.T) {
+func testHTTP(t *testing.T, proto string) {
 	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
-		proto := r.Proto
-		if proto != "HTTP/1.1" {
-			t.Errorf("expected HTTP/1.1, got %s", proto)
+		reqProto := r.Proto
+		if reqProto != proto {
+			t.Errorf("expected %s, got %s", proto, reqProto)
+		}
+		var scheme string
+		if ts.TLS == nil {
+			scheme = "http"
+		} else {
+			scheme = "https"
 		}
 		sp := bytes.Split([]byte(ts.URL), []byte(":"))
 		portval, err := strconv.Atoi(string(sp[2]))
@@ -53,8 +65,11 @@ func TestHTTP11(t *testing.T) {
 		if err != nil {
 			t.Errorf("could not parse template")
 		}
-		type inputs struct{ Port int }
-		wf, err := execTemplate(*tpl, "fields", inputs{Port: portval})
+		type inputs struct {
+			Port   int
+			Scheme string
+		}
+		wf, err := execTemplate(*tpl, "fields", inputs{Port: portval, Scheme: scheme})
 		verifier, err := NewHMACSHA256Verifier("key1", bytes.Repeat([]byte{0x03}, 64),
 			NewVerifyConfig().SetVerifyCreated(false),
 			Headers("@query"))
@@ -69,17 +84,43 @@ func TestHTTP11(t *testing.T) {
 		if sigInput != wf {
 			// t.Errorf("expected: %s\ngot: %s\n", wantFields, sigInput)
 			t.Errorf("unexpected fields: %s\n", diff.CharacterDiff(sigInput, wantFields))
-		} // TODO: copy Host from request/response to URL if empty in URL
+		}
 		w.WriteHeader(200)
 	}
-	ts = httptest.NewServer(http.HandlerFunc(simpleHandler))
+
+	// Client code
+	switch proto {
+	case "HTTP/1.1":
+		ts = httptest.NewServer(http.HandlerFunc(simpleHandler))
+	case "HTTP/2.0":
+		ts = httptest.NewUnstartedServer(http.HandlerFunc(simpleHandler))
+		ts.EnableHTTP2 = true
+		ts.StartTLS()
+	default:
+		t.Errorf("no server")
+	}
 	defer ts.Close()
+
+	tr := &http.Transport{
+		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true}, // Do not verify server certificate
+		ForceAttemptHTTP2: true,
+	}
 
 	signer, err := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{0x03}, 64),
 		NewSignConfig().SignCreated(false),
-		Headers("kuku", "@query", "@method", "@target-uri"))
-	client := NewDefaultClient("sig1", signer, nil, nil)
-	req := newClientRequest(t, "GET", ts.URL+"/"+"?k1=v1&k2", httpreq5)
+		*NewFields().AddHeaders("kuku", "@query", "@method", "@target-uri", "@authority", "@scheme", "@target-uri",
+			"@path", "@query").AddQueryParam("k1").AddQueryParam("k2"))
+	var client *Client
+	switch proto {
+	case "HTTP/1.1":
+		client = NewDefaultClient("sig1", signer, nil, nil)
+	case "HTTP/2.0":
+		c := &http.Client{Transport: tr}
+		client = NewClient("sig1", signer, nil, nil, *c)
+	default:
+		t.Errorf("no client for you")
+	}
+	req := newClientRequest(t, "GET", ts.URL+"/path"+"?k1=v1&k2", "")
 	req.Header.Set("Kuku", "my awesome header")
 	res, err := client.Do(req)
 	if err != nil {
@@ -96,4 +137,12 @@ func TestHTTP11(t *testing.T) {
 			t.Errorf("Bad status returned")
 		}
 	}
+}
+
+func TestHTTP11(t *testing.T) {
+	testHTTP(t, "HTTP/1.1")
+}
+
+func TestHTTP20(t *testing.T) {
+	testHTTP(t, "HTTP/2.0")
 }
