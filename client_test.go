@@ -188,11 +188,12 @@ func TestClient_Head(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "TLS",
+			name: "Happy Path",
 			fields: fields{
 				sigName: "sig1",
 				signer: func() *Signer {
-					signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64), NewSignConfig(), Headers("@method"))
+					signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64), NewSignConfig(),
+						Headers("@method"))
 					return signer
 				}(),
 				verifier:      nil,

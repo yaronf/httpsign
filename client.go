@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 )
 
 // Client represents an HTTP client that optionally signs requests and optionally verifies responses.
@@ -107,4 +109,9 @@ func (c *Client) Post(url, contentType string, body io.Reader) (res *http.Respon
 	}
 	req.Header.Set("Content-Type", contentType)
 	return c.Do(req)
+}
+
+// PostForm sends an HTTP POST, with data keys and values URL-encoded as the request body.
+func (c *Client) PostForm(url string, data url.Values) (resp *http.Response, err error) {
+	return c.Post(url, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 }
