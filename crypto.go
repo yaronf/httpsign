@@ -222,6 +222,9 @@ func NewHMACSHA256Verifier(keyID string, key []byte, config *VerifyConfig, field
 	if config == nil {
 		config = NewVerifyConfig()
 	}
+	if config.verifyKeyID && keyID == "" {
+		return nil, fmt.Errorf("keyID should not be empty")
+	}
 	return &Verifier{
 		keyID:  keyID,
 		key:    key,
@@ -236,6 +239,9 @@ func NewHMACSHA256Verifier(keyID string, key []byte, config *VerifyConfig, field
 func NewRSAVerifier(keyID string, key rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if config == nil {
 		config = NewVerifyConfig()
+	}
+	if config.verifyKeyID && keyID == "" {
+		return nil, fmt.Errorf("keyID should not be empty")
 	}
 	return &Verifier{
 		keyID:  keyID,
@@ -252,6 +258,9 @@ func NewRSAPSSVerifier(keyID string, key rsa.PublicKey, config *VerifyConfig, fi
 	if config == nil {
 		config = NewVerifyConfig()
 	}
+	if config.verifyKeyID && keyID == "" {
+		return nil, fmt.Errorf("keyID should not be empty")
+	}
 	return &Verifier{
 		keyID:  keyID,
 		key:    key,
@@ -266,6 +275,9 @@ func NewRSAPSSVerifier(keyID string, key rsa.PublicKey, config *VerifyConfig, fi
 func NewP256Verifier(keyID string, key ecdsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if config == nil {
 		config = NewVerifyConfig()
+	}
+	if config.verifyKeyID && keyID == "" {
+		return nil, fmt.Errorf("keyID should not be empty")
 	}
 	return &Verifier{
 		keyID:  keyID,
@@ -285,6 +297,9 @@ func NewEd25519Verifier(keyID string, key ed25519.PublicKey, config *VerifyConfi
 	if config == nil {
 		config = NewVerifyConfig()
 	}
+	if config.verifyKeyID && keyID == "" {
+		return nil, fmt.Errorf("keyID should not be empty")
+	}
 	return &Verifier{
 		keyID:  keyID,
 		key:    key,
@@ -300,6 +315,12 @@ func NewEd25519Verifier(keyID string, key ed25519.PublicKey, config *VerifyConfi
 func NewJWSVerifier(alg jwa.SignatureAlgorithm, key interface{}, keyID string, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
+	}
+	if config == nil {
+		config = NewVerifyConfig()
+	}
+	if config.verifyKeyID && keyID == "" {
+		return nil, fmt.Errorf("keyID should not be empty")
 	}
 	if alg == jwa.NoSignature {
 		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")

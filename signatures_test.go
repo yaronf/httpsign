@@ -939,7 +939,7 @@ func TestVerifyRequest(t *testing.T) {
 			name: "test case B.2.1",
 			args: args{
 				signatureName: "sig-b21",
-				verifier:      makeRSAVerifier(t, *NewFields()),
+				verifier:      makeRSAVerifier(t, "test-key-rsa-pss", *NewFields()),
 				req:           readRequest(httpreq1pssMinimal),
 			},
 			want:    true,
@@ -1001,7 +1001,7 @@ func TestVerifyRequest(t *testing.T) {
 			name: "verify bad sig (not base64)",
 			args: args{
 				signatureName: "sig1",
-				verifier:      makeRSAVerifier(t, *NewFields()),
+				verifier:      makeRSAVerifier(t, "test-key-rsa-pss", *NewFields()),
 				req:           readRequest(httpreq1pssSelectiveBad),
 			},
 			want:    false,
@@ -1011,8 +1011,25 @@ func TestVerifyRequest(t *testing.T) {
 			name: "missing fields",
 			args: args{
 				signatureName: "sig1",
-				verifier:      makeRSAVerifier(t, *NewFields().AddQueryParam("missing")),
+				verifier:      makeRSAVerifier(t, "test-key-rsa-pss", *NewFields().AddQueryParam("missing")),
 				req:           readRequest(httpreq1pssMinimal),
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "bad keyID",
+			args: args{
+				signatureName: "sig-b22",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier("bad-key-id", *pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+					return *verifier
+				})(),
+				req: readRequest(httpreq1pssSelective),
 			},
 			want:    false,
 			wantErr: true,
@@ -1029,13 +1046,13 @@ func TestVerifyRequest(t *testing.T) {
 	}
 }
 
-func makeRSAVerifier(t *testing.T, fields Fields) Verifier {
+func makeRSAVerifier(t *testing.T, keyID string, fields Fields) Verifier {
 	return (func() Verifier {
 		pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
 		if err != nil {
 			t.Errorf("cannot parse public key: %v", err)
 		}
-		verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+		verifier, _ := NewRSAPSSVerifier(keyID, *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 		return *verifier
 	})()
 }
