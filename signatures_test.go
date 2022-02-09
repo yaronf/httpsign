@@ -86,7 +86,7 @@ Content-Type: application/json
 Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
 Content-Length: 18
 Signature-Input: sig-b23=("date" "@method" "@path" "@query" "@authority" "content-type" "content-digest" "content-length");created=1618884473;keyid="test-key-rsa-pss"
-Signature: sig-b23=:f9nOGJSjCdQ/t+/Mp7gpAHU7Kn1LpnWJE6W2081yRFITJobBDODwQNxnjiIdAGstfGKuM2vlc5SyN16//K5dBLGoiaboMco4J6R0zS+8oXqD7o6KRpIZR/qMrFc5Bu6f6UxuoWZPfCxhs3vxL/60JbF8dcdul1b77mWyC07ZjZ9VkelByeF5+zN7v6Al/vnBzMS3H1NLz9dI2sw5Vb7kxQQ6CvEI9v3R30aFgWz4rCuyT0Kt3ytQvTHOBsadF66eDe641Sd6O/DgbdFibsE/+ToYopL9NlAuva42NlcFemrozvOKvGIPXdAPqmng/bePoSR6DIaFbWp5aDlNSbWlcA==:
+Signature: sig-b23=:bbN8oArOxYoyylQQUU6QYwrTuaxLwjAC9fbY2F6SVWvh0yBiMIRGOnMYwZ/5MR6fb0Kh1rIRASVxFkeGt683+qRpRRU5p2voTp768ZrCUb38K0fUxN0O0iC59DzYx8DFll5GmydPxSmme9v6ULbMFkl+V5B1TP/yPViV7KsLNmvKiLJH1pFkh/aYA2HXXZzNBXmIkoQoLd7YfW91kE9o/CCoC1xMy7JA1ipwvKvfrs65ldmlu9bpG6A9BmzhuzF8Eim5f8ui9eH8LZH896+QIF61ka39VBrohr9iyMUJpvRX2Zbhl5ZJzSRxpJyoEZAFL2FUo5fTIztsDZKEgM4cUA==:
 
 {"hello": "world"}
 `
@@ -976,8 +976,8 @@ func TestVerifyRequest(t *testing.T) {
 				})(),
 				req: readRequest(httpreq1pssFull),
 			},
-			want:    false, // TODO when the draft is fixed
-			wantErr: true,
+			want:    true,
+			wantErr: false,
 		},
 		{
 			name: "test case B.2.6",
@@ -1283,7 +1283,7 @@ func fold(vs []string) string {
 var dict1 = `GET /foo?param=value&pet=dog&pet=snake&bar=baz HTTP/1.1
 Host: example.com
 Date: Tue, 20 Apr 2021 02:07:55 GMT
-Example-Dictionary:  a=1,    b=2;x=1;y=2,   c=(a   b   c)
+Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)
 Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
 
 `
@@ -1291,8 +1291,8 @@ Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
 var dict2 = `GET /foo?param=value&pet=dog&pet=snake&bar=baz HTTP/1.1
 Host: example.com
 Date: Tue, 20 Apr 2021 02:07:55 GMT
-Example-Dictionary:  a=1    
-Example-Dictionary:      b=2;x=1;y=2,   c=(a   b   c)
+Example-Dict:  a=1    
+Example-Dict:      b=2;x=1;y=2,   c=(a   b   c)
 Digest: SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=
 
 `
@@ -1305,7 +1305,7 @@ X-Obs-Fold-Header: Obsolete
     line folding.
 Cache-Control: max-age=60
 Cache-Control:    must-revalidate
-Example-Dictionary:  a=1,    b=2;x=1;y=2,   c=(a   b   c)
+Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)
 
 `
 
@@ -1327,36 +1327,36 @@ func Test_signRequestDebug(t *testing.T) {
 			name: "normal header, sec. 2.1.1",
 			args: args{
 				signatureName: "sig1",
-				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), Headers("example-dictionary")),
+				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), Headers("example-dict")),
 				req:           readRequest(dict1),
 			},
-			wantSignatureInputHeader: "sig1=(\"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:AZTloqb5fzK7SCR5cB4E+b0ljviAMgWzutocEnGlN7g=:",
-			wantSignatureInput:       "\"example-dictionary\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignatureInputHeader: "sig1=(\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:QIpdcJ+ooLtayPLbo/wte3hVTH78oyg6xfKpO1JIXgU=:",
+			wantSignatureInput:       "\"example-dict\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
 			wantErr:                  false,
 		},
 		{
 			name: "normal header as SFV, sec. 2.1.1",
 			args: args{
 				signatureName: "sig1",
-				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), *NewFields().AddStructuredField("example-dictionary")),
+				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), *NewFields().AddStructuredField("example-dict")),
 				req:           readRequest(dict1),
 			},
-			wantSignatureInputHeader: "sig1=(\"example-dictionary\";sf);alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:Ts9x90TxYoMYiGHgSysuJdOI26mL7Tzg310l9FdYt7I=:",
-			wantSignatureInput:       "\"example-dictionary\";sf: a=1, b=2;x=1;y=2, c=(a b c)\n\"@signature-params\": (\"example-dictionary\";sf);alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignatureInputHeader: "sig1=(\"example-dict\";sf);alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:rYmKiJM/+dqWmK6NsSOSk5KnZIubvwGPCD8TU0CXVd0=:",
+			wantSignatureInput:       "\"example-dict\";sf: a=1, b=2;x=1;y=2, c=(a b c)\n\"@signature-params\": (\"example-dict\";sf);alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
 			wantErr:                  false,
 		},
 		{
 			name: "cross-line header, trim",
 			args: args{
 				signatureName: "sig1",
-				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), Headers("example-dictionary")),
+				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), Headers("example-dict")),
 				req:           readRequest(dict2),
 			},
-			wantSignatureInputHeader: "sig1=(\"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:haRjFgaeI6YgscKXzGgDgruWsKDMW9RLZW1R55OCcmA=:",
-			wantSignatureInput:       "\"example-dictionary\": a=1, b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignatureInputHeader: "sig1=(\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:xboyl9rhvXv0b7ulp/jt6CrVx8VRhuYixUbk3UmcJ50=:",
+			wantSignatureInput:       "\"example-dict\": a=1, b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
 			wantErr:                  false,
 		},
 		{
@@ -1364,12 +1364,12 @@ func Test_signRequestDebug(t *testing.T) {
 			args: args{
 				signatureName: "sig1",
 				signer: makeHMACSigner(*NewSignConfig().SignCreated(false),
-					Headers("X-OWS-Header", "X-Obs-Fold-Header", "Cache-Control", "Example-Dictionary")),
+					Headers("X-OWS-Header", "X-Obs-Fold-Header", "Cache-Control", "example-dict")),
 				req: readRequest(httpreq4),
 			},
-			wantSignatureInputHeader: "sig1=(\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:4a5PQFe7Z3Cx5b8uX4hNx56zenxuJ2/dA9nl/wDSuzo=:",
-			wantSignatureInput:       "\"x-ows-header\": Leading and trailing whitespace.\n\"x-obs-fold-header\": Obsolete line folding.\n\"cache-control\": max-age=60, must-revalidate\n\"example-dictionary\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dictionary\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignatureInputHeader: "sig1=(\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:em2Fo9lAgLfPKqZQUhFyYrcBhF+5K8y71+zcFyzAJb8=:",
+			wantSignatureInput:       "\"x-ows-header\": Leading and trailing whitespace.\n\"x-obs-fold-header\": Obsolete line folding.\n\"cache-control\": max-age=60, must-revalidate\n\"example-dict\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
 			wantErr:                  false,
 		},
 		{
@@ -1377,12 +1377,12 @@ func Test_signRequestDebug(t *testing.T) {
 			args: args{
 				signatureName: "sig1",
 				signer: makeHMACSigner(*NewSignConfig().SignCreated(false),
-					*NewFields().AddHeaders("Cache-Control").AddDictHeader("Example-Dictionary", "a").AddDictHeader("Example-Dictionary", "b").AddDictHeader("Example-Dictionary", "c")),
+					*NewFields().AddHeaders("Cache-Control").AddDictHeader("example-dict", "a").AddDictHeader("example-dict", "b").AddDictHeader("example-dict", "c")),
 				req: readRequest(httpreq4),
 			},
-			wantSignatureInputHeader: "sig1=(\"cache-control\" \"example-dictionary\";key=\"a\" \"example-dictionary\";key=\"b\" \"example-dictionary\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:8ahOKeLf89H5O4bjk1PU6Hl/X48KUO7fxyG8l/sxOJE=:",
-			wantSignatureInput:       "\"cache-control\": max-age=60, must-revalidate\n\"example-dictionary\";key=\"a\": 1\n\"example-dictionary\";key=\"b\": 2;x=1;y=2\n\"example-dictionary\";key=\"c\": (a b c)\n\"@signature-params\": (\"cache-control\" \"example-dictionary\";key=\"a\" \"example-dictionary\";key=\"b\" \"example-dictionary\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignatureInputHeader: "sig1=(\"cache-control\" \"example-dict\";key=\"a\" \"example-dict\";key=\"b\" \"example-dict\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:ZgRaU7rBGNrMr2aEpKjXYU6sReB0V+Uks2jpm30jh24=:",
+			wantSignatureInput:       "\"cache-control\": max-age=60, must-revalidate\n\"example-dict\";key=\"a\": 1\n\"example-dict\";key=\"b\": 2;x=1;y=2\n\"example-dict\";key=\"c\": (a b c)\n\"@signature-params\": (\"cache-control\" \"example-dict\";key=\"a\" \"example-dict\";key=\"b\" \"example-dict\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
 			wantErr:                  false,
 		},
 	}
