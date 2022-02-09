@@ -48,10 +48,7 @@ func NewHMACSHA256Signer(keyID string, key []byte, config *SignConfig, fields Fi
 
 // NewRSASigner returns a new Signer structure. Key is an RSA private key.
 // Config may be nil for a default configuration.
-func NewRSASigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
-	if key == nil {
-		return nil, fmt.Errorf("key must not be nil")
-	}
+func NewRSASigner(keyID string, key rsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if keyID == "" {
 		return nil, fmt.Errorf("keyID must not be empty")
 	}
@@ -69,10 +66,7 @@ func NewRSASigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fields 
 
 // NewRSAPSSSigner returns a new Signer structure. Key is an RSA private key.
 // Config may be nil for a default configuration.
-func NewRSAPSSSigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
-	if key == nil {
-		return nil, fmt.Errorf("key must not be nil")
-	}
+func NewRSAPSSSigner(keyID string, key rsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if keyID == "" {
 		return nil, fmt.Errorf("keyID must not be empty")
 	}
@@ -90,10 +84,7 @@ func NewRSAPSSSigner(keyID string, key *rsa.PrivateKey, config *SignConfig, fiel
 
 // NewP256Signer returns a new Signer structure. Key is an elliptic curve P-256 private key.
 // Config may be nil for a default configuration.
-func NewP256Signer(keyID string, key *ecdsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
-	if key == nil {
-		return nil, fmt.Errorf("key must not be nil")
-	}
+func NewP256Signer(keyID string, key ecdsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if keyID == "" {
 		return nil, fmt.Errorf("keyID must not be empty")
 	}
@@ -111,7 +102,7 @@ func NewP256Signer(keyID string, key *ecdsa.PrivateKey, config *SignConfig, fiel
 
 // NewEd25519Signer returns a new Signer structure. Key is an EdDSA Curve 25519 private key.
 // Config may be nil for a default configuration.
-func NewEd25519Signer(keyID string, key *ed25519.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
+func NewEd25519Signer(keyID string, key ed25519.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
@@ -133,18 +124,21 @@ func NewEd25519Signer(keyID string, key *ed25519.PrivateKey, config *SignConfig,
 // NewEd25519SignerFromSeed returns a new Signer structure. Key is an EdDSA Curve 25519 private key,
 // a 32 byte buffer according to RFC 8032.
 // Config may be nil for a default configuration.
-func NewEd25519SignerFromSeed(keyID string, seed *[]byte, config *SignConfig, fields Fields) (*Signer, error) {
-	if seed == nil || len(*seed) != ed25519.SeedSize {
+func NewEd25519SignerFromSeed(keyID string, seed []byte, config *SignConfig, fields Fields) (*Signer, error) {
+	if seed == nil || len(seed) != ed25519.SeedSize {
 		return nil, fmt.Errorf("seed must not be nil, and must have length %d", ed25519.SeedSize)
 	}
-	key := ed25519.NewKeyFromSeed(*seed)
-	return NewEd25519Signer(keyID, &key, config, fields)
+	key := ed25519.NewKeyFromSeed(seed)
+	return NewEd25519Signer(keyID, key, config, fields)
 }
 
 // NewJWSSigner creates a generic signer for JWS algorithms, using the go-jwx package. The particular key type for each algorithm
 // is documented in that package.
 // Config may be nil for a default configuration.
 func NewJWSSigner(alg jwa.SignatureAlgorithm, keyID string, key interface{}, config *SignConfig, fields Fields) (*Signer, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
 	if alg == jwa.NoSignature {
 		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
 	}
@@ -180,23 +174,27 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		return mac.Sum(nil), nil
 	case "rsa-v1_5-sha256":
 		hashed := sha256.Sum256(buff)
-		sig, err := rsa.SignPKCS1v15(nil, s.key.(*rsa.PrivateKey), crypto.SHA256, hashed[:])
+		key := s.key.(rsa.PrivateKey)
+		sig, err := rsa.SignPKCS1v15(nil, &key, crypto.SHA256, hashed[:])
 		if err != nil {
 			return nil, fmt.Errorf("RSA signature failed")
 		}
 		return sig, nil
 	case "rsa-pss-sha512":
 		hashed := sha512.Sum512(buff)
-		sig, err := rsa.SignPSS(rand.Reader, s.key.(*rsa.PrivateKey), crypto.SHA512, hashed[:], nil)
+		key := s.key.(rsa.PrivateKey)
+		sig, err := rsa.SignPSS(rand.Reader, &key, crypto.SHA512, hashed[:], nil)
 		if err != nil {
 			return nil, fmt.Errorf("RSA-PSS signature failed")
 		}
 		return sig, nil
 	case "ecdsa-p256-sha256":
 		hashed := sha256.Sum256(buff)
-		return ecdsaSignRaw(rand.Reader, s.key.(*ecdsa.PrivateKey), hashed[:])
+		key := s.key.(ecdsa.PrivateKey)
+		return ecdsaSignRaw(rand.Reader, &key, hashed[:])
 	case "ed25519":
-		return ed25519.Sign(*s.key.(*ed25519.PrivateKey), buff), nil
+		key := s.key.(ed25519.PrivateKey)
+		return ed25519.Sign(key, buff), nil
 	default:
 		return nil, fmt.Errorf("sign: unknown algorithm \"%s\"", s.alg)
 	}
@@ -235,10 +233,7 @@ func NewHMACSHA256Verifier(keyID string, key []byte, config *VerifyConfig, field
 
 // NewRSAVerifier generates a new Verifier for RSA signatures. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
-func NewRSAVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
-	if key == nil {
-		return nil, fmt.Errorf("key must not be nil")
-	}
+func NewRSAVerifier(keyID string, key rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if config == nil {
 		config = NewVerifyConfig()
 	}
@@ -253,10 +248,7 @@ func NewRSAVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, fiel
 
 // NewRSAPSSVerifier generates a new Verifier for RSA-PSS signatures. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
-func NewRSAPSSVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
-	if key == nil {
-		return nil, fmt.Errorf("key must not be nil")
-	}
+func NewRSAPSSVerifier(keyID string, key rsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if config == nil {
 		config = NewVerifyConfig()
 	}
@@ -271,10 +263,7 @@ func NewRSAPSSVerifier(keyID string, key *rsa.PublicKey, config *VerifyConfig, f
 
 // NewP256Verifier generates a new Verifier for ECDSA (P-256) signatures. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
-func NewP256Verifier(keyID string, key *ecdsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
-	if key == nil {
-		return nil, fmt.Errorf("key must not be nil")
-	}
+func NewP256Verifier(keyID string, key ecdsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if config == nil {
 		config = NewVerifyConfig()
 	}
@@ -289,7 +278,7 @@ func NewP256Verifier(keyID string, key *ecdsa.PublicKey, config *VerifyConfig, f
 
 // NewEd25519Verifier generates a new Verifier for EdDSA Curve 25519 signatures. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
-func NewEd25519Verifier(keyID string, key *ed25519.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
+func NewEd25519Verifier(keyID string, key ed25519.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
@@ -309,6 +298,9 @@ func NewEd25519Verifier(keyID string, key *ed25519.PublicKey, config *VerifyConf
 // is documented in that package. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
 func NewJWSVerifier(alg jwa.SignatureAlgorithm, key interface{}, keyID string, config *VerifyConfig, fields Fields) (*Verifier, error) {
+	if key == nil {
+		return nil, fmt.Errorf("key must not be nil")
+	}
 	if alg == jwa.NoSignature {
 		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
 	}
@@ -347,23 +339,27 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		return bytes.Equal(mac.Sum(nil), sig), nil
 	case "rsa-v1_5-sha256":
 		hashed := sha256.Sum256(buff)
-		err := rsa.VerifyPKCS1v15(v.key.(*rsa.PublicKey), crypto.SHA256, hashed[:], sig)
+		key := v.key.(rsa.PublicKey)
+		err := rsa.VerifyPKCS1v15(&key, crypto.SHA256, hashed[:], sig)
 		if err != nil {
 			return false, fmt.Errorf("RSA verification failed: %w", err)
 		}
 		return true, nil
 	case "rsa-pss-sha512":
 		hashed := sha512.Sum512(buff)
-		err := rsa.VerifyPSS(v.key.(*rsa.PublicKey), crypto.SHA512, hashed[:], sig, nil)
+		key := v.key.(rsa.PublicKey)
+		err := rsa.VerifyPSS(&key, crypto.SHA512, hashed[:], sig, nil)
 		if err != nil {
 			return false, fmt.Errorf("RSA-PSS verification failed: %w", err)
 		}
 		return true, nil
 	case "ecdsa-p256-sha256":
 		hashed := sha256.Sum256(buff)
-		return ecdsaVerifyRaw(v.key.(*ecdsa.PublicKey), hashed[:], sig)
+		key := v.key.(ecdsa.PublicKey)
+		return ecdsaVerifyRaw(&key, hashed[:], sig)
 	case "ed25519":
-		verified := ed25519.Verify(*v.key.(*ed25519.PublicKey), buff, sig)
+		key := v.key.(ed25519.PublicKey)
+		verified := ed25519.Verify(key, buff, sig)
 		if !verified {
 			return false, fmt.Errorf("failed Ed25519 verification")
 		}

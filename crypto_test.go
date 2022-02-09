@@ -135,7 +135,7 @@ func TestNewRSASigner(t *testing.T) {
 
 	type args struct {
 		keyID  string
-		key    *rsa.PrivateKey
+		key    rsa.PrivateKey
 		config *SignConfig
 		fields Fields
 	}
@@ -149,19 +149,8 @@ func TestNewRSASigner(t *testing.T) {
 			name: "empty key ID",
 			args: args{
 				keyID:  "",
-				key:    privateKey,
+				key:    *privateKey,
 				config: nil,
-				fields: *NewFields(),
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "nil key",
-			args: args{
-				keyID:  "kk",
-				key:    nil,
-				config: NewSignConfig(),
 				fields: *NewFields(),
 			},
 			want:    nil,
@@ -240,7 +229,7 @@ func TestNewRSASigner1(t *testing.T) {
 			},
 			want: &Signer{
 				keyID:         "key100",
-				key:           key,
+				key:           *key,
 				alg:           "rsa-v1_5-sha256",
 				config:        NewSignConfig(),
 				fields:        Fields{},
@@ -251,7 +240,7 @@ func TestNewRSASigner1(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewRSASigner(tt.args.keyID, tt.args.key, tt.args.config, tt.args.fields)
+			got, err := NewRSASigner(tt.args.keyID, *tt.args.key, tt.args.config, tt.args.fields)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewRSASigner() error = %v, wantErr %v", err, tt.wantErr)
 				return
