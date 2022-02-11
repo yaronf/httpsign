@@ -50,21 +50,21 @@ func (c *SignConfig) setFakeCreated(ts int64) *SignConfig {
 }
 
 // SetExpires adds an "expires" parameter containing an expiration deadline, as Unix time.
-// Default: 0 (do not add the parameter)
+// Default: 0 (do not add the parameter).
 func (c *SignConfig) SetExpires(expires int64) *SignConfig {
 	c.expires = expires
 	return c
 }
 
 // SetNonce adds a "nonce" string parameter whose content should be unique per signed message.
-// Default: empty string (do not add the parameter)
+// Default: empty string (do not add the parameter).
 func (c *SignConfig) SetNonce(nonce string) *SignConfig {
 	c.nonce = nonce
 	return c
 }
 
-// SetRequestResponse allows the server to indicate signature name and signature that
-// it had received from a client and include it in the signature input.
+// SetRequestResponse allows the server to indicate the signature name and signature that
+// it had received in a client's request and include them in the signature input of the response.
 func (c *SignConfig) SetRequestResponse(name, signature string) *SignConfig {
 	c.requestResponse = &requestResponse{name, signature}
 	return c
@@ -130,7 +130,7 @@ func (v *VerifyConfig) SetRequestResponse(name, signature string) *VerifyConfig 
 
 // SetVerifyKeyID defines how to verify the keyid parameter, if one exists. If this value is set,
 // the signature verifies only if the value is the same as was specified in the Verifier structure.
-// Default: true
+// Default: true.
 func (v *VerifyConfig) SetVerifyKeyID(verify bool) *VerifyConfig {
 	v.verifyKeyID = verify
 	return v

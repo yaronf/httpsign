@@ -15,7 +15,7 @@ import (
 	"github.com/lestrrat-go/jwx/jws"
 )
 
-// Signer includes a cryptographic key and configuration of what needs to be signed.
+// Signer includes a cryptographic key (typically a private key) and configuration of what needs to be signed.
 type Signer struct {
 	keyID         string
 	key           interface{}

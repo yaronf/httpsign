@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Fields is a list of fields to be signed. To initialize, use Headers or for more complex
+// Fields is a list of fields to be signed or verified. To initialize, use Headers or for more complex
 // cases, NewFields followed by a chain of Add... methods.
 type Fields struct {
 	f []field
@@ -34,7 +34,7 @@ func Headers(hs ...string) Fields {
 	return *fs.AddHeaders(hs...)
 }
 
-// AddHeaders adds a list of simple or derived header names
+// AddHeaders adds a list of simple or derived header names.
 func (fs *Fields) AddHeaders(hs ...string) *Fields {
 	for _, h := range hs {
 		fs.f = append(fs.f, *fromHeaderName(h))
@@ -42,7 +42,7 @@ func (fs *Fields) AddHeaders(hs ...string) *Fields {
 	return fs
 }
 
-// NewFields return an empty list of fields
+// NewFields returns an empty list of fields.
 func NewFields() *Fields {
 	fs := Fields{}
 	return &fs
@@ -54,7 +54,7 @@ func fromHeaderName(hdr string) *field {
 	return &f
 }
 
-// AddHeader appends a bare header name, e.g. "cache-control"
+// AddHeader appends a bare header name, e.g. "cache-control".
 func (fs *Fields) AddHeader(hdr string) *Fields {
 	f := fromHeaderName(hdr)
 	fs.f = append(fs.f, *f)
@@ -67,7 +67,7 @@ func fromQueryParam(qp string) *field {
 	return &f
 }
 
-// AddQueryParam indicates a request for a specific query parameter to be signed
+// AddQueryParam indicates a request for a specific query parameter to be signed.
 func (fs *Fields) AddQueryParam(qp string) *Fields {
 	f := fromQueryParam(qp)
 	fs.f = append(fs.f, *f)
@@ -80,7 +80,7 @@ func fromDictHeader(hdr, key string) *field {
 	return &f
 }
 
-// AddDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified
+// AddDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified.
 func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
 	f := fromDictHeader(hdr, key)
 	fs.f = append(fs.f, *f)
@@ -93,7 +93,7 @@ func fromStructuredField(hdr string) *field {
 	return &f
 }
 
-// AddStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941
+// AddStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941.
 func (fs *Fields) AddStructuredField(hdr string) *Fields {
 	f := fromStructuredField(hdr)
 	fs.f = append(fs.f, *f)
@@ -132,7 +132,7 @@ func (fs *Fields) asSignatureInput(p *httpsfv.Params) (string, error) {
 	return s, err
 }
 
-//  contains verifies that all required fields are in the given list of fields (yes, this is O(n^2))
+//  contains verifies that all required fields are in the given list of fields (yes, this is O(n^2)).
 func (fs *Fields) contains(requiredFields *Fields) bool {
 outer:
 	for _, f1 := range requiredFields.f {
