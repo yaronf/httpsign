@@ -173,6 +173,17 @@ Signature: sig-b24=:0Ry6HsvzS5VmA6HlfBYS/fYYeNs7fYuA7s0tAdxfUlPGv0CSVuwrrzBOjcCF
 {"message": "good dog"}
 `
 
+var httpreqtlsproxy = `POST /foo?param=Value&Pet=dog HTTP/1.1
+Host: service.internal.example
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Content-Type: application/json
+Content-Length: 18
+Client-Cert: :MIIBqDCCAU6gAwIBAgIBBzAKBggqhkjOPQQDAjA6MRswGQYDVQQKDBJMZXQncyBBdXRoZW50aWNhdGUxGzAZBgNVBAMMEkxBIEludGVybWVkaWF0ZSBDQTAeFw0yMDAxMTQyMjU1MzNaFw0yMTAxMjMyMjU1MzNaMA0xCzAJBgNVBAMMAkJDMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8YnXXfaUgmnMtOXU/IncWalRhebrXmckC8vdgJ1p5Be5F/3YC8OthxM4+k1M6aEAEFcGzkJiNy6J84y7uzo9M6NyMHAwCQYDVR0TBAIwADAfBgNVHSMEGDAWgBRm3WjLa38lbEYCuiCPct0ZaSED2DAOBgNVHQ8BAf8EBAMCBsAwEwYDVR0lBAwwCgYIKwYBBQUHAwIwHQYDVR0RAQH/BBMwEYEPYmRjQGV4YW1wbGUuY29tMAoGCCqGSM49BAMCA0gAMEUCIBHda/r1vaL6G3VliL4/Di6YK0Q6bMjeSkC3dFCOOB8TAiEAx/kHSB4urmiZ0NX5r5XarmPk0wmuydBVoU4hBVZ1yhk=:
+Signature-Input: ttrp=("@path" "@query" "@method" "@authority" "client-cert");created=1618884473;keyid="test-key-ecc-p256"
+Signature: ttrp=:xVMHVpawaAC/0SbHrKRs9i8I3eOs5RtTMGCWXm/9nvZzoHsIg6Mce9315T6xoklyy0yzhD9ah4JHRwMLOgmizw==:
+
+{"hello": "world"}`
+
 var rsaPubKey = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyD6Hrh5mV16s/jQngCF1
 IfpzLuJTraeqJFlNESsvbeNMcA4dQjU/LMX2XA3vyF7nOyleTisdmzFZb9TLoC1H
@@ -993,6 +1004,20 @@ func TestVerifyRequest(t *testing.T) {
 					return *verifier
 				})(),
 				req: readRequest(httpreq1ed25519),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "test case B.3", // TLS-terminating proxy
+			args: args{
+				signatureName: "ttrp",
+				verifier: (func() Verifier {
+					pubKey, _ := parseECPublicKeyFromPemStr(p256PubKey2)
+					verifier, _ := NewP256Verifier("test-key-ecc-p256", *pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+					return *verifier
+				})(),
+				req: readRequest(httpreqtlsproxy),
 			},
 			want:    true,
 			wantErr: false,
