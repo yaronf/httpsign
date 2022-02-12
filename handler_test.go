@@ -13,7 +13,7 @@ import (
 func Test_WrapHandler(t *testing.T) {
 	fetchVerifier := func(r *http.Request) (string, *Verifier) {
 		sigName := "sig1"
-		verifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), nil,
+		verifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{1}, 64), nil,
 			Headers("@method"))
 		return sigName, verifier
 	}
@@ -31,16 +31,22 @@ func Test_WrapHandler(t *testing.T) {
 		_, _ = fmt.Fprintln(w, "Hello, client")
 		_, _ = fmt.Fprintln(w, "Hello again")
 	}
-	config := NewHandlerConfig().SetFetchVerifier(fetchVerifier).SetVerifyRequest(false).
+	config := NewHandlerConfig().SetFetchVerifier(fetchVerifier).
 		SetFetchSigner(fetchSigner)
-	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), config))
+	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), *config))
 	defer ts.Close()
+
+	signer, err := NewHMACSHA256Signer("key", bytes.Repeat([]byte{1}, 64), nil,
+		Headers("@method"))
+	if err != nil {
+		t.Errorf("%v", err)
+	}
 
 	verifier, err := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), NewVerifyConfig(), *NewFields())
 	if err != nil {
 		t.Errorf("%v", err)
 	}
-	client := NewDefaultClient("sig1", nil, verifier, nil)
+	client := NewDefaultClient("sig1", signer, verifier, nil)
 	res, err := client.Get(ts.URL)
 	if err != nil {
 		t.Errorf("%v", err)
@@ -88,26 +94,25 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 		var config *HandlerConfig
 		if !nilSigner {
 			if !noSigner {
-				config = NewHandlerConfig().SetVerifyRequest(false).SetFetchSigner(fetchSigner)
+				config = NewHandlerConfig().SetFetchSigner(fetchSigner)
 			} else {
-				config = NewHandlerConfig().SetVerifyRequest(false).SetFetchSigner(badFetchSigner)
+				config = NewHandlerConfig().SetFetchSigner(badFetchSigner)
 			}
 
 		} else {
-			config = NewHandlerConfig().SetVerifyRequest(false).SetFetchSigner(nil)
+			config = NewHandlerConfig().SetFetchSigner(nil)
 
 		}
 		if dontSignResponse {
-			config = config.SetSignResponse(false)
+			config = config.SetFetchSigner(nil)
 		}
 		if verifyRequest {
 			serverVerifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{9}, 64), NewVerifyConfig(), *NewFields())
 			config = config.SetFetchVerifier(func(r *http.Request) (sigName string, verifier *Verifier) {
 				return "sig333", serverVerifier
 			})
-			config = config.SetVerifyRequest(true) // override
 		}
-		ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), config))
+		ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), *config))
 		defer ts.Close()
 
 		// HTTP client code
@@ -182,7 +187,7 @@ func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler
 		return sigName, verifier
 	}
 	config := NewHandlerConfig().SetReqNotVerified(verifyFailed).SetFetchVerifier(fetchVerifier)
-	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), config))
+	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), *config))
 	defer ts.Close()
 
 	// Client code starts here

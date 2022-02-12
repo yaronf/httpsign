@@ -149,50 +149,40 @@ func NewVerifyConfig() *VerifyConfig {
 }
 
 // HandlerConfig contains additional configuration for the HTTP message handler wrapper.
+// Either or both of fetchVerifier and fetchSigner may be nil for the corresponding operation
+// to be skipped.
 type HandlerConfig struct {
-	verifyRequest  bool
-	signResponse   bool
-	reqNotVerified func(w http.ResponseWriter, r *http.Request, err error)
-	fetchVerifier  func(r *http.Request) (sigName string, verifier *Verifier)
-	fetchSigner    func(res http.Response, r *http.Request) (sigName string, signer *Signer)
+	reqNotVerified func(w http.ResponseWriter,
+		r *http.Request, err error)
+	fetchVerifier func(r *http.Request) (sigName string, verifier *Verifier)
+	fetchSigner   func(res http.Response, r *http.Request) (sigName string, signer *Signer)
 }
 
 // NewHandlerConfig generates a default configuration. When verification or respectively,
 // signing is required, the respective "fetch" callback must be supplied.
 func NewHandlerConfig() *HandlerConfig {
 	return &HandlerConfig{
-		verifyRequest:  true,
-		signResponse:   true,
 		reqNotVerified: defaultReqNotVerified,
 		fetchVerifier:  nil,
 		fetchSigner:    nil,
 	}
 }
 
-// SetVerifyRequest indicates that all incoming requests for this handler must be verified.
-func (h *HandlerConfig) SetVerifyRequest(b bool) *HandlerConfig {
-	h.verifyRequest = b
-	return h
-}
-
-// SetSignResponse indicates that all HTTP responses must be signed.
-func (h *HandlerConfig) SetSignResponse(b bool) *HandlerConfig {
-	h.signResponse = b
-	return h
-}
-
 func defaultReqNotVerified(w http.ResponseWriter, _ *http.Request, err error) {
 	w.WriteHeader(http.StatusUnauthorized)
 	if err == nil { // should not happen
 		_, _ = fmt.Fprintf(w, "Unknown error")
+	} else {
+		log.Println("Could not verify request signature: " + err.Error())
+		_, _ = fmt.Fprintln(w, "Could not verify request signature") // For security reasons, do not print error
 	}
-	log.Println("Could not verify request signature: " + err.Error())
-	_, _ = fmt.Fprintln(w, "Could not verify request signature")
 }
 
 // SetReqNotVerified defines a callback to be called when a request fails to verify. The default
-// callback sends a 401 status code with a generic error message.
-func (h *HandlerConfig) SetReqNotVerified(f func(w http.ResponseWriter, r *http.Request, err error)) *HandlerConfig {
+// callback sends an unsigned 401 status code with a generic error message. For production, you
+// probably need to sign it.
+func (h *HandlerConfig) SetReqNotVerified(f func(w http.ResponseWriter, r *http.Request,
+	err error)) *HandlerConfig {
 	h.reqNotVerified = f
 	return h
 }

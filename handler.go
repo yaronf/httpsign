@@ -9,16 +9,12 @@ import (
 )
 
 // WrapHandler wraps a server's HTTP request handler so that the incoming request is verified
-// and the response is signed. Both operations are optional. If config is nil, the default
-// configuration is applied: requests are verified and responses are signed.
-// Note: unlike the standard net.http behavior, if you want the "Content-Type" header to be signed,
-// you should specify it explicitly.
-func WrapHandler(h http.Handler, config *HandlerConfig) http.Handler {
-	if config == nil {
-		config = NewHandlerConfig()
-	}
+// and the response is signed. Both operations are optional.
+// Note: unlike the standard net.http behavior, for the "Content-Type" header to be signed,
+// it should be created explicitly.
+func WrapHandler(h http.Handler, config HandlerConfig) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if config.verifyRequest {
+		if config.fetchVerifier != nil {
 			if !verifyServerRequest(w, r, config) {
 				return
 			}
@@ -26,7 +22,7 @@ func WrapHandler(h http.Handler, config *HandlerConfig) http.Handler {
 		wrapped := newWrappedResponseWriter(w, r, config) // and this includes response signature
 		h.ServeHTTP(wrapped, r)
 		if !wrapped.wroteBody { // Body-less responses are rare but possible
-			if config.signResponse {
+			if config.fetchSigner != nil {
 				_ = signServerResponse(wrapped, r, config) // failures are handled by call
 			}
 		}
@@ -38,12 +34,12 @@ func WrapHandler(h http.Handler, config *HandlerConfig) http.Handler {
 func sigFailed(w http.ResponseWriter, _ *http.Request, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	log.Printf("Failed to sign response: %v\n", err)
-	_, _ = fmt.Fprintln(w, "Failed to sign response.")
+	_, _ = fmt.Fprintln(w, "Failed to sign response.") // For security reasons, error is not printed
 }
 
 // This needs to happen exactly at the point when the response headers (other than status!) had been written,
 // but not yet the body, so that signature headers can be added.
-func signServerResponse(wrapped *wrappedResponseWriter, r *http.Request, config *HandlerConfig) (success bool) {
+func signServerResponse(wrapped *wrappedResponseWriter, r *http.Request, config HandlerConfig) (success bool) {
 	if wrapped.Header().Get("Date") == "" {
 		wrapped.Header().Set("Date", time.Now().UTC().Format(http.TimeFormat))
 	}
@@ -88,11 +84,11 @@ type wrappedResponseWriter struct {
 	wroteHeader  bool
 	wroteBody    bool
 	ignoreWrites bool
-	config       *HandlerConfig
+	config       HandlerConfig
 	r            *http.Request
 }
 
-func newWrappedResponseWriter(w http.ResponseWriter, r *http.Request, config *HandlerConfig) *wrappedResponseWriter {
+func newWrappedResponseWriter(w http.ResponseWriter, r *http.Request, config HandlerConfig) *wrappedResponseWriter {
 	return &wrappedResponseWriter{ResponseWriter: w, r: r, config: config}
 }
 
@@ -103,7 +99,7 @@ func (w *wrappedResponseWriter) Status() int {
 func (w *wrappedResponseWriter) Write(p []byte) (n int, err error) {
 	if !w.wroteBody {
 		w.wroteBody = true
-		if w.config.signResponse {
+		if w.config.fetchSigner != nil {
 			if !signServerResponse(w, w.r, w.config) {
 				w.ignoreWrites = true
 				return 0, fmt.Errorf("failed to sign response headers")
@@ -128,7 +124,7 @@ func (w *wrappedResponseWriter) WriteHeader(code int) {
 	w.wroteHeader = true
 }
 
-func verifyServerRequest(w http.ResponseWriter, r *http.Request, config *HandlerConfig) bool {
+func verifyServerRequest(w http.ResponseWriter, r *http.Request, config HandlerConfig) bool {
 	if config.fetchVerifier == nil {
 		config.reqNotVerified(w, r, fmt.Errorf("could not fetch a Verifier"))
 		return false

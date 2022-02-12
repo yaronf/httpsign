@@ -10,6 +10,7 @@ import (
 )
 
 func ExampleClient_Get() {
+	// Note: client/server examples may fail in the Go Playground, https://github.com/golang/go/issues/45855
 	// Set up a test server
 	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)

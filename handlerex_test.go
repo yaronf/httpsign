@@ -13,6 +13,7 @@ import (
 )
 
 func ExampleWrapHandler_clientSigns() {
+	// Note: client/server examples may fail in the Go Playground, https://github.com/golang/go/issues/45855
 	// Callback to let the server locate its verifying key and configuration
 	fetchVerifier := func(r *http.Request) (string, *httpsign.Verifier) {
 		sigName := "sig1"
@@ -29,8 +30,8 @@ func ExampleWrapHandler_clientSigns() {
 	}
 
 	// Configure the wrapper and set it up
-	config := httpsign.NewHandlerConfig().SetSignResponse(false).SetFetchVerifier(fetchVerifier)
-	ts := httptest.NewServer(httpsign.WrapHandler(http.HandlerFunc(simpleHandler), config))
+	config := httpsign.NewHandlerConfig().SetFetchVerifier(fetchVerifier)
+	ts := httptest.NewServer(httpsign.WrapHandler(http.HandlerFunc(simpleHandler), *config))
 	defer ts.Close()
 
 	// HTTP client code, with a signer
@@ -53,6 +54,7 @@ func ExampleWrapHandler_clientSigns() {
 }
 
 func ExampleWrapHandler_serverSigns() {
+	// Note: client/server examples may fail in the Go Playground, https://github.com/golang/go/issues/45855
 	// Callback to let the server locate its signing key and configuration
 	fetchSigner := func(res http.Response, r *http.Request) (string, *httpsign.Signer) {
 		sigName := "sig1"
@@ -69,8 +71,8 @@ func ExampleWrapHandler_serverSigns() {
 	}
 
 	// Configure the wrapper and set it up
-	config := httpsign.NewHandlerConfig().SetVerifyRequest(false).SetFetchSigner(fetchSigner)
-	ts := httptest.NewServer(httpsign.WrapHandler(http.HandlerFunc(simpleHandler), config))
+	config := httpsign.NewHandlerConfig().SetFetchSigner(fetchSigner)
+	ts := httptest.NewServer(httpsign.WrapHandler(http.HandlerFunc(simpleHandler), *config))
 	defer ts.Close()
 
 	// HTTP client code
