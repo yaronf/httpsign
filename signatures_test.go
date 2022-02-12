@@ -1059,6 +1059,24 @@ func TestVerifyRequest(t *testing.T) {
 			want:    false,
 			wantErr: true,
 		},
+		{
+			name: "bad keyID but not verified", // this is NOT a failure
+			args: args{
+				signatureName: "sig-b22",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier("bad-key-id", *pubKey, NewVerifyConfig().
+						SetVerifyCreated(false).SetVerifyKeyID(false), *NewFields())
+					return *verifier
+				})(),
+				req: readRequest(httpreq1pssSelective),
+			},
+			want:    true,
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

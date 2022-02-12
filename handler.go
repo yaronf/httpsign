@@ -92,10 +92,6 @@ func newWrappedResponseWriter(w http.ResponseWriter, r *http.Request, config Han
 	return &wrappedResponseWriter{ResponseWriter: w, r: r, config: config}
 }
 
-func (w *wrappedResponseWriter) Status() int {
-	return w.status
-}
-
 func (w *wrappedResponseWriter) Write(p []byte) (n int, err error) {
 	if !w.wroteBody {
 		w.wroteBody = true
