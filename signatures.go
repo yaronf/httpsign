@@ -389,7 +389,7 @@ func verifyMessage(config VerifyConfig, name string, verifier Verifier, message 
 	if !(psiSig.fields.contains(&fields)) {
 		return "", fmt.Errorf("actual signature does not cover all required fields")
 	}
-	err = applyVerificationPolicy(verifier, psiSig, config)
+	err = applyVerificationPolicy(verifier, message, psiSig, config)
 	if err != nil {
 		return "", err
 	}
@@ -400,8 +400,8 @@ func verifyMessage(config VerifyConfig, name string, verifier Verifier, message 
 	return signatureInput, verifySignature(verifier, signatureInput, wantSigRaw)
 }
 
-func applyVerificationPolicy(verifier Verifier, psi *psiSignature, config VerifyConfig) error {
-	err := applyPolicyCreated(psi, config)
+func applyVerificationPolicy(verifier Verifier, message parsedMessage, psi *psiSignature, config VerifyConfig) error {
+	err := applyPolicyCreated(psi, message, config)
 	if err != nil {
 		return err
 	}
@@ -477,7 +477,10 @@ func applyPolicyAlgs(psi *psiSignature, config VerifyConfig) error {
 	return nil
 }
 
-func applyPolicyCreated(psi *psiSignature, config VerifyConfig) error {
+func applyPolicyCreated(psi *psiSignature, message parsedMessage, config VerifyConfig) error {
+	if !config.verifyCreated && config.dateWithin != 0 {
+		return fmt.Errorf("cannot verify Date header if Created parameter is not verified")
+	}
 	if config.verifyCreated {
 		now := time.Now()
 		createdParam, ok := psi.params["created"]
@@ -494,6 +497,23 @@ func applyPolicyCreated(psi *psiSignature, config VerifyConfig) error {
 		}
 		if createdTime.Add(config.notOlderThan).Before(now) {
 			return fmt.Errorf("message is too old, check for replay")
+		}
+
+		if config.dateWithin != 0 {
+			dateHdr, ok := message.headers["date"]
+			if ok {
+				if len(dateHdr) > 1 {
+					return fmt.Errorf("multiple Date headers?")
+				}
+				date, err := http.ParseTime(dateHdr[0])
+				if err != nil {
+					return fmt.Errorf("cannot parse Date header: %w", err)
+				}
+				if createdTime.After(date.Add(config.dateWithin)) ||
+					date.After(createdTime.Add(config.dateWithin)) {
+					return fmt.Errorf("the Date header is not within time window of Created parameter")
+				}
+			}
 		}
 	}
 	return nil

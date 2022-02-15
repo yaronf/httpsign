@@ -79,6 +79,7 @@ type VerifyConfig struct {
 	rejectExpired   bool
 	requestResponse *requestResponse
 	verifyKeyID     bool
+	dateWithin      time.Duration
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,
@@ -136,6 +137,15 @@ func (v *VerifyConfig) SetVerifyKeyID(verify bool) *VerifyConfig {
 	return v
 }
 
+// SetVerifyDateWithin indicates that the Date header should be verified if it exists, and its value
+// must be within a certain time duration (positive or negative) of the Created signature parameter.
+// This verification is only available if the Created field itself is verified.
+// Default: 0, meaning no verification of the Date header.
+func (v *VerifyConfig) SetVerifyDateWithin(d time.Duration) *VerifyConfig {
+	v.dateWithin = d
+	return v
+}
+
 // NewVerifyConfig generates a default configuration.
 func NewVerifyConfig() *VerifyConfig {
 	return &VerifyConfig{
@@ -145,6 +155,7 @@ func NewVerifyConfig() *VerifyConfig {
 		rejectExpired: true,
 		allowedAlgs:   []string{},
 		verifyKeyID:   true,
+		dateWithin:    0, // meaning no constraint
 	}
 }
 

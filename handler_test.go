@@ -3,6 +3,7 @@ package httpsign
 import (
 	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"io"
 	"log"
 	"net/http"
@@ -38,29 +39,19 @@ func Test_WrapHandler(t *testing.T) {
 
 	signer, err := NewHMACSHA256Signer("key", bytes.Repeat([]byte{1}, 64), nil,
 		Headers("@method"))
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	assert.NoError(t, err)
 
 	verifier, err := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), NewVerifyConfig(), *NewFields())
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	assert.NoError(t, err)
 	client := NewDefaultClient("sig1", signer, verifier, nil)
 	res, err := client.Get(ts.URL)
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	assert.NoError(t, err)
 	if res != nil {
 		_, err = io.ReadAll(res.Body)
 		_ = res.Body.Close()
-		if err != nil {
-			t.Errorf("%v", err)
-		}
+		assert.NoError(t, err)
 
-		if res.Status != "200 OK" {
-			t.Errorf("Bad status returned")
-		}
+		assert.Equal(t, res.Status, "200 OK", "Bad status returned")
 	}
 }
 
@@ -199,11 +190,7 @@ func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler
 
 	// Send an HTTP GET, get response -- signing and verification happen behind the scenes
 	res, err := client.Get(ts.URL)
-	if err != nil {
-		t.Errorf("Get failed: %s", err)
-	}
+	assert.NoError(t, err, "Get failed")
 
-	if res.StatusCode != 599 {
-		t.Errorf("Verification did not fail?")
-	}
+	assert.Equal(t, res.StatusCode, 599, "Verification did not fail?")
 }

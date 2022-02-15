@@ -14,6 +14,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"strings"
 	"testing"
@@ -549,9 +550,7 @@ func TestSignRequest(t *testing.T) {
 
 func makeRSAPSSSigner(t *testing.T, config SignConfig, fields Fields) Signer {
 	prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
-	if err != nil {
-		t.Errorf("cannot parse private key: %v", err)
-	}
+	assert.NoError(t, err, "cannot parse private key")
 	signer, _ := NewRSAPSSSigner("test-key-rsa-pss", *prvKey, &config, fields)
 	return *signer
 }
@@ -637,13 +636,9 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
 	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
-	if err != nil {
-		t.Errorf("could not generate Verifier: %s", err)
-	}
+	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req)
-	if err != nil {
-		t.Errorf("verification error: %s", err)
-	}
+	assert.NoError(t, err, "verification error")
 }
 
 func TestSignAndVerifyHMACBad(t *testing.T) {
@@ -658,13 +653,9 @@ func TestSignAndVerifyHMACBad(t *testing.T) {
 	req.Header.Add("Signature-Input", sigInput)
 	badkey := append(key, byte(0x77))
 	verifier, err := NewHMACSHA256Verifier("test-shared-secret", badkey, NewVerifyConfig().SetVerifyCreated(false), fields)
-	if err != nil {
-		t.Errorf("could not generate Verifier: %s", err)
-	}
+	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req)
-	if err == nil {
-		t.Errorf("verification should have failed")
-	}
+	assert.Error(t, err, "verification should have failed")
 }
 
 func TestCreated(t *testing.T) {
@@ -675,9 +666,12 @@ func TestCreated(t *testing.T) {
 		signConfig := NewSignConfig().SignCreated(true).setFakeCreated(createdTime)
 		signer, _ := NewHMACSHA256Signer("test-shared-secret", key, signConfig, fields)
 		res := readResponse(httpres2)
+		nowStr := time.Now().UTC().Format(http.TimeFormat)
+		res.Header.Set("Date", nowStr)
 		sigInput, sig, _ := SignResponse(signatureName, *signer, res)
 
 		res2 := readResponse(httpres2)
+		res2.Header.Set("Date", nowStr)
 		res2.Header.Add("Signature", sig)
 		res2.Header.Add("Signature-Input", sigInput)
 		verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, verifyConfig, fields)
@@ -685,6 +679,7 @@ func TestCreated(t *testing.T) {
 			t.Errorf("could not generate Verifier: %s", err)
 		}
 		err = VerifyResponse(signatureName, *verifier, res2)
+
 		if wantSuccess && err != nil {
 			t.Errorf("verification error: %s", err)
 		}
@@ -711,6 +706,12 @@ func TestCreated(t *testing.T) {
 	testNewWindow2 := func(t *testing.T) {
 		testOnceWithConfig(t, now+15_000, NewVerifyConfig().SetNotNewerThan(14_000*time.Second), false)
 	}
+	testDate := func(t *testing.T) {
+		testOnceWithConfig(t, now, NewVerifyConfig().SetVerifyDateWithin(100*time.Millisecond), true)
+	}
+	testDateFail := func(t *testing.T) {
+		testOnceWithConfig(t, now, NewVerifyConfig().SetVerifyCreated(false).SetVerifyDateWithin(100*time.Millisecond), false)
+	}
 	t.Run("in window", testInWindow)
 	t.Run("older", testOlder)
 	t.Run("newer", testNewer)
@@ -718,6 +719,8 @@ func TestCreated(t *testing.T) {
 	t.Run("older, larger than window", testOldWindow2)
 	t.Run("newer, smaller than window", testNewWindow1)
 	t.Run("newer, larger than window", testNewWindow2)
+	t.Run("verify Date header within window", testDate)
+	t.Run("verify logic requires to verify Created", testDateFail)
 }
 
 func TestSignAndVerifyResponseHMAC(t *testing.T) {

@@ -55,7 +55,8 @@ func parseResponse(res *http.Response) (*parsedMessage, error) {
 		return nil, err
 	}
 
-	return &parsedMessage{derived: generateResDerivedComponents(res), url: nil, headers: normalizeHeaderNames(res.Header)}, nil
+	return &parsedMessage{derived: generateResDerivedComponents(res), url: nil,
+		headers: normalizeHeaderNames(res.Header)}, nil
 }
 
 func validateMessageHeaders(header http.Header) error {

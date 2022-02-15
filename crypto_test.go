@@ -279,7 +279,7 @@ func TestNewJWSVerifier(t *testing.T) {
 			want: &Verifier{
 				keyID:           "key200",
 				key:             "1234",
-				alg:             "HS256",
+				alg:             "",
 				config:          NewVerifyConfig(),
 				fields:          *NewFields(),
 				foreignVerifier: verifier,

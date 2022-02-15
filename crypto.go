@@ -149,7 +149,7 @@ func NewJWSSigner(alg jwa.SignatureAlgorithm, keyID string, key interface{}, con
 	return &Signer{
 		keyID:         keyID,
 		key:           key,
-		alg:           string(alg),
+		alg:           "",
 		config:        config,
 		fields:        fields,
 		foreignSigner: jwsSigner,
@@ -332,7 +332,7 @@ func NewJWSVerifier(alg jwa.SignatureAlgorithm, key interface{}, keyID string, c
 	return &Verifier{
 		keyID:           keyID,
 		key:             key,
-		alg:             string(alg),
+		alg:             "",
 		config:          config,
 		fields:          fields,
 		foreignVerifier: verifier,
