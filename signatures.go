@@ -503,7 +503,7 @@ func applyPolicyCreated(psi *psiSignature, message parsedMessage, config VerifyC
 			dateHdr, ok := message.headers["date"]
 			if ok {
 				if len(dateHdr) > 1 {
-					return fmt.Errorf("multiple Date headers?")
+					return fmt.Errorf("multiple Date headers")
 				}
 				date, err := http.ParseTime(dateHdr[0])
 				if err != nil {
