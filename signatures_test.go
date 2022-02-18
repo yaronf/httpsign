@@ -1349,6 +1349,7 @@ Date: Tue, 20 Apr 2021 02:07:56 GMT
 X-OWS-Header:   Leading and trailing whitespace.
 X-Obs-Fold-Header: Obsolete
     line folding.
+Empty-Header:
 Cache-Control: max-age=60
 Cache-Control:    must-revalidate
 Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)
@@ -1410,12 +1411,12 @@ func Test_signRequestDebug(t *testing.T) {
 			args: args{
 				signatureName: "sig1",
 				signer: makeHMACSigner(*NewSignConfig().SignCreated(false),
-					Headers("X-OWS-Header", "X-Obs-Fold-Header", "Cache-Control", "example-dict")),
+					Headers("X-OWS-Header", "X-Obs-Fold-Header", "Empty-Header", "Cache-Control", "example-dict")),
 				req: readRequest(httpreq4),
 			},
-			wantSignatureInputHeader: "sig1=(\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:em2Fo9lAgLfPKqZQUhFyYrcBhF+5K8y71+zcFyzAJb8=:",
-			wantSignatureInput:       "\"x-ows-header\": Leading and trailing whitespace.\n\"x-obs-fold-header\": Obsolete line folding.\n\"cache-control\": max-age=60, must-revalidate\n\"example-dict\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"x-ows-header\" \"x-obs-fold-header\" \"cache-control\" \"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignatureInputHeader: "sig1=(\"x-ows-header\" \"x-obs-fold-header\" \"empty-header\" \"cache-control\" \"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:            "sig1=:Xh8fPRbyfFXVnMD44Skm6krxiOIJea6qN22QK88VmjM=:",
+			wantSignatureInput:       "\"x-ows-header\": Leading and trailing whitespace.\n\"x-obs-fold-header\": Obsolete line folding.\n\"empty-header\": \n\"cache-control\": max-age=60, must-revalidate\n\"example-dict\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"x-ows-header\" \"x-obs-fold-header\" \"empty-header\" \"cache-control\" \"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
 			wantErr:                  false,
 		},
 		{
