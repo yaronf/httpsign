@@ -1,7 +1,6 @@
 package httpsign
 
 import (
-	"fmt"
 	"github.com/dunglas/httpsfv"
 	"strings"
 )
@@ -15,16 +14,30 @@ type Fields struct {
 // The SFV representation of a field is name;flagName="flagValue"
 // Note that this is a subset of SFV, we only support string-valued params, and only one param
 // per field for now.
-type field struct {
-	name                string
-	flagName, flagValue string
+type field httpsfv.Item
+
+func (f field) String() string {
+	i := httpsfv.Item(f)
+	s, err := httpsfv.Marshal(i)
+	if err != nil {
+		return s
+	} else {
+		return err.Error()
+	}
 }
 
-func (f *field) String() string {
-	if f.flagName == "" {
-		return f.name
+func (f1 field) Equal(f2 field) bool {
+	if f1.name() == f2.name() {
+		for _, p := range f1.Params.Names() {
+			v1, _ := f1.Params.Get(p)
+			v2, ok := f2.Params.Get(p)
+			if !ok || v1 != v2 {
+				return false
+			}
+		}
+		return true
 	}
-	return fmt.Sprintf("%s;%s=\"%s\"", f.name, f.flagName, f.flagValue)
+	return false
 }
 
 // Headers is a simple way to generate a Fields list, where only simple header names and derived headers
@@ -48,10 +61,28 @@ func NewFields() *Fields {
 	return &fs
 }
 
+func (f *field) name() string {
+	i := httpsfv.Item(*f)
+	n, ok := i.Value.(string)
+	if !ok {
+		panic("no support for non-string valued fields")
+	}
+	return n
+}
+
 func fromHeaderName(hdr string) *field {
 	h := strings.ToLower(hdr)
-	f := field{h, "", ""}
+	f := field(httpsfv.NewItem(h))
 	return &f
+}
+
+func (f field) headerName() (bool, string) {
+	_, ok1 := f.Params.Get("name")
+	_, ok2 := f.Params.Get("key")
+	if !ok1 && !ok2 {
+		return true, f.Value.(string)
+	}
+	return false, ""
 }
 
 // AddHeader appends a bare header name, e.g. "cache-control".
@@ -63,8 +94,20 @@ func (fs *Fields) AddHeader(hdr string) *Fields {
 
 func fromQueryParam(qp string) *field {
 	q := strings.ToLower(qp)
-	f := field{"@query-params", "name", q}
+	i := httpsfv.NewItem("@query-params")
+	i.Params.Add("name", q)
+	f := field(i)
 	return &f
+}
+
+func (f field) queryParam() (bool, string) {
+	if f.name() == "@query-params" {
+		v, ok := httpsfv.Item(f).Params.Get("name")
+		if ok {
+			return true, v.(string)
+		}
+	}
+	return false, ""
 }
 
 // AddQueryParam indicates a request for a specific query parameter to be signed.
@@ -76,8 +119,18 @@ func (fs *Fields) AddQueryParam(qp string) *Fields {
 
 func fromDictHeader(hdr, key string) *field {
 	h := strings.ToLower(hdr)
-	f := field{h, "key", key}
+	i := httpsfv.NewItem(h)
+	i.Params.Add("key", key)
+	f := field(i)
 	return &f
+}
+
+func (f field) dictHeader() (ok bool, hdr, key string) {
+	v, ok := f.Params.Get("key")
+	if ok {
+		return true, f.Value.(string), v.(string)
+	}
+	return false, "", ""
 }
 
 // AddDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified.
@@ -89,8 +142,15 @@ func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
 
 func fromStructuredField(hdr string) *field {
 	h := strings.ToLower(hdr)
-	f := field{h, "sf", ""}
+	i := httpsfv.NewItem(h)
+	i.Params.Add("sf", true)
+	f := field(i)
 	return &f
+}
+
+func (f field) structuredField() bool {
+	v, ok := f.Params.Get("sf")
+	return ok && v.(bool)
 }
 
 // AddStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941.
@@ -100,18 +160,15 @@ func (fs *Fields) AddStructuredField(hdr string) *Fields {
 	return fs
 }
 
+func fromRequestResponse(sigName string) *field {
+	i := httpsfv.NewItem("@request-response")
+	i.Params.Add("key", sigName)
+	f := field(i)
+	return &f
+}
+
 func (f field) toItem() httpsfv.Item {
-	p := httpsfv.NewParams()
-	if f.flagName == "sf" { //special case
-		p.Add(f.flagName, true)
-	} else if f.flagName != "" {
-		p.Add(f.flagName, f.flagValue)
-	}
-	i := httpsfv.Item{
-		Value:  f.name,
-		Params: p,
-	}
-	return i
+	return httpsfv.Item(f)
 }
 
 func (f field) asSignatureInput() (string, error) {
@@ -137,7 +194,7 @@ func (fs *Fields) contains(requiredFields *Fields) bool {
 outer:
 	for _, f1 := range requiredFields.f {
 		for _, f2 := range fs.f {
-			if f1 == f2 {
+			if f1.Equal(f2) {
 				continue outer
 			}
 		}

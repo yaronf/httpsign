@@ -67,25 +67,28 @@ func generateSignatureInput(message parsedMessage, fields Fields, params string)
 }
 
 func generateFieldValues(f field, message parsedMessage) ([]string, error) {
-	if f.flagName == "" || f.flagName == "sf" {
-		if strings.HasPrefix(f.name, "@") { // derived component
-			vv, found := message.derived[f.name]
+	ok, name := f.headerName()
+	if ok {
+		if strings.HasPrefix(name, "@") { // derived component
+			vv, found := message.derived[name]
 			if !found {
-				return nil, fmt.Errorf("derived header %s not found", f.name)
+				return nil, fmt.Errorf("derived header %s not found", f.name())
 			}
 			return []string{vv}, nil
 		}
-		return message.getHeader(f.name, f.flagName == "sf")
+		return message.getHeader(name, f.structuredField())
 	}
-	if f.name == "@query-params" && f.flagName == "name" {
-		vals, found := message.qParams[f.flagValue]
+	ok, name = f.queryParam()
+	if ok {
+		vals, found := message.qParams[name]
 		if !found {
-			return nil, fmt.Errorf("query parameter %s not found", f.flagValue)
+			return nil, fmt.Errorf("query parameter %s not found", name)
 		}
 		return vals, nil
 	}
-	if f.flagName == "key" { // dictionary header
-		return message.getDictHeader(f.name, f.flagValue)
+	ok, hdr, key := f.dictHeader()
+	if ok {
+		return message.getDictHeader(hdr, key)
 	}
 	return nil, fmt.Errorf("unrecognized field %s", f)
 }
@@ -216,14 +219,10 @@ func SignResponse(signatureName string, signer Signer, res *http.Response) (sign
 // Handle the special header-like @request-response
 func addPseudoHeaders(message *parsedMessage, rr *requestResponse, fields Fields) Fields {
 	if rr != nil {
-		rrfield := field{
-			name:      "@request-response",
-			flagName:  "key",
-			flagValue: rr.name,
-		}
+		rrfield := fromRequestResponse(rr.name)
 		message.headers.Add("@request-response", rr.name+"="+rr.signature)
 
-		fields.f = append(fields.f, rrfield)
+		fields.f = append(fields.f, *rrfield)
 		return fields
 	}
 	return fields
@@ -550,26 +549,7 @@ func parseSignatureInput(input string, sigName string) (*psiSignature, error) {
 	}
 	var f Fields
 	for _, ff := range fieldsList.Items {
-		fname, ok := ff.Value.(string)
-		if !ok {
-			return nil, fmt.Errorf("Signature-Input: value is not a string")
-		}
-		if ff.Params == nil || len(ff.Params.Names()) == 0 {
-			f.f = append(f.f, *fromHeaderName(fname))
-		} else {
-			if len(ff.Params.Names()) > 1 {
-				return nil, fmt.Errorf("more than one param for \"%s\"", fname)
-			}
-			flagNames := ff.Params.Names()
-			flagName := flagNames[0]
-			flagValue, _ := ff.Params.Get(flagName)
-			fv := flagValue.(string)
-			f.f = append(f.f, field{
-				name:      fname,
-				flagName:  flagName,
-				flagValue: fv,
-			})
-		}
+		f.f = append(f.f, field(ff))
 	}
 	params := map[string]interface{}{}
 	ps := fieldsList.Params
