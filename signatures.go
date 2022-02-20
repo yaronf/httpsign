@@ -297,10 +297,10 @@ func GetRequestSignature(req *http.Request, signatureName string) (string, error
 	}
 	ws, err := parsedMessage.getDictHeader("signature", signatureName)
 	if err != nil {
-		return "", fmt.Errorf("missing \"signature\" header for \"%s\"", signatureName)
+		return "", fmt.Errorf("missing \"Signature\" header for \"%s\"", signatureName)
 	}
 	if len(ws) > 1 {
-		return "", fmt.Errorf("more than one \"signature\" value for \"%s\"", signatureName)
+		return "", fmt.Errorf("more than one \"Signature\" value for \"%s\"", signatureName)
 	}
 	sigHeader := ws[0]
 	sigRaw, err := parseWantSignature(sigHeader)
@@ -313,10 +313,10 @@ func GetRequestSignature(req *http.Request, signatureName string) (string, error
 func messageKeyID(signatureName string, parsedMessage parsedMessage) (keyID, alg string, err error) {
 	si, err := parsedMessage.getDictHeader("signature-input", signatureName)
 	if err != nil {
-		return "", "", fmt.Errorf("missing \"signature-input\" header, or cannot find \"%s\": %w", signatureName, err)
+		return "", "", fmt.Errorf("missing \"Signature-Input\" header, or cannot find \"%s\": %w", signatureName, err)
 	}
 	if len(si) > 1 {
-		return "", "", fmt.Errorf("more than one \"signature-input\" for %s", signatureName)
+		return "", "", fmt.Errorf("more than one \"Signature-Input\" for %s", signatureName)
 	}
 	signatureInput := si[0]
 	psi, err := parseSignatureInput(signatureInput, signatureName)

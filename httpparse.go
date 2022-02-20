@@ -27,22 +27,22 @@ func parseRequest(req *http.Request) (*parsedMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse query: %s", req.URL.RawQuery)
 	}
-	url := req.URL
-	if url.Host == "" {
-		url.Host = req.Host
+	u := req.URL
+	if u.Host == "" {
+		u.Host = req.Host
 	}
-	if url.Scheme == "" {
+	if u.Scheme == "" {
 		if req.TLS == nil {
-			url.Scheme = "http"
+			u.Scheme = "http"
 		} else {
-			url.Scheme = "https"
+			u.Scheme = "https"
 		}
 	}
-	return &parsedMessage{derived: generateReqDerivedComponents(req), url: url, headers: normalizeHeaderNames(req.Header), qParams: values}, nil
+	return &parsedMessage{derived: generateReqDerivedComponents(req), url: u, headers: normalizeHeaderNames(req.Header), qParams: values}, nil
 }
 
 func normalizeHeaderNames(header http.Header) http.Header {
-	var t http.Header = http.Header{}
+	var t = http.Header{}
 	for k, v := range header {
 		t[strings.ToLower(k)] = v
 	}
@@ -77,20 +77,20 @@ func foldFields(fields []string) string {
 	return ff
 }
 
-func specialtyComponent(name, v string, components components) {
+func derivedComponent(name, v string, components components) {
 	components[name] = v
 }
 
 func generateReqDerivedComponents(req *http.Request) components {
 	components := components{}
-	specialtyComponent("@method", scMethod(req), components)
+	derivedComponent("@method", scMethod(req), components)
 	theURL := req.URL
-	specialtyComponent("@target-uri", scTargetURI(theURL), components)
-	specialtyComponent("@path", scPath(theURL), components)
-	specialtyComponent("@authority", scAuthority(req), components)
-	specialtyComponent("@scheme", scScheme(theURL), components)
-	specialtyComponent("@request-target", scRequestTarget(theURL), components)
-	specialtyComponent("@query", scQuery(theURL), components)
+	derivedComponent("@target-uri", scTargetURI(theURL), components)
+	derivedComponent("@path", scPath(theURL), components)
+	derivedComponent("@authority", scAuthority(req), components)
+	derivedComponent("@scheme", scScheme(theURL), components)
+	derivedComponent("@request-target", scRequestTarget(theURL), components)
+	derivedComponent("@query", scQuery(theURL), components)
 	// @request-response does not belong here
 	return components
 }
@@ -128,7 +128,7 @@ func scMethod(req *http.Request) string {
 
 func generateResDerivedComponents(res *http.Response) components {
 	components := components{}
-	specialtyComponent("@status", scStatus(res), components)
+	derivedComponent("@status", scStatus(res), components)
 	return components
 }
 
