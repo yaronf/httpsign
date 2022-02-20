@@ -72,7 +72,7 @@ func generateFieldValues(f field, message parsedMessage) ([]string, error) {
 		if strings.HasPrefix(name, "@") { // derived component
 			vv, found := message.derived[name]
 			if !found {
-				return nil, fmt.Errorf("derived header %s not found", f.name())
+				return nil, fmt.Errorf("derived header %s not found", name)
 			}
 			return []string{vv}, nil
 		}

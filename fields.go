@@ -1,6 +1,7 @@
 package httpsign
 
 import (
+	"fmt"
 	"github.com/dunglas/httpsfv"
 	"strings"
 )
@@ -26,7 +27,9 @@ func (f field) String() string {
 }
 
 func (f field) Equal(f2 field) bool {
-	if f.name() == f2.name() {
+	n1, err1 := f.name()
+	n2, err2 := f2.name()
+	if err1 == nil && err2 == nil && n1 == n2 {
 		for _, p := range f.Params.Names() {
 			v1, _ := f.Params.Get(p)
 			v2, ok := f2.Params.Get(p)
@@ -60,13 +63,13 @@ func NewFields() *Fields {
 	return &fs
 }
 
-func (f *field) name() string {
+func (f *field) name() (string, error) {
 	i := httpsfv.Item(*f)
 	n, ok := i.Value.(string)
 	if !ok {
-		panic("no support for non-string valued fields")
+		return "", fmt.Errorf("field has a non-string value")
 	}
-	return n
+	return n, nil
 }
 
 func fromHeaderName(hdr string) *field {
@@ -100,7 +103,8 @@ func fromQueryParam(qp string) *field {
 }
 
 func (f field) queryParam() (bool, string) {
-	if f.name() == "@query-params" {
+	name, err := f.name()
+	if err == nil && name == "@query-params" {
 		v, ok := httpsfv.Item(f).Params.Get("name")
 		if ok {
 			return true, v.(string)
