@@ -21,15 +21,14 @@ func (f field) String() string {
 	s, err := httpsfv.Marshal(i)
 	if err != nil {
 		return s
-	} else {
-		return err.Error()
 	}
+	return err.Error()
 }
 
-func (f1 field) Equal(f2 field) bool {
-	if f1.name() == f2.name() {
-		for _, p := range f1.Params.Names() {
-			v1, _ := f1.Params.Get(p)
+func (f field) Equal(f2 field) bool {
+	if f.name() == f2.name() {
+		for _, p := range f.Params.Names() {
+			v1, _ := f.Params.Get(p)
 			v2, ok := f2.Params.Get(p)
 			if !ok || v1 != v2 {
 				return false
