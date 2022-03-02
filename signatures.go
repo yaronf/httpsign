@@ -18,12 +18,13 @@ import (
 
 func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage parsedMessage,
 	fields Fields) (signatureInputHeader, signature, signatureInput string, err error) {
-	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, signer.foreignSigner, fields)
+	filtered := filterOptionalFields(fields, parsedMessage)
+	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, signer.foreignSigner, filtered)
 	if err != nil {
 		return "", "", "", err
 	}
 	signatureInputHeader = fmt.Sprintf("%s=%s", signatureName, sigParams)
-	signatureInput, err = generateSignatureInput(parsedMessage, fields, sigParams)
+	signatureInput, err = generateSignatureInput(parsedMessage, filtered, sigParams)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -32,6 +33,23 @@ func signMessage(config SignConfig, signatureName string, signer Signer, parsedM
 		return "", "", "", err
 	}
 	return signatureInputHeader, signature, signatureInput, nil
+}
+
+func filterOptionalFields(fields Fields, message parsedMessage) Fields {
+	filtered := *NewFields()
+	for _, f := range fields.f {
+		if !f.isOptional() {
+			filtered.f = append(filtered.f, f)
+		} else {
+			_, err := generateFieldValues(f, message)
+			if err == nil { // value was found
+				ff := f.copy()
+				ff.unmarkOptional()
+				filtered.f = append(filtered.f, ff)
+			}
+		}
+	}
+	return filtered
 }
 
 func generateSignature(name string, signer Signer, input string) (string, error) {
@@ -385,7 +403,8 @@ func verifyMessage(config VerifyConfig, name string, verifier Verifier, message 
 	if err != nil {
 		return "", err
 	}
-	if !(psiSig.fields.contains(&fields)) {
+	filtered := filterOptionalFields(fields, message)
+	if !(psiSig.fields.contains(&filtered)) {
 		return "", fmt.Errorf("actual signature does not cover all required fields")
 	}
 	err = applyVerificationPolicy(verifier, message, psiSig, config)

@@ -1489,3 +1489,59 @@ func TestVerifyResponse(t *testing.T) {
 		})
 	}
 }
+
+func TestOptionalSign(t *testing.T) {
+	req := readRequest(httpreq2)
+	f := NewFields().AddHeader("date").AddOptionalHeader("x-optional")
+	key1 := bytes.Repeat([]byte{0x55}, 64)
+	signer, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f)
+	assert.NoError(t, err, "Could not create signer")
+	sigInputHeader, _, sigInput, err := signRequestDebug("sig1", *signer, req)
+	assert.NoError(t, err, "Should not fail with optional header absent")
+	assert.Equal(t, "sig1=(\"date\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
+	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"@signature-params\": (\"date\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
+
+	req.Header.Add("X-Optional", "value")
+	sigInputHeader, _, sigInput, err = signRequestDebug("sig1", *signer, req)
+	assert.NoError(t, err, "Should not fail with optional header present")
+	assert.Equal(t, "sig1=(\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
+	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@signature-params\": (\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
+}
+
+func TestOptionalVerify(t *testing.T) {
+	req := readRequest(httpreq2)
+	req.Header.Add("X-Opt1", "val1")
+	f1 := NewFields().AddHeader("date").AddOptionalHeader("x-opt1")
+	key1 := bytes.Repeat([]byte{0x66}, 64)
+	signer, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(8888), *f1)
+	assert.NoError(t, err, "Could not create signer")
+	sigInputHeader, signature, err := SignRequest("sig1", *signer, req)
+	assert.NoError(t, err, "Should not fail with optional header present")
+	req.Header.Add("Signature-Input", sigInputHeader)
+	req.Header.Add("Signature", signature)
+
+	verifier, err := NewHMACSHA256Verifier("key1", key1, NewVerifyConfig().SetVerifyCreated(false), *f1)
+	assert.NoError(t, err, "Could not create verifier")
+	err = VerifyRequest("sig1", *verifier, req)
+	assert.NoError(t, err, "Should not fail: present and signed")
+
+	req.Header.Del("X-Opt1") // header absent but included in covered components
+	err = VerifyRequest("sig1", *verifier, req)
+	assert.Error(t, err, "Should fail: absent and signed")
+
+	req = readRequest(httpreq2) // header present but not signed
+	req.Header.Add("X-Opt1", "val1")
+	f2 := NewFields().AddHeader("date") // without the optional header
+	signer, err = NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(2222), *f2)
+	sigInputHeader, signature, err = SignRequest("sig1", *signer, req)
+	assert.NoError(t, err, "Should not fail with redundant header present")
+	req.Header.Add("Signature-Input", sigInputHeader)
+	req.Header.Add("Signature", signature)
+
+	err = VerifyRequest("sig1", *verifier, req)
+	assert.Error(t, err, "Should fail: present and not signed")
+
+	req.Header.Del("X-Opt1")
+	err = VerifyRequest("sig1", *verifier, req)
+	assert.NoError(t, err, "Should not fail: absent and not signed")
+}

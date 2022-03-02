@@ -8,6 +8,13 @@ import (
 
 // Fields is a list of fields to be signed or verified. To initialize, use Headers or for more complex
 // cases, NewFields followed by a chain of Add... methods.
+//
+// Several component types may be marked as optional. When signing a message, an optional component (e.g., header)
+// is signed if it exists in the message to be signed, otherwise it is not included in the signature input.
+// Upon verification, a field marked optional must be included in the signed components if it appears at all.
+// This allows for intuitive handling of application components (headers, query parameters) whose presence in
+// the message depends on application logic. Please do NOT use this functionality for headers that may legitimately be
+// added by a proxy, such as X-Forwarded-For.
 type Fields struct {
 	f []field
 }
@@ -94,6 +101,15 @@ func (fs *Fields) AddHeader(hdr string) *Fields {
 	return fs
 }
 
+// AddOptionalHeader appends a bare header name, e.g. "cache-control". The field is optional, see type documentation
+// for details.
+func (fs *Fields) AddOptionalHeader(hdr string) *Fields {
+	f := fromHeaderName(hdr)
+	f.markOptional()
+	fs.f = append(fs.f, *f)
+	return fs
+}
+
 func fromQueryParam(qp string) *field {
 	q := strings.ToLower(qp)
 	i := httpsfv.NewItem("@query-params")
@@ -116,6 +132,15 @@ func (f field) queryParam() (bool, string) {
 // AddQueryParam indicates a request for a specific query parameter to be signed.
 func (fs *Fields) AddQueryParam(qp string) *Fields {
 	f := fromQueryParam(qp)
+	fs.f = append(fs.f, *f)
+	return fs
+}
+
+// AddOptionalQueryParam indicates a request for a specific query parameter to be signed. The field is optional,
+// see type documentation for details.
+func (fs *Fields) AddOptionalQueryParam(qp string) *Fields {
+	f := fromQueryParam(qp)
+	f.markOptional()
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -143,6 +168,15 @@ func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
 	return fs
 }
 
+// AddOptionalDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified.
+// The field is optional, see type documentation for details.
+func (fs *Fields) AddOptionalDictHeader(hdr, key string) *Fields {
+	f := fromDictHeader(hdr, key)
+	f.markOptional()
+	fs.f = append(fs.f, *f)
+	return fs
+}
+
 func fromStructuredField(hdr string) *field {
 	h := strings.ToLower(hdr)
 	i := httpsfv.NewItem(h)
@@ -163,6 +197,15 @@ func (fs *Fields) AddStructuredField(hdr string) *Fields {
 	return fs
 }
 
+// AddOptionalStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941.
+// The field is optional, see type documentation for details.
+func (fs *Fields) AddOptionalStructuredField(hdr string) *Fields {
+	f := fromStructuredField(hdr)
+	f.markOptional()
+	fs.f = append(fs.f, *f)
+	return fs
+}
+
 func fromRequestResponse(sigName string) *field {
 	i := httpsfv.NewItem("@request-response")
 	i.Params.Add("key", sigName)
@@ -177,6 +220,50 @@ func (f field) toItem() httpsfv.Item {
 func (f field) asSignatureInput() (string, error) {
 	s, err := httpsfv.Marshal(f.toItem())
 	return s, err
+}
+
+func (f field) markOptional() {
+	if f.Params == nil {
+		f.Params = httpsfv.NewParams()
+	}
+	f.Params.Add("optional", true)
+}
+
+func (f field) unmarkOptional() {
+	if f.Params == nil {
+		f.Params = httpsfv.NewParams()
+	}
+	f.Params.Del("optional")
+}
+
+func (f field) isOptional() bool {
+	if f.Params != nil {
+		v, ok := f.Params.Get("optional")
+		if ok {
+			vv, ok2 := v.(bool)
+			if ok2 {
+				return vv
+			}
+		}
+	}
+	return false
+}
+
+// Not a full deep copy, but good enough for mutating params
+func (f field) copy() field {
+	ff := field{
+		Value: f.Value,
+	}
+	if f.Params == nil {
+		ff.Params = nil
+	} else {
+		ff.Params = httpsfv.NewParams()
+		for _, n := range f.Params.Names() {
+			v, _ := f.Params.Get(n)
+			ff.Params.Add(n, v)
+		}
+	}
+	return ff
 }
 
 func (fs *Fields) asSignatureInput(p *httpsfv.Params) (string, error) {
