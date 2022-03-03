@@ -17,22 +17,22 @@ import (
 )
 
 func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage parsedMessage,
-	fields Fields) (signatureInputHeader, signature, signatureInput string, err error) {
+	fields Fields) (signatureInput, signature, signatureBase string, err error) {
 	filtered := filterOptionalFields(fields, parsedMessage)
 	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, signer.foreignSigner, filtered)
 	if err != nil {
 		return "", "", "", err
 	}
-	signatureInputHeader = fmt.Sprintf("%s=%s", signatureName, sigParams)
-	signatureInput, err = generateSignatureInput(parsedMessage, filtered, sigParams)
+	signatureInput = fmt.Sprintf("%s=%s", signatureName, sigParams)
+	signatureBase, err = generateSignatureBase(parsedMessage, filtered, sigParams)
 	if err != nil {
 		return "", "", "", err
 	}
-	signature, err = generateSignature(signatureName, signer, signatureInput)
+	signature, err = generateSignature(signatureName, signer, signatureBase)
 	if err != nil {
 		return "", "", "", err
 	}
-	return signatureInputHeader, signature, signatureInput, nil
+	return signatureInput, signature, signatureBase, nil
 }
 
 func filterOptionalFields(fields Fields, message parsedMessage) Fields {
@@ -64,10 +64,10 @@ func encodeBytes(raw []byte) string {
 	return ":" + base64.StdEncoding.EncodeToString(raw) + ":"
 }
 
-func generateSignatureInput(message parsedMessage, fields Fields, params string) (string, error) {
+func generateSignatureBase(message parsedMessage, fields Fields, params string) (string, error) {
 	inp := ""
 	for _, c := range fields.f {
-		f, err := c.asSignatureInput()
+		f, err := c.asSignatureBase()
 		if err != nil {
 			return "", fmt.Errorf("could not marshal %v", f)
 		}
@@ -191,14 +191,14 @@ func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner inte
 //
 // SignRequest signs an HTTP request. Returns the Signature-Input and the Signature header values.
 //
-func SignRequest(signatureName string, signer Signer, req *http.Request) (signatureInputHeader, signature string, err error) {
-	signatureInputHeader, signature, signatureInput, err := signRequestDebug(signatureName, signer, req)
-	_ = signatureInput
+func SignRequest(signatureName string, signer Signer, req *http.Request) (signatureInput, signature string, err error) {
+	signatureInput, signature, signatureBase, err := signRequestDebug(signatureName, signer, req)
+	_ = signatureBase
 	return
 }
 
 // Same as SignRequest, but also returns the raw signature input string
-func signRequestDebug(signatureName string, signer Signer, req *http.Request) (signatureInputHeader, signature, signatureInput string, err error) {
+func signRequestDebug(signatureName string, signer Signer, req *http.Request) (signatureInput, signature, signatureBase string, err error) {
 	if req == nil {
 		return "", "", "", fmt.Errorf("nil request")
 	}
@@ -218,13 +218,13 @@ func signRequestDebug(signatureName string, signer Signer, req *http.Request) (s
 //
 // SignResponse signs an HTTP response. Returns the Signature-Input and the Signature header values.
 //
-func SignResponse(signatureName string, signer Signer, res *http.Response) (signatureInputHeader, signature string, err error) {
-	signatureInputHeader, signature, signatureInput, err := signResponseDebug(signatureName, signer, res)
-	_ = signatureInput
+func SignResponse(signatureName string, signer Signer, res *http.Response) (signatureInput, signature string, err error) {
+	signatureInput, signature, signatureBase, err := signResponseDebug(signatureName, signer, res)
+	_ = signatureBase
 	return
 }
 
-func signResponseDebug(signatureName string, signer Signer, res *http.Response) (signatureInputHeader, signatureInput, signature string, err error) {
+func signResponseDebug(signatureName string, signer Signer, res *http.Response) (signatureInput, signature, signatureBase string, err error) {
 	if res == nil {
 		return "", "", "", fmt.Errorf("nil response")
 	}
@@ -258,7 +258,7 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) e
 	return err
 }
 
-func verifyRequestDebug(signatureName string, verifier Verifier, req *http.Request) (signatureInput string, err error) {
+func verifyRequestDebug(signatureName string, verifier Verifier, req *http.Request) (signatureBase string, err error) {
 	if req == nil {
 		return "", fmt.Errorf("nil request")
 	}
@@ -416,11 +416,11 @@ func verifyMessage(config VerifyConfig, name string, verifier Verifier, message 
 	if err != nil {
 		return "", err
 	}
-	signatureInput, err := generateSignatureInput(message, psiSig.fields, psiSig.origSigParams)
+	signatureBase, err := generateSignatureBase(message, psiSig.fields, psiSig.origSigParams)
 	if err != nil {
 		return "", err
 	}
-	return signatureInput, verifySignature(verifier, signatureInput, wantSigRaw)
+	return signatureBase, verifySignature(verifier, signatureBase, wantSigRaw)
 }
 
 func applyVerificationPolicy(verifier Verifier, message parsedMessage, psi *psiSignature, config VerifyConfig) error {

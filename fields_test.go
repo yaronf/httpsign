@@ -44,11 +44,11 @@ func TestFields_asSignatureInput(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.fs.asSignatureInput(tt.args.p)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("asSignatureInput() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("asSignatureBase() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("asSignatureInput() got = %v, want %v", got, tt.want)
+				t.Errorf("asSignatureBase() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

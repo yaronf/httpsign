@@ -1363,12 +1363,12 @@ func Test_signRequestDebug(t *testing.T) {
 		req           *http.Request
 	}
 	tests := []struct {
-		name                     string
-		args                     args
-		wantSignatureInputHeader string
-		wantSignature            string
-		wantSignatureInput       string
-		wantErr                  bool
+		name               string
+		args               args
+		wantSignatureInput string
+		wantSignature      string
+		wantSignatureBase  string
+		wantErr            bool
 	}{
 		{
 			name: "normal header, sec. 2.1.1",
@@ -1377,10 +1377,10 @@ func Test_signRequestDebug(t *testing.T) {
 				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), Headers("example-dict")),
 				req:           readRequest(dict1),
 			},
-			wantSignatureInputHeader: "sig1=(\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:QIpdcJ+ooLtayPLbo/wte3hVTH78oyg6xfKpO1JIXgU=:",
-			wantSignatureInput:       "\"example-dict\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantErr:                  false,
+			wantSignatureInput: "sig1=(\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:      "sig1=:QIpdcJ+ooLtayPLbo/wte3hVTH78oyg6xfKpO1JIXgU=:",
+			wantSignatureBase:  "\"example-dict\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:            false,
 		},
 		{
 			name: "normal header as SFV, sec. 2.1.1",
@@ -1389,10 +1389,10 @@ func Test_signRequestDebug(t *testing.T) {
 				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), *NewFields().AddStructuredField("example-dict")),
 				req:           readRequest(dict1),
 			},
-			wantSignatureInputHeader: "sig1=(\"example-dict\";sf);alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:rYmKiJM/+dqWmK6NsSOSk5KnZIubvwGPCD8TU0CXVd0=:",
-			wantSignatureInput:       "\"example-dict\";sf: a=1, b=2;x=1;y=2, c=(a b c)\n\"@signature-params\": (\"example-dict\";sf);alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantErr:                  false,
+			wantSignatureInput: "sig1=(\"example-dict\";sf);alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:      "sig1=:rYmKiJM/+dqWmK6NsSOSk5KnZIubvwGPCD8TU0CXVd0=:",
+			wantSignatureBase:  "\"example-dict\";sf: a=1, b=2;x=1;y=2, c=(a b c)\n\"@signature-params\": (\"example-dict\";sf);alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:            false,
 		},
 		{
 			name: "cross-line header, trim",
@@ -1401,10 +1401,10 @@ func Test_signRequestDebug(t *testing.T) {
 				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), Headers("example-dict")),
 				req:           readRequest(dict2),
 			},
-			wantSignatureInputHeader: "sig1=(\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:xboyl9rhvXv0b7ulp/jt6CrVx8VRhuYixUbk3UmcJ50=:",
-			wantSignatureInput:       "\"example-dict\": a=1, b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantErr:                  false,
+			wantSignatureInput: "sig1=(\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:      "sig1=:xboyl9rhvXv0b7ulp/jt6CrVx8VRhuYixUbk3UmcJ50=:",
+			wantSignatureBase:  "\"example-dict\": a=1, b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:            false,
 		},
 		{
 			name: "various headers, Sec. 2.1",
@@ -1414,10 +1414,10 @@ func Test_signRequestDebug(t *testing.T) {
 					Headers("X-OWS-Header", "X-Obs-Fold-Header", "Empty-Header", "Cache-Control", "example-dict")),
 				req: readRequest(httpreq4),
 			},
-			wantSignatureInputHeader: "sig1=(\"x-ows-header\" \"x-obs-fold-header\" \"empty-header\" \"cache-control\" \"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:Xh8fPRbyfFXVnMD44Skm6krxiOIJea6qN22QK88VmjM=:",
-			wantSignatureInput:       "\"x-ows-header\": Leading and trailing whitespace.\n\"x-obs-fold-header\": Obsolete line folding.\n\"empty-header\": \n\"cache-control\": max-age=60, must-revalidate\n\"example-dict\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"x-ows-header\" \"x-obs-fold-header\" \"empty-header\" \"cache-control\" \"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantErr:                  false,
+			wantSignatureInput: "sig1=(\"x-ows-header\" \"x-obs-fold-header\" \"empty-header\" \"cache-control\" \"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:      "sig1=:Xh8fPRbyfFXVnMD44Skm6krxiOIJea6qN22QK88VmjM=:",
+			wantSignatureBase:  "\"x-ows-header\": Leading and trailing whitespace.\n\"x-obs-fold-header\": Obsolete line folding.\n\"empty-header\": \n\"cache-control\": max-age=60, must-revalidate\n\"example-dict\": a=1,    b=2;x=1;y=2,   c=(a   b   c)\n\"@signature-params\": (\"x-ows-header\" \"x-obs-fold-header\" \"empty-header\" \"cache-control\" \"example-dict\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:            false,
 		},
 		{
 			name: "reserialized dictionary headers, Sec. 2.1.2",
@@ -1427,27 +1427,27 @@ func Test_signRequestDebug(t *testing.T) {
 					*NewFields().AddHeaders("Cache-Control").AddDictHeader("example-dict", "a").AddDictHeader("example-dict", "b").AddDictHeader("example-dict", "c")),
 				req: readRequest(httpreq4),
 			},
-			wantSignatureInputHeader: "sig1=(\"cache-control\" \"example-dict\";key=\"a\" \"example-dict\";key=\"b\" \"example-dict\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantSignature:            "sig1=:ZgRaU7rBGNrMr2aEpKjXYU6sReB0V+Uks2jpm30jh24=:",
-			wantSignatureInput:       "\"cache-control\": max-age=60, must-revalidate\n\"example-dict\";key=\"a\": 1\n\"example-dict\";key=\"b\": 2;x=1;y=2\n\"example-dict\";key=\"c\": (a b c)\n\"@signature-params\": (\"cache-control\" \"example-dict\";key=\"a\" \"example-dict\";key=\"b\" \"example-dict\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
-			wantErr:                  false,
+			wantSignatureInput: "sig1=(\"cache-control\" \"example-dict\";key=\"a\" \"example-dict\";key=\"b\" \"example-dict\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:      "sig1=:ZgRaU7rBGNrMr2aEpKjXYU6sReB0V+Uks2jpm30jh24=:",
+			wantSignatureBase:  "\"cache-control\": max-age=60, must-revalidate\n\"example-dict\";key=\"a\": 1\n\"example-dict\";key=\"b\": 2;x=1;y=2\n\"example-dict\";key=\"c\": (a b c)\n\"@signature-params\": (\"cache-control\" \"example-dict\";key=\"a\" \"example-dict\";key=\"b\" \"example-dict\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:            false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotSignatureInputHeader, gotSignature, gotSignatureInput, err := signRequestDebug(tt.args.signatureName, tt.args.signer, tt.args.req)
+			gotSignatureInput, gotSignature, gotSignatureBase, err := signRequestDebug(tt.args.signatureName, tt.args.signer, tt.args.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("signRequestDebug() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if gotSignatureInputHeader != tt.wantSignatureInputHeader {
-				t.Errorf("signRequestDebug() gotSignatureInputHeader = %v, want %v", gotSignatureInputHeader, tt.wantSignatureInputHeader)
+			if gotSignatureInput != tt.wantSignatureInput {
+				t.Errorf("signRequestDebug() gotSignatureInput = %v, want %v", gotSignatureInput, tt.wantSignatureInput)
 			}
 			if gotSignature != tt.wantSignature {
 				t.Errorf("signRequestDebug() gotSignature = %v, want %v", gotSignature, tt.wantSignature)
 			}
-			if gotSignatureInput != tt.wantSignatureInput {
-				t.Errorf("signRequestDebug() gotSignatureInput = %v, want %v", gotSignatureInput, tt.wantSignatureInput)
+			if gotSignatureBase != tt.wantSignatureBase {
+				t.Errorf("signRequestDebug() gotSignatureBase = %v, want %v", gotSignatureBase, tt.wantSignatureBase)
 			}
 		})
 	}
@@ -1496,44 +1496,44 @@ func TestOptionalSign(t *testing.T) {
 	key1 := bytes.Repeat([]byte{0x55}, 64)
 	signer1, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f1)
 	assert.NoError(t, err, "Could not create signer")
-	sigInputHeader, _, sigInput, err := signRequestDebug("sig1", *signer1, req)
+	signatureInput, _, signatureBase, err := signRequestDebug("sig1", *signer1, req)
 	assert.NoError(t, err, "Should not fail with optional header absent")
-	assert.Equal(t, "sig1=(\"date\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
-	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"@signature-params\": (\"date\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
+	assert.Equal(t, "sig1=(\"date\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
+	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"@signature-params\": (\"date\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
 
 	req.Header.Add("X-Optional", "value")
-	sigInputHeader, _, sigInput, err = signRequestDebug("sig1", *signer1, req)
+	signatureInput, _, signatureBase, err = signRequestDebug("sig1", *signer1, req)
 	assert.NoError(t, err, "Should not fail with optional header present")
-	assert.Equal(t, "sig1=(\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
-	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@signature-params\": (\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
+	assert.Equal(t, "sig1=(\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
+	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@signature-params\": (\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
 
 	f2 := f1.AddOptionalQueryParam("bla").AddOptionalQueryParam("bar")
 	signer2, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f2)
 	assert.NoError(t, err, "Could not create signer")
-	sigInputHeader, _, sigInput, err = signRequestDebug("sig1", *signer2, req)
+	signatureInput, _, signatureBase, err = signRequestDebug("sig1", *signer2, req)
 	assert.NoError(t, err, "Should not fail with query params")
-	assert.Equal(t, "sig1=(\"date\" \"x-optional\" \"@query-params\";name=\"bar\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
-	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@query-params\";name=\"bar\": baz\n\"@signature-params\": (\"date\" \"x-optional\" \"@query-params\";name=\"bar\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
+	assert.Equal(t, "sig1=(\"date\" \"x-optional\" \"@query-params\";name=\"bar\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
+	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@query-params\";name=\"bar\": baz\n\"@signature-params\": (\"date\" \"x-optional\" \"@query-params\";name=\"bar\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
 
 	res1 := readResponse(httpres2)
 	res1.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a b c)")
 	f3 := NewFields().AddOptionalDictHeader("x-dictionary", "a").AddOptionalDictHeader("x-dictionary", "zz")
 	signer3, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f3)
 	assert.NoError(t, err, "Could not create signer")
-	sigInputHeader, _, sigInput, err = signResponseDebug("sig1", *signer3, res1)
+	signatureInput, _, signatureBase, err = signResponseDebug("sig1", *signer3, res1)
 	assert.NoError(t, err, "Should not fail with dict headers")
-	assert.Equal(t, "sig1=(\"x-dictionary\";key=\"a\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
-	assert.Equal(t, "\"x-dictionary\";key=\"a\": 1\n\"@signature-params\": (\"x-dictionary\";key=\"a\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
+	assert.Equal(t, "sig1=(\"x-dictionary\";key=\"a\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
+	assert.Equal(t, "\"x-dictionary\";key=\"a\": 1\n\"@signature-params\": (\"x-dictionary\";key=\"a\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
 
 	res2 := readResponse(httpres2)
 	res2.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a  b  c)")
 	f4 := NewFields().AddOptionalStructuredField("x-dictionary").AddOptionalStructuredField("x-not-a-dictionary")
 	signer4, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f4)
 	assert.NoError(t, err, "Could not create signer")
-	sigInputHeader, _, sigInput, err = signResponseDebug("sig1", *signer4, res2)
+	signatureInput, _, signatureBase, err = signResponseDebug("sig1", *signer4, res2)
 	assert.NoError(t, err, "Should not fail with structured fields")
-	assert.Equal(t, "sig1=(\"x-dictionary\";sf);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
-	assert.Equal(t, "\"x-dictionary\";sf: a=1, b=2;x=1;y=2, c=(a b c)\n\"@signature-params\": (\"x-dictionary\";sf);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
+	assert.Equal(t, "sig1=(\"x-dictionary\";sf);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
+	assert.Equal(t, "\"x-dictionary\";sf: a=1, b=2;x=1;y=2, c=(a b c)\n\"@signature-params\": (\"x-dictionary\";sf);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
 }
 
 func TestOptionalVerify(t *testing.T) {
@@ -1543,9 +1543,9 @@ func TestOptionalVerify(t *testing.T) {
 	key1 := bytes.Repeat([]byte{0x66}, 64)
 	signer, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(8888), *f1)
 	assert.NoError(t, err, "Could not create signer")
-	sigInputHeader, signature, err := SignRequest("sig1", *signer, req)
+	sigInput, signature, err := SignRequest("sig1", *signer, req)
 	assert.NoError(t, err, "Should not fail with optional header present")
-	req.Header.Add("Signature-Input", sigInputHeader)
+	req.Header.Add("Signature-Input", sigInput)
 	req.Header.Add("Signature", signature)
 
 	verifier, err := NewHMACSHA256Verifier("key1", key1, NewVerifyConfig().SetVerifyCreated(false), *f1)
@@ -1561,9 +1561,9 @@ func TestOptionalVerify(t *testing.T) {
 	req.Header.Add("X-Opt1", "val1")
 	f2 := NewFields().AddHeader("date") // without the optional header
 	signer, err = NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(2222), *f2)
-	sigInputHeader, signature, err = SignRequest("sig1", *signer, req)
+	sigInput, signature, err = SignRequest("sig1", *signer, req)
 	assert.NoError(t, err, "Should not fail with redundant header present")
-	req.Header.Add("Signature-Input", sigInputHeader)
+	req.Header.Add("Signature-Input", sigInput)
 	req.Header.Add("Signature", signature)
 
 	err = VerifyRequest("sig1", *verifier, req)

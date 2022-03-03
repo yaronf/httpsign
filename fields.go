@@ -217,7 +217,7 @@ func (f field) toItem() httpsfv.Item {
 	return httpsfv.Item(f)
 }
 
-func (f field) asSignatureInput() (string, error) {
+func (f field) asSignatureBase() (string, error) {
 	s, err := httpsfv.Marshal(f.toItem())
 	return s, err
 }
