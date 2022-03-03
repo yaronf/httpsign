@@ -1492,20 +1492,48 @@ func TestVerifyResponse(t *testing.T) {
 
 func TestOptionalSign(t *testing.T) {
 	req := readRequest(httpreq2)
-	f := NewFields().AddHeader("date").AddOptionalHeader("x-optional")
+	f1 := NewFields().AddHeader("date").AddOptionalHeader("x-optional")
 	key1 := bytes.Repeat([]byte{0x55}, 64)
-	signer, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f)
+	signer1, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f1)
 	assert.NoError(t, err, "Could not create signer")
-	sigInputHeader, _, sigInput, err := signRequestDebug("sig1", *signer, req)
+	sigInputHeader, _, sigInput, err := signRequestDebug("sig1", *signer1, req)
 	assert.NoError(t, err, "Should not fail with optional header absent")
 	assert.Equal(t, "sig1=(\"date\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
 	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"@signature-params\": (\"date\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
 
 	req.Header.Add("X-Optional", "value")
-	sigInputHeader, _, sigInput, err = signRequestDebug("sig1", *signer, req)
+	sigInputHeader, _, sigInput, err = signRequestDebug("sig1", *signer1, req)
 	assert.NoError(t, err, "Should not fail with optional header present")
 	assert.Equal(t, "sig1=(\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
 	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@signature-params\": (\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
+
+	f2 := f1.AddOptionalQueryParam("bla").AddOptionalQueryParam("bar")
+	signer2, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f2)
+	assert.NoError(t, err, "Could not create signer")
+	sigInputHeader, _, sigInput, err = signRequestDebug("sig1", *signer2, req)
+	assert.NoError(t, err, "Should not fail with query params")
+	assert.Equal(t, "sig1=(\"date\" \"x-optional\" \"@query-params\";name=\"bar\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
+	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@query-params\";name=\"bar\": baz\n\"@signature-params\": (\"date\" \"x-optional\" \"@query-params\";name=\"bar\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
+
+	res1 := readResponse(httpres2)
+	res1.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a b c)")
+	f3 := NewFields().AddOptionalDictHeader("x-dictionary", "a").AddOptionalDictHeader("x-dictionary", "zz")
+	signer3, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f3)
+	assert.NoError(t, err, "Could not create signer")
+	sigInputHeader, _, sigInput, err = signResponseDebug("sig1", *signer3, res1)
+	assert.NoError(t, err, "Should not fail with dict headers")
+	assert.Equal(t, "sig1=(\"x-dictionary\";key=\"a\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
+	assert.Equal(t, "\"x-dictionary\";key=\"a\": 1\n\"@signature-params\": (\"x-dictionary\";key=\"a\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
+
+	res2 := readResponse(httpres2)
+	res2.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a  b  c)")
+	f4 := NewFields().AddOptionalStructuredField("x-dictionary").AddOptionalStructuredField("x-not-a-dictionary")
+	signer4, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f4)
+	assert.NoError(t, err, "Could not create signer")
+	sigInputHeader, _, sigInput, err = signResponseDebug("sig1", *signer4, res2)
+	assert.NoError(t, err, "Should not fail with structured fields")
+	assert.Equal(t, "sig1=(\"x-dictionary\";sf);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInputHeader)
+	assert.Equal(t, "\"x-dictionary\";sf: a=1, b=2;x=1;y=2, c=(a b c)\n\"@signature-params\": (\"x-dictionary\";sf);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", sigInput)
 }
 
 func TestOptionalVerify(t *testing.T) {

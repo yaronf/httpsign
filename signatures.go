@@ -218,20 +218,25 @@ func signRequestDebug(signatureName string, signer Signer, req *http.Request) (s
 //
 // SignResponse signs an HTTP response. Returns the Signature-Input and the Signature header values.
 //
-func SignResponse(signatureName string, signer Signer, res *http.Response) (signatureInput, signature string, err error) {
+func SignResponse(signatureName string, signer Signer, res *http.Response) (signatureInputHeader, signature string, err error) {
+	signatureInputHeader, signature, signatureInput, err := signResponseDebug(signatureName, signer, res)
+	_ = signatureInput
+	return
+}
+
+func signResponseDebug(signatureName string, signer Signer, res *http.Response) (signatureInputHeader, signatureInput, signature string, err error) {
 	if res == nil {
-		return "", "", fmt.Errorf("nil response")
+		return "", "", "", fmt.Errorf("nil response")
 	}
 	if signatureName == "" {
-		return "", "", fmt.Errorf("empty signature name")
+		return "", "", "", fmt.Errorf("empty signature name")
 	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	extendedFields := addPseudoHeaders(parsedMessage, signer.config.requestResponse, signer.fields)
-	signatureInput, signature, _, err = signMessage(*signer.config, signatureName, signer, *parsedMessage, extendedFields)
-	return
+	return signMessage(*signer.config, signatureName, signer, *parsedMessage, extendedFields)
 }
 
 // Handle the special header-like @request-response
