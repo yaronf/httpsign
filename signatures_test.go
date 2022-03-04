@@ -1292,6 +1292,9 @@ func TestDictionary(t *testing.T) {
 
 func TestMultipleSignatures(t *testing.T) {
 	priv1, _, err := genP256KeyPair() // no pub, no verify
+	if err != nil {
+		t.Errorf("Could not create keypair")
+	}
 	res := readResponse(httpres2)
 	signer1, err := NewP256Signer("key10", *priv1, NewSignConfig().SignCreated(false), Headers("Content-Type", "Digest"))
 	if err != nil {
@@ -1305,6 +1308,9 @@ func TestMultipleSignatures(t *testing.T) {
 	res.Header.Add("Signature", sig1)
 
 	priv2, _, err := genP256KeyPair() // no pub, no verify
+	if err != nil {
+		t.Errorf("Could not create keypair")
+	}
 	signer2, err := NewP256Signer("key20", *priv2, NewSignConfig().SignCreated(false), *NewFields().AddDictHeader("Signature", "sig2"))
 	if err != nil {
 		t.Errorf("Could not create signer")
@@ -1561,6 +1567,7 @@ func TestOptionalVerify(t *testing.T) {
 	req.Header.Add("X-Opt1", "val1")
 	f2 := NewFields().AddHeader("date") // without the optional header
 	signer, err = NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(2222), *f2)
+	assert.NoError(t, err, "Should not fail to create Signer")
 	sigInput, signature, err = SignRequest("sig1", *signer, req)
 	assert.NoError(t, err, "Should not fail with redundant header present")
 	req.Header.Add("Signature-Input", sigInput)

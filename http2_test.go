@@ -70,6 +70,9 @@ func testHTTP(t *testing.T, proto string) {
 			Scheme string
 		}
 		wf, err := execTemplate(*tpl, "fields", inputs{Port: portval, Scheme: scheme})
+		if err != nil {
+			t.Errorf("execTemplate failed")
+		}
 		verifier, err := NewHMACSHA256Verifier("key1", bytes.Repeat([]byte{0x03}, 64),
 			NewVerifyConfig().SetVerifyCreated(false),
 			Headers("@query"))
@@ -88,6 +91,11 @@ func testHTTP(t *testing.T, proto string) {
 		w.WriteHeader(200)
 	}
 
+	// And run the client code...
+	simpleClient(t, proto, simpleHandler)
+}
+
+func simpleClient(t *testing.T, proto string, simpleHandler func(w http.ResponseWriter, r *http.Request)) {
 	// Client code
 	switch proto {
 	case "HTTP/1.1":
@@ -110,6 +118,10 @@ func testHTTP(t *testing.T, proto string) {
 		NewSignConfig().SignCreated(false),
 		*NewFields().AddHeaders("kuku", "@query", "@method", "@target-uri", "@authority", "@scheme", "@target-uri",
 			"@path", "@query").AddQueryParam("k1").AddQueryParam("k2"))
+	if err != nil {
+		t.Errorf("failed to create signer")
+	}
+
 	var client *Client
 	switch proto {
 	case "HTTP/1.1":
