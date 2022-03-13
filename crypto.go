@@ -1,7 +1,6 @@
 package httpsign
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
@@ -10,6 +9,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/subtle"
 	"fmt"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jws"
@@ -357,7 +357,7 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 	case "hmac-sha256":
 		mac := hmac.New(sha256.New, v.key.([]byte))
 		mac.Write(buff)
-		return bytes.Equal(mac.Sum(nil), sig), nil
+		return subtle.ConstantTimeCompare(mac.Sum(nil), sig) == 1, nil
 	case "rsa-v1_5-sha256":
 		hashed := sha256.Sum256(buff)
 		key := v.key.(rsa.PublicKey)
