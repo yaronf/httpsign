@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -164,9 +165,10 @@ func NewVerifyConfig() *VerifyConfig {
 // to be skipped.
 type HandlerConfig struct {
 	reqNotVerified func(w http.ResponseWriter,
-		r *http.Request, err error)
+		r *http.Request, logger *log.Logger, err error)
 	fetchVerifier func(r *http.Request) (sigName string, verifier *Verifier)
 	fetchSigner   func(res http.Response, r *http.Request) (sigName string, signer *Signer)
+	logger        *log.Logger
 }
 
 // NewHandlerConfig generates a default configuration. When verification or respectively,
@@ -176,15 +178,18 @@ func NewHandlerConfig() *HandlerConfig {
 		reqNotVerified: defaultReqNotVerified,
 		fetchVerifier:  nil,
 		fetchSigner:    nil,
+		logger:         log.New(os.Stderr, "httpsign: ", log.LstdFlags|log.Lmsgprefix),
 	}
 }
 
-func defaultReqNotVerified(w http.ResponseWriter, _ *http.Request, err error) {
+func defaultReqNotVerified(w http.ResponseWriter, _ *http.Request, logger *log.Logger, err error) {
 	w.WriteHeader(http.StatusUnauthorized)
 	if err == nil { // should not happen
 		_, _ = fmt.Fprintf(w, "Unknown error")
 	} else {
-		log.Println("Could not verify request signature: " + err.Error())
+		if logger != nil {
+			logger.Println("Could not verify request signature: " + err.Error())
+		}
 		_, _ = fmt.Fprintln(w, "Could not verify request signature") // For security reasons, do not print error
 	}
 }
@@ -192,7 +197,7 @@ func defaultReqNotVerified(w http.ResponseWriter, _ *http.Request, err error) {
 // SetReqNotVerified defines a callback to be called when a request fails to verify. The default
 // callback sends an unsigned 401 status code with a generic error message. For production, you
 // probably need to sign it.
-func (h *HandlerConfig) SetReqNotVerified(f func(w http.ResponseWriter, r *http.Request,
+func (h *HandlerConfig) SetReqNotVerified(f func(w http.ResponseWriter, r *http.Request, l *log.Logger,
 	err error)) *HandlerConfig {
 	h.reqNotVerified = f
 	return h
@@ -215,5 +220,12 @@ func (h *HandlerConfig) SetFetchVerifier(f func(r *http.Request) (sigName string
 // to store this information. If a Signer cannot be determined, the function should return Signer as nil.
 func (h *HandlerConfig) SetFetchSigner(f func(res http.Response, r *http.Request) (sigName string, signer *Signer)) *HandlerConfig {
 	h.fetchSigner = f
+	return h
+}
+
+// SetLogger defines a logger for cases where an error cannot be returned. The default logger prints to stderr.
+// Set to nil to prevent logging.
+func (h *HandlerConfig) SetLogger(l *log.Logger) *HandlerConfig {
+	h.logger = l
 	return h
 }

@@ -163,12 +163,14 @@ func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler
 		_, _ = fmt.Fprintf(w, "Hey client, you sent a signature with these parameters: %s\n",
 			r.Header.Get("Signature-Input"))
 	}
-	verifyFailed := func(w http.ResponseWriter, r *http.Request, err error) {
+	verifyFailed := func(w http.ResponseWriter, r *http.Request, logger *log.Logger, err error) {
 		w.WriteHeader(599)
 		if err == nil { // should not happen
 			t.Errorf("Test failed, handler received an error: %v", err)
 		}
-		log.Println("Could not verify request signature: " + err.Error())
+		if logger != nil {
+			log.Println("Could not verify request signature: " + err.Error())
+		}
 		_, _ = fmt.Fprintln(w, "Could not verify request signature")
 	}
 	fetchVerifier := func(r *http.Request) (string, *Verifier) {

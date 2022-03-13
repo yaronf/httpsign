@@ -31,9 +31,11 @@ func WrapHandler(h http.Handler, config HandlerConfig) http.Handler {
 }
 
 // This error case is not optional, as it's always a server bug
-func sigFailed(w http.ResponseWriter, _ *http.Request, err error) {
+func sigFailed(w http.ResponseWriter, _ *http.Request, logger *log.Logger, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
-	log.Printf("Failed to sign response: %v\n", err)
+	if logger != nil {
+		logger.Printf("Failed to sign response: %v\n", err)
+	}
 	_, _ = fmt.Fprintln(w, "Failed to sign response.") // For security reasons, error is not printed
 }
 
@@ -60,17 +62,17 @@ func signServerResponse(wrapped *wrappedResponseWriter, r *http.Request, config 
 		TLS:              nil,
 	}
 	if config.fetchSigner == nil {
-		sigFailed(wrapped.ResponseWriter, r, fmt.Errorf("could not fetch a Signer"))
+		sigFailed(wrapped.ResponseWriter, r, config.logger, fmt.Errorf("could not fetch a Signer"))
 		return false
 	}
 	sigName, signer := config.fetchSigner(response, r)
 	if signer == nil {
-		sigFailed(wrapped.ResponseWriter, r, fmt.Errorf("could not fetch a Signer, check key ID"))
+		sigFailed(wrapped.ResponseWriter, r, config.logger, fmt.Errorf("could not fetch a Signer, check key ID"))
 		return false
 	}
 	signatureInput, signature, err := SignResponse(sigName, *signer, &response)
 	if err != nil {
-		sigFailed(wrapped.ResponseWriter, r, fmt.Errorf("failed to sign the response: %w", err))
+		sigFailed(wrapped.ResponseWriter, r, config.logger, fmt.Errorf("failed to sign the response: %w", err))
 		return false
 	}
 	wrapped.Header().Add("Signature-Input", signatureInput)
@@ -122,17 +124,17 @@ func (w *wrappedResponseWriter) WriteHeader(code int) {
 
 func verifyServerRequest(w http.ResponseWriter, r *http.Request, config HandlerConfig) bool {
 	if config.fetchVerifier == nil {
-		config.reqNotVerified(w, r, fmt.Errorf("could not fetch a Verifier"))
+		config.reqNotVerified(w, r, config.logger, fmt.Errorf("could not fetch a Verifier"))
 		return false
 	}
 	sigName, verifier := config.fetchVerifier(r)
 	if verifier == nil {
-		config.reqNotVerified(w, r, fmt.Errorf("could not fetch a Verifier, check key ID"))
+		config.reqNotVerified(w, r, config.logger, fmt.Errorf("could not fetch a Verifier, check key ID"))
 		return false
 	}
 	err := VerifyRequest(sigName, *verifier, r)
 	if err != nil {
-		config.reqNotVerified(w, r, err)
+		config.reqNotVerified(w, r, config.logger, err)
 		return false
 	}
 	return true
