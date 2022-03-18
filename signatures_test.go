@@ -621,7 +621,8 @@ func readRequest(s string) *http.Request {
 
 func readResponse(s string) *http.Response {
 	in := strings.NewReader(s)
-	res, _ := http.ReadResponse(bufio.NewReader(in), nil)
+	res, err := http.ReadResponse(bufio.NewReader(in), nil)
+	_ = err
 	return res
 }
 
@@ -1109,11 +1110,10 @@ func TestRequestDetails(t *testing.T) {
 		req           *http.Request
 	}
 	tests := []struct {
-		name      string
-		args      args
-		wantKeyID string
-		wantAlg   string
-		wantErr   bool
+		name        string
+		args        args
+		wantDetails MessageDetails
+		wantErr     bool
 	}{
 		{
 			name: "happy path",
@@ -1121,23 +1121,26 @@ func TestRequestDetails(t *testing.T) {
 				signatureName: "sig1",
 				req:           readRequest(httpreq1p256),
 			},
-			wantKeyID: "test-key-ecc-p256",
-			wantAlg:   "",
-			wantErr:   false,
+			wantDetails: MessageDetails{
+				KeyID:  "test-key-ecc-p256",
+				Alg:    "",
+				Fields: Fields{},
+			},
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotKeyID, gotAlg, err := RequestDetails(tt.args.signatureName, tt.args.req)
+			gotDetails, err := RequestDetails(tt.args.signatureName, tt.args.req)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RequestDetails() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if gotKeyID != tt.wantKeyID {
-				t.Errorf("RequestDetails() gotKeyID = %v, want %v", gotKeyID, tt.wantKeyID)
+			if gotDetails.KeyID != tt.wantDetails.KeyID {
+				t.Errorf("RequestDetails() gotKeyID = %v, want %v", gotDetails.KeyID, tt.wantDetails.KeyID)
 			}
-			if gotAlg != tt.wantAlg {
-				t.Errorf("RequestDetails() gotAlg = %v, want %v", gotAlg, tt.wantAlg)
+			if gotDetails.Alg != tt.wantDetails.Alg {
+				t.Errorf("RequestDetails() gotAlg = %v, want %v", gotDetails.Alg, tt.wantDetails.Alg)
 			}
 		})
 	}
@@ -1168,11 +1171,13 @@ func TestResponseDetails(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotKeyID, gotAlg, err := ResponseDetails(tt.args.signatureName, tt.args.res)
+			gotDetails, err := ResponseDetails(tt.args.signatureName, tt.args.res)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ResponseDetails() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			gotKeyID := gotDetails.KeyID
+			gotAlg := gotDetails.Alg
 			if gotKeyID != tt.wantKeyID {
 				t.Errorf("ResponseDetails() gotKeyID = %v, want %v", gotKeyID, tt.wantKeyID)
 			}

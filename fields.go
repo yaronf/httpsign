@@ -292,3 +292,13 @@ outer:
 	}
 	return true
 }
+
+func (fs *Fields) hasHeader(name string) bool {
+	h := *fromHeaderName(name)
+	for _, f := range fs.f {
+		if f.Equal(h) {
+			return true
+		}
+	}
+	return false
+}

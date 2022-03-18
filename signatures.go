@@ -1,7 +1,6 @@
 package httpsign
 
 import (
-	"encoding/base64"
 	"fmt"
 	"github.com/dunglas/httpsfv"
 	"net/http"
@@ -54,7 +53,9 @@ func generateSignature(name string, signer Signer, input string) (string, error)
 }
 
 func encodeBytes(raw []byte) string {
-	return ":" + base64.StdEncoding.EncodeToString(raw) + ":"
+	i := httpsfv.NewItem(raw)
+	s, _ := httpsfv.Marshal(i)
+	return s
 }
 
 func generateSignatureBase(message parsedMessage, fields Fields, params string) (string, error) {
@@ -268,34 +269,40 @@ func verifyRequestDebug(signatureName string, verifier Verifier, req *http.Reque
 	return verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, verifier.fields)
 }
 
+// MessageDetails aggregates the details of a signed message
+type MessageDetails struct {
+	KeyID, Alg string
+	Fields     Fields
+}
+
 // RequestDetails parses a signed request and returns the key ID and optionally the algorithm used in the given signature.
-func RequestDetails(signatureName string, req *http.Request) (keyID, alg string, err error) {
+func RequestDetails(signatureName string, req *http.Request) (details *MessageDetails, err error) {
 	if req == nil {
-		return "", "", fmt.Errorf("nil request")
+		return nil, fmt.Errorf("nil request")
 	}
 	if signatureName == "" {
-		return "", "", fmt.Errorf("empty signature name")
+		return nil, fmt.Errorf("empty signature name")
 	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	return messageKeyID(signatureName, *parsedMessage)
+	return messageDetails(signatureName, *parsedMessage)
 }
 
 // ResponseDetails parses a signed response and returns the key ID and optionally the algorithm used in the given signature.
-func ResponseDetails(signatureName string, res *http.Response) (keyID, alg string, err error) {
+func ResponseDetails(signatureName string, res *http.Response) (details *MessageDetails, err error) {
 	if res == nil {
-		return "", "", fmt.Errorf("nil response")
+		return nil, fmt.Errorf("nil response")
 	}
 	if signatureName == "" {
-		return "", "", fmt.Errorf("empty signature name")
+		return nil, fmt.Errorf("empty signature name")
 	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
-	return messageKeyID(signatureName, *parsedMessage)
+	return messageDetails(signatureName, *parsedMessage)
 }
 
 // GetRequestSignature returns the base64-encoded signature, parsed from a signed request.
@@ -326,13 +333,13 @@ func GetRequestSignature(req *http.Request, signatureName string) (string, error
 	return encodeBytes(sigRaw), nil
 }
 
-func messageKeyID(signatureName string, parsedMessage parsedMessage) (keyID, alg string, err error) {
+func messageDetails(signatureName string, parsedMessage parsedMessage) (details *MessageDetails, err error) {
 	si, err := parsedMessage.getDictHeader("signature-input", signatureName)
 	if err != nil {
-		return "", "", fmt.Errorf("missing \"Signature-Input\" header, or cannot find \"%s\": %w", signatureName, err)
+		return nil, fmt.Errorf("missing \"Signature-Input\" header, or cannot find \"%s\": %w", signatureName, err)
 	}
 	if len(si) > 1 {
-		return "", "", fmt.Errorf("more than one \"Signature-Input\" for %s", signatureName)
+		return nil, fmt.Errorf("more than one \"Signature-Input\" for %s", signatureName)
 	}
 	signatureInput := si[0]
 	psi, err := parseSignatureInput(signatureInput, signatureName)
@@ -341,20 +348,25 @@ func messageKeyID(signatureName string, parsedMessage parsedMessage) (keyID, alg
 	}
 	keyIDParam, ok := psi.params["keyid"]
 	if !ok {
-		return "", "", fmt.Errorf("missing \"keyid\" parameter")
+		return nil, fmt.Errorf("missing \"keyid\" parameter")
 	}
-	keyID, ok = keyIDParam.(string)
+	keyID, ok := keyIDParam.(string)
 	if !ok {
-		return "", "", fmt.Errorf("malformed \"keyid\" parameter")
+		return nil, fmt.Errorf("malformed \"keyid\" parameter")
 	}
+	var alg string
 	algParam, ok := psi.params["alg"] // "alg" is optional
 	if ok {
 		alg, ok = algParam.(string)
 		if !ok {
-			return "", "", fmt.Errorf("malformed \"alg\" parameter")
+			return nil, fmt.Errorf("malformed \"alg\" parameter")
 		}
 	}
-	return keyID, alg, nil
+	return &MessageDetails{
+		KeyID:  keyID,
+		Alg:    alg,
+		Fields: psi.fields,
+	}, nil
 }
 
 //

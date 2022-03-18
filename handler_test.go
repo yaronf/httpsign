@@ -22,7 +22,7 @@ func Test_WrapHandler(t *testing.T) {
 	fetchSigner := func(res http.Response, r *http.Request) (string, *Signer) {
 		sigName := "sig1"
 		signer, _ := NewHMACSHA256Signer("key", bytes.Repeat([]byte{0}, 64), nil,
-			Headers("@status", "bar", "date"))
+			Headers("@status", "bar", "date", "Content-Digest"))
 		return sigName, signer
 	}
 
@@ -33,7 +33,7 @@ func Test_WrapHandler(t *testing.T) {
 		_, _ = fmt.Fprintln(w, "Hello again")
 	}
 	config := NewHandlerConfig().SetFetchVerifier(fetchVerifier).
-		SetFetchSigner(fetchSigner)
+		SetFetchSigner(fetchSigner).SetDigestScheme(DigestSha256)
 	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), *config))
 	defer ts.Close()
 
@@ -43,7 +43,7 @@ func Test_WrapHandler(t *testing.T) {
 
 	verifier, err := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), NewVerifyConfig(), *NewFields())
 	assert.NoError(t, err)
-	client := NewDefaultClient("sig1", signer, verifier, nil)
+	client := NewDefaultClient(NewClientConfig().SetSignatureName("sig1").SetSigner(signer).SetVerifier(verifier).SetDigestScheme(DigestSha256))
 	res, err := client.Get(ts.URL)
 	assert.NoError(t, err)
 	if res != nil {
@@ -119,7 +119,7 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 		}
 		verifier, _ := NewHMACSHA256Verifier("key", key, verifyConfig, *NewFields())
 
-		client := NewDefaultClient("sig1", nil, verifier, nil)
+		client := NewDefaultClient(NewClientConfig().SetSignatureName("sig1").SetVerifier(verifier))
 		res, err := client.Get(ts.URL)
 		if err == nil && res.StatusCode == 200 {
 			t.Errorf("Surprise! Server sent 200 OK and signature validation was successful.")
@@ -188,7 +188,7 @@ func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler
 	// don't do that in production.)
 	signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64),
 		NewSignConfig().SignCreated(false), Headers("@method"))
-	client := NewDefaultClient("sig22", signer, nil, nil) // sign, don't verify
+	client := NewDefaultClient(NewClientConfig().SetSignatureName("sig22").SetSigner(signer)) // sign, don't verify
 
 	// Send an HTTP GET, get response -- signing and verification happen behind the scenes
 	res, err := client.Get(ts.URL)

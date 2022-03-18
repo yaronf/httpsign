@@ -38,7 +38,7 @@ func ExampleWrapHandler_clientSigns() {
 	signer, _ := httpsign.NewHMACSHA256Signer("key", bytes.Repeat([]byte{0x99}, 64), nil,
 		*httpsign.NewFields().AddHeader("content-type").AddQueryParam("pet").AddHeader("@method"))
 
-	client := httpsign.NewDefaultClient("sig1", signer, nil, nil)
+	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig1").SetSigner(signer))
 	body := `{"hello": "world"}`
 	host := ts.URL // test server
 	path := "/foo?param=value&pet=dog"
@@ -77,7 +77,7 @@ func ExampleWrapHandler_serverSigns() {
 
 	// HTTP client code
 	verifier, _ := httpsign.NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), httpsign.NewVerifyConfig(), *httpsign.NewFields())
-	client := httpsign.NewDefaultClient("sig1", nil, verifier, nil)
+	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig1").SetVerifier(verifier))
 	res, err := client.Get(ts.URL)
 	if err != nil {
 		log.Fatal(err)

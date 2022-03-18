@@ -32,7 +32,7 @@ func ExampleClient_Get() {
 	// don't do that in production.)
 	signer, _ := httpsign.NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64),
 		httpsign.NewSignConfig().SignCreated(false), httpsign.Headers("@method"))
-	client := httpsign.NewDefaultClient("sig22", signer, nil, nil) // sign, don't verify
+	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig22").SetSigner(signer)) // sign, don't verify
 
 	// Send an HTTP GET, get response -- signing and verification happen behind the scenes
 	res, _ := client.Get(ts.URL)
@@ -109,8 +109,8 @@ func TestClientUsage(t *testing.T) {
 	// Create a signer and a wrapped HTTP client
 	signer, _ := httpsign.NewRSAPSSSigner("key1", *prvKey,
 		httpsign.NewSignConfig(),
-		httpsign.Headers("@request-target"))
-	client := httpsign.NewDefaultClient("sig1", signer, nil, nil) // sign requests, don't verify responses
+		httpsign.Headers("@request-target", "Content-Digest"))
+	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig1").SetSigner(signer)) // sign requests, don't verify responses
 
 	// Send an HTTP POST, get response -- signing and verification happen behind the scenes
 	body := `{"hello": "world"}`

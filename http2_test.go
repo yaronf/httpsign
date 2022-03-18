@@ -125,10 +125,10 @@ func simpleClient(t *testing.T, proto string, simpleHandler func(w http.Response
 	var client *Client
 	switch proto {
 	case "HTTP/1.1":
-		client = NewDefaultClient("sig1", signer, nil, nil)
+		client = NewDefaultClient(NewClientConfig().SetSignatureName("sig1").SetSigner(signer))
 	case "HTTP/2.0":
 		c := &http.Client{Transport: tr}
-		client = NewClient("sig1", signer, nil, nil, *c)
+		client = NewClient(*c, NewClientConfig().SetSignatureName("sig1").SetSigner(signer))
 	default:
 		t.Errorf("no client for you")
 	}

@@ -169,6 +169,8 @@ type HandlerConfig struct {
 	fetchVerifier func(r *http.Request) (sigName string, verifier *Verifier)
 	fetchSigner   func(res http.Response, r *http.Request) (sigName string, signer *Signer)
 	logger        *log.Logger
+	digestScheme  string
+	computeDigest bool
 }
 
 // NewHandlerConfig generates a default configuration. When verification or respectively,
@@ -179,6 +181,7 @@ func NewHandlerConfig() *HandlerConfig {
 		fetchVerifier:  nil,
 		fetchSigner:    nil,
 		logger:         log.New(os.Stderr, "httpsign: ", log.LstdFlags|log.Lmsgprefix),
+		computeDigest:  true,
 	}
 }
 
@@ -228,4 +231,78 @@ func (h *HandlerConfig) SetFetchSigner(f func(res http.Response, r *http.Request
 func (h *HandlerConfig) SetLogger(l *log.Logger) *HandlerConfig {
 	h.logger = l
 	return h
+}
+
+// SetComputeDigest when set to its default value (true), this flag indicates that
+// if the Content-Digest header is in the set of covered components but the header itself is missing,
+// the header value will be computed
+// and added to the message before sending it; conversely in received messages, if Content-Digest is covered, the digest
+// will be computed and validated. Setting the flag to false inhibits this behavior.
+func (h *HandlerConfig) SetComputeDigest(b bool) *HandlerConfig {
+	h.computeDigest = b
+	return h
+}
+
+// SetDigestScheme defines the scheme (cryptographic hash algorithm) to be used for the message digest.
+// It only needs to be set if a Content-Digest header is signed.
+func (h *HandlerConfig) SetDigestScheme(s string) *HandlerConfig {
+	h.digestScheme = s
+	return h
+}
+
+// ClientConfig contains additional configuration for the HTTP client-side wrapper.
+// Signing and verification may either be skipped, independently.
+type ClientConfig struct {
+	signatureName string
+	signer        *Signer
+	verifier      *Verifier
+	fetchVerifier func(res *http.Response, req *http.Request) (sigName string, verifier *Verifier)
+	computeDigest bool
+	digestScheme  string
+}
+
+// NewClientConfig creates a new, default ClientConfig.
+func NewClientConfig() *ClientConfig {
+	return &ClientConfig{computeDigest: true, digestScheme: DigestSha256}
+}
+
+// SetSignatureName sets the signature name to be used for signing or verification.
+func (c *ClientConfig) SetSignatureName(s string) *ClientConfig {
+	c.signatureName = s
+	return c
+}
+
+// SetSigner defines a signer for outgoing requests.
+func (c *ClientConfig) SetSigner(s *Signer) *ClientConfig {
+	c.signer = s
+	return c
+}
+
+// SetVerifier defines a verifier for incoming responses.
+func (c *ClientConfig) SetVerifier(v *Verifier) *ClientConfig {
+	c.verifier = v
+	return c
+}
+
+// SetFetchVerifier defines a function that fetches a verifier which may be customized for the incoming response.
+func (c *ClientConfig) SetFetchVerifier(fv func(res *http.Response, req *http.Request) (sigName string, verifier *Verifier)) *ClientConfig {
+	c.fetchVerifier = fv
+	return c
+}
+
+// SetComputeDigest when set to its default value (true), this flag indicates that
+// if the Content-Digest header is in the set of covered components but the header itself is missing,
+// the header value will be computed
+// and added to the message before sending it; conversely in received messages, if Content-Digest is covered, the digest
+// will be computed and validated. Setting the flag to false inhibits this behavior.
+func (c *ClientConfig) SetComputeDigest(b bool) *ClientConfig {
+	c.computeDigest = b
+	return c
+}
+
+// SetDigestScheme defines the cryptographic algorithm to use for the
+// Content-Digest header. Default: DigestSha256.
+func (c *ClientConfig) SetDigestScheme(s string) *ClientConfig {
+	c.digestScheme = s
+	return c
 }
