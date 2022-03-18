@@ -109,7 +109,7 @@ func TestClientUsage(t *testing.T) {
 	// Create a signer and a wrapped HTTP client
 	signer, _ := httpsign.NewRSAPSSSigner("key1", *prvKey,
 		httpsign.NewSignConfig(),
-		httpsign.Headers("@request-target", "Content-Digest"))
+		httpsign.Headers("@request-target", "Content-Digest")) // The Content-Digest header will be auto-generated
 	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig1").SetSigner(signer)) // sign requests, don't verify responses
 
 	// Send an HTTP POST, get response -- signing and verification happen behind the scenes

@@ -3,10 +3,13 @@ package httpsign
 import (
 	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -236,6 +239,66 @@ func TestClient_Head(t *testing.T) {
 			if !reflect.DeepEqual(gotRes, tt.wantRes) {
 				t.Errorf("Head() gotRes = %v, want %v", gotRes, tt.wantRes)
 			}
+		})
+	}
+}
+
+func TestClient_PostForm(t *testing.T) {
+	type fields struct {
+		config ClientConfig
+		client http.Client
+	}
+	type args struct {
+		url  string
+		data url.Values
+	}
+
+	ts := makeTestServer()
+	defer ts.Close()
+
+	tests := []struct {
+		name            string
+		fields          fields
+		args            args
+		wantRespHeaders []string
+		wantErr         assert.ErrorAssertionFunc
+	}{
+		{
+			name: "happy path",
+			fields: fields{
+				config: *NewClientConfig(),
+				client: *http.DefaultClient,
+			},
+			args: args{
+				url: ts.URL,
+				data: func() url.Values {
+					var v url.Values = url.Values{}
+					v.Add("k1", "v1")
+					v.Set("k2", "v2")
+					return v
+				}(),
+			},
+			wantRespHeaders: []string{"Content-Length", "Content-Type", "Date"},
+			wantErr:         assert.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Client{
+				config: tt.fields.config,
+				client: tt.fields.client,
+			}
+			gotResp, err := c.PostForm(tt.args.url, tt.args.data)
+			if !tt.wantErr(t, err, fmt.Sprintf("PostForm(%v, %v)", tt.args.url, tt.args.data)) {
+				return
+			}
+			headers := []string{}
+			for k, _ := range gotResp.Header {
+				headers = append(headers, k)
+			}
+			sort.Strings(headers)
+			assert.Equalf(t, tt.wantRespHeaders, headers, "PostForm(%v, %v)", tt.args.url, tt.args.data)
 		})
 	}
 }
