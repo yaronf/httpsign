@@ -34,7 +34,7 @@ func Test_WrapHandler(t *testing.T) {
 		_, _ = fmt.Fprintln(w, "Hello again")
 	}
 	config := NewHandlerConfig().SetFetchVerifier(fetchVerifier).
-		SetFetchSigner(fetchSigner).SetDigestScheme(DigestSha256)
+		SetFetchSigner(fetchSigner).SetDigestSchemesSend([]string{DigestSha256}).SetDigestSchemesRecv([]string{DigestSha256})
 	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), *config))
 	defer ts.Close()
 
@@ -44,7 +44,7 @@ func Test_WrapHandler(t *testing.T) {
 
 	verifier, err := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), NewVerifyConfig(), *NewFields())
 	assert.NoError(t, err)
-	client := NewDefaultClient(NewClientConfig().SetSignatureName("sig1").SetSigner(signer).SetVerifier(verifier).SetDigestScheme(DigestSha256))
+	client := NewDefaultClient(NewClientConfig().SetSignatureName("sig1").SetSigner(signer).SetVerifier(verifier).SetDigestSchemesSend([]string{DigestSha256}))
 	res, err := client.Post(ts.URL, "text/plain", strings.NewReader("Message body here"))
 	assert.NoError(t, err)
 	if res != nil {

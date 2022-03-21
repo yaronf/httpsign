@@ -17,7 +17,7 @@ import (
 func WrapHandler(h http.Handler, config HandlerConfig) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if config.fetchVerifier != nil {
-			err := verifyServerRequest(w, r, config)
+			err := verifyServerRequest(r, config)
 			if err != nil {
 				config.reqNotVerified(w, r, config.logger, err)
 				return
@@ -90,7 +90,7 @@ func signServerResponse(wrapped *wrappedResponseWriter, r *http.Request, config 
 	if signer.fields.hasHeader("Content-Digest") &&
 		wrapped.body != nil && config.computeDigest && wrapped.Header().Get("Content-Digest") == "" {
 		closer := io.NopCloser(bytes.NewReader(wrapped.body.Bytes()))
-		digest, err := GenerateContentDigest(&closer, config.digestScheme)
+		digest, err := GenerateContentDigestHeader(&closer, config.digestSchemesSend)
 		if err != nil {
 			return err
 		}
@@ -135,7 +135,7 @@ func (w *wrappedResponseWriter) WriteHeader(code int) {
 	w.wroteHeader = true
 }
 
-func verifyServerRequest(w http.ResponseWriter, r *http.Request, config HandlerConfig) error {
+func verifyServerRequest(r *http.Request, config HandlerConfig) error {
 	if config.fetchVerifier == nil {
 		return fmt.Errorf("could not fetch a Verifier")
 	}
@@ -148,16 +148,13 @@ func verifyServerRequest(w http.ResponseWriter, r *http.Request, config HandlerC
 		return err
 	}
 	if config.computeDigest && details.Fields.hasHeader("Content-Digest") { // if Content-Digest is signed
-		receivedContentDigest := r.Header.Get("Content-Digest")
-		if r.Body == nil {
+		receivedContentDigest := r.Header.Values("Content-Digest")
+		if r.Body == nil && len(receivedContentDigest) > 0 {
 			return fmt.Errorf("found Content-Digest but no message body")
 		}
-		digest, err := GenerateContentDigest(&r.Body, config.digestScheme)
+		err := ValidateContentDigestHeader(receivedContentDigest, &r.Body, config.digestSchemesRecv)
 		if err != nil {
 			return err
-		}
-		if receivedContentDigest != digest {
-			return fmt.Errorf("bad Content-Digest received")
 		}
 	}
 	return VerifyRequest(sigName, *verifier, r)

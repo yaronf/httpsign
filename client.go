@@ -82,16 +82,13 @@ func verifyClientResponse(req *http.Request, conf ClientConfig, res *http.Respon
 			return fmt.Errorf("fetchVerifier returned a nil verifier")
 		}
 	}
-	receivedContentDigest := res.Header.Get("Content-Digest")
+	receivedContentDigest := res.Header.Values("Content-Digest")
 	if conf.computeDigest &&
-		res.Body != nil && receivedContentDigest != "" {
+		res.Body != nil && len(receivedContentDigest) > 0 {
 		// verify the header even if not explicitly required by verifier field list
-		digest, err := GenerateContentDigest(&res.Body, conf.digestScheme)
+		err := ValidateContentDigestHeader(receivedContentDigest, &res.Body, conf.digestSchemesRecv)
 		if err != nil {
 			return err
-		}
-		if receivedContentDigest != digest {
-			return fmt.Errorf("bad Content-Digest received")
 		}
 	}
 	err := VerifyResponse(signatureName, *verifier, res)
@@ -104,11 +101,11 @@ func verifyClientResponse(req *http.Request, conf ClientConfig, res *http.Respon
 func signClientRequest(req *http.Request, conf ClientConfig) error {
 	if conf.computeDigest && conf.signer.fields.hasHeader("Content-Digest") &&
 		req.Body != nil && req.Header.Get("Content-Digest") == "" {
-		digest, err := GenerateContentDigest(&req.Body, conf.digestScheme)
+		header, err := GenerateContentDigestHeader(&req.Body, conf.digestSchemesSend)
 		if err != nil {
 			return err
 		}
-		req.Header.Add("Content-Digest", digest)
+		req.Header.Set("Content-Digest", header)
 	}
 	sigInput, sig, err := SignRequest(conf.signatureName, *conf.signer, req)
 	if err != nil {

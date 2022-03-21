@@ -166,22 +166,25 @@ func NewVerifyConfig() *VerifyConfig {
 type HandlerConfig struct {
 	reqNotVerified func(w http.ResponseWriter,
 		r *http.Request, logger *log.Logger, err error)
-	fetchVerifier func(r *http.Request) (sigName string, verifier *Verifier)
-	fetchSigner   func(res http.Response, r *http.Request) (sigName string, signer *Signer)
-	logger        *log.Logger
-	digestScheme  string
-	computeDigest bool
+	fetchVerifier     func(r *http.Request) (sigName string, verifier *Verifier)
+	fetchSigner       func(res http.Response, r *http.Request) (sigName string, signer *Signer)
+	logger            *log.Logger
+	computeDigest     bool
+	digestSchemesSend []string
+	digestSchemesRecv []string
 }
 
 // NewHandlerConfig generates a default configuration. When verification or respectively,
 // signing is required, the respective "fetch" callback must be supplied.
 func NewHandlerConfig() *HandlerConfig {
 	return &HandlerConfig{
-		reqNotVerified: defaultReqNotVerified,
-		fetchVerifier:  nil,
-		fetchSigner:    nil,
-		logger:         log.New(os.Stderr, "httpsign: ", log.LstdFlags|log.Lmsgprefix),
-		computeDigest:  true,
+		reqNotVerified:    defaultReqNotVerified,
+		fetchVerifier:     nil,
+		fetchSigner:       nil,
+		logger:            log.New(os.Stderr, "httpsign: ", log.LstdFlags|log.Lmsgprefix),
+		computeDigest:     true,
+		digestSchemesSend: []string{DigestSha256},
+		digestSchemesRecv: []string{DigestSha256, DigestSha512},
 	}
 }
 
@@ -243,27 +246,40 @@ func (h *HandlerConfig) SetComputeDigest(b bool) *HandlerConfig {
 	return h
 }
 
-// SetDigestScheme defines the scheme (cryptographic hash algorithm) to be used for the message digest.
-// It only needs to be set if a Content-Digest header is signed.
-func (h *HandlerConfig) SetDigestScheme(s string) *HandlerConfig {
-	h.digestScheme = s
+// SetDigestSchemesSend defines the scheme(s) (cryptographic hash algorithms) to be used to generate the message digest.
+// It only needs to be set if a Content-Digest header is signed. Default: DigestSha256
+func (h *HandlerConfig) SetDigestSchemesSend(s []string) *HandlerConfig {
+	h.digestSchemesSend = s
+	return h
+}
+
+// SetDigestSchemesRecv defines the cryptographic algorithms to accept when receiving the
+// Content-Digest header. Any recognized algorithm's digest must be correct, but the overall header is valid if at least
+// one accepted digest is included. Default: DigestSha256, DigestSha512.
+func (h *HandlerConfig) SetDigestSchemesRecv(s []string) *HandlerConfig {
+	h.digestSchemesRecv = s
 	return h
 }
 
 // ClientConfig contains additional configuration for the HTTP client-side wrapper.
 // Signing and verification may either be skipped, independently.
 type ClientConfig struct {
-	signatureName string
-	signer        *Signer
-	verifier      *Verifier
-	fetchVerifier func(res *http.Response, req *http.Request) (sigName string, verifier *Verifier)
-	computeDigest bool
-	digestScheme  string
+	signatureName     string
+	signer            *Signer
+	verifier          *Verifier
+	fetchVerifier     func(res *http.Response, req *http.Request) (sigName string, verifier *Verifier)
+	computeDigest     bool
+	digestSchemesSend []string
+	digestSchemesRecv []string
 }
 
 // NewClientConfig creates a new, default ClientConfig.
 func NewClientConfig() *ClientConfig {
-	return &ClientConfig{computeDigest: true, digestScheme: DigestSha256}
+	return &ClientConfig{
+		computeDigest:     true,
+		digestSchemesSend: []string{DigestSha256},
+		digestSchemesRecv: []string{DigestSha256, DigestSha512},
+	}
 }
 
 // SetSignatureName sets the signature name to be used for signing or verification.
@@ -300,9 +316,17 @@ func (c *ClientConfig) SetComputeDigest(b bool) *ClientConfig {
 	return c
 }
 
-// SetDigestScheme defines the cryptographic algorithm to use for the
+// SetDigestSchemesSend defines the cryptographic algorithms to use when generating the
 // Content-Digest header. Default: DigestSha256.
-func (c *ClientConfig) SetDigestScheme(s string) *ClientConfig {
-	c.digestScheme = s
+func (c *ClientConfig) SetDigestSchemesSend(s []string) *ClientConfig {
+	c.digestSchemesSend = s
+	return c
+}
+
+// SetDigestSchemesRecv defines the cryptographic algorithms to accept when receiving the
+// Content-Digest header. Any recognized algorithm's digest must be correct, but the overall header is valid if at least
+// one accepted digest is included. Default: DigestSha256, DigestSha512.
+func (c *ClientConfig) SetDigestSchemesRecv(s []string) *ClientConfig {
+	c.digestSchemesRecv = s
 	return c
 }

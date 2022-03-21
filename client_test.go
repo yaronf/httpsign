@@ -294,7 +294,7 @@ func TestClient_PostForm(t *testing.T) {
 				return
 			}
 			headers := []string{}
-			for k, _ := range gotResp.Header {
+			for k := range gotResp.Header {
 				headers = append(headers, k)
 			}
 			sort.Strings(headers)
