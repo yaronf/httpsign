@@ -23,9 +23,9 @@ var wantFields = `"kuku": my awesome header
 "@target-uri": {{.Scheme}}://127.0.0.1:{{.Port}}/path?k1=v1&k2
 "@path": /path
 "@query": ?k1=v1&k2
-"@query-params";name="k1": v1
-"@query-params";name="k2": 
-"@signature-params": ("kuku" "@query" "@method" "@target-uri" "@authority" "@scheme" "@target-uri" "@path" "@query" "@query-params";name="k1" "@query-params";name="k2");alg="hmac-sha256";keyid="key1"`
+"@query-param";name="k1": v1
+"@query-param";name="k2": 
+"@signature-params": ("kuku" "@query" "@method" "@target-uri" "@authority" "@scheme" "@target-uri" "@path" "@query" "@query-param";name="k1" "@query-param";name="k2");alg="hmac-sha256";keyid="key1"`
 
 func execTemplate(t template.Template, name string, data interface{}) (string, error) {
 	buf := &bytes.Buffer{}

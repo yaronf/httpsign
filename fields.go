@@ -112,7 +112,7 @@ func (fs *Fields) AddOptionalHeader(hdr string) *Fields {
 
 func fromQueryParam(qp string) *field {
 	q := strings.ToLower(qp)
-	i := httpsfv.NewItem("@query-params")
+	i := httpsfv.NewItem("@query-param")
 	i.Params.Add("name", q)
 	f := field(i)
 	return &f
@@ -120,7 +120,7 @@ func fromQueryParam(qp string) *field {
 
 func (f field) queryParam() (bool, string) {
 	name, err := f.name()
-	if err == nil && name == "@query-params" {
+	if err == nil && name == "@query-param" {
 		v, ok := httpsfv.Item(f).Params.Get("name")
 		if ok {
 			return true, v.(string)

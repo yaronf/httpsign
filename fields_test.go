@@ -36,7 +36,7 @@ func TestFields_asSignatureInput(t *testing.T) {
 			args: args{
 				p: httpsfv.NewParams(),
 			},
-			want:    `("hdr-name" "@query-params";name="qparamname")`,
+			want:    `("hdr-name" "@query-param";name="qparamname")`,
 			wantErr: false,
 		},
 	}

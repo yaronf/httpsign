@@ -1523,8 +1523,8 @@ func TestOptionalSign(t *testing.T) {
 	assert.NoError(t, err, "Could not create signer")
 	signatureInput, _, signatureBase, err = signRequestDebug("sig1", *signer2, req)
 	assert.NoError(t, err, "Should not fail with query params")
-	assert.Equal(t, "sig1=(\"date\" \"x-optional\" \"@query-params\";name=\"bar\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
-	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@query-params\";name=\"bar\": baz\n\"@signature-params\": (\"date\" \"x-optional\" \"@query-params\";name=\"bar\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
+	assert.Equal(t, "sig1=(\"date\" \"x-optional\" \"@query-param\";name=\"bar\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
+	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@query-param\";name=\"bar\": baz\n\"@signature-params\": (\"date\" \"x-optional\" \"@query-param\";name=\"bar\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
 
 	res1 := readResponse(httpres2)
 	res1.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a b c)")
