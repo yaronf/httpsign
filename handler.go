@@ -12,6 +12,8 @@ import (
 
 // WrapHandler wraps a server's HTTP request handler so that the incoming request is verified
 // and the response is signed. Both operations are optional.
+// Side effects: when signing, the wrapped handler adds a Signature and a Signature-input header. If the
+// Content-Digest header is included in the list of signed components, it is generated and added to the response.
 // Note: unlike the standard net.http behavior, for the "Content-Type" header to be signed,
 // it should be created explicitly.
 func WrapHandler(h http.Handler, config HandlerConfig) http.Handler {

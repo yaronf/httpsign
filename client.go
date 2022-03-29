@@ -13,6 +13,8 @@ import (
 // The fetchVerifier callback allows to generate a Verifier based on the particular response.
 // Either Verifier or fetchVerifier may be specified, but not both.
 // The client embeds an http.Client, which in most cases can be http.DefaultClient.
+// Side effects: when signing, the Client adds a Signature and a Signature-input header. If the
+// Content-Digest header is included in the list of signed components, it is generated and added to the request.
 type Client struct {
 	config ClientConfig
 	client http.Client

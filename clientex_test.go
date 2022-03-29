@@ -109,10 +109,10 @@ func TestClientUsage(t *testing.T) {
 	// Create a signer and a wrapped HTTP client
 	signer, _ := httpsign.NewRSAPSSSigner("key1", *prvKey,
 		httpsign.NewSignConfig(),
-		httpsign.Headers("@request-target", "Content-Digest")) // The Content-Digest header will be auto-generated
+		httpsign.Headers("@request-target", "content-digest")) // The Content-Digest header will be auto-generated
 	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig1").SetSigner(signer)) // sign requests, don't verify responses
 
-	// Send an HTTP POST, get response -- signing and verification happen behind the scenes
+	// Send an HTTP POST, get response -- signing happens behind the scenes
 	body := `{"hello": "world"}`
 	res, err := client.Post(ts.URL, "application/json", bufio.NewReader(strings.NewReader(body)))
 	if err != nil {
@@ -124,5 +124,4 @@ func TestClientUsage(t *testing.T) {
 	_ = res.Body.Close()
 
 	fmt.Println("Server sent: ", string(serverText))
-	// Output: Server sent:  Hey client, you sent a signature with these parameters: sig22=("@method");alg="hmac-sha256";keyid="key1"
 }
