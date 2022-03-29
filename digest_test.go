@@ -96,9 +96,9 @@ func TestValidateContentDigestHeader(t *testing.T) {
 	err = ValidateContentDigestHeader(hdr, &res6.Body, []string{DigestSha256})
 	assert.Error(t, err, "digest mismatch")
 
-	// TODO fix when the draft is modified,https://github.com/httpwg/http-extensions/pull/2049
+	// Response taken from the draft,see https://github.com/httpwg/http-extensions/pull/2049
 	res7 := readResponse(httpres4)
 	hdr = res7.Header.Values("Content-Digest")
 	err = ValidateContentDigestHeader(hdr, &res7.Body, []string{DigestSha512})
-	assert.Error(t, err, "digest mismatch?")
+	assert.NoError(t, err, "digest mismatch?")
 }
