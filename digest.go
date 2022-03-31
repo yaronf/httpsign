@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/sha512"
+	"errors"
 	"fmt"
 	"github.com/dunglas/httpsfv"
 	"io"
@@ -59,6 +60,8 @@ func duplicateBody(body *io.ReadCloser) (*bytes.Buffer, error) {
 	return buff, nil
 }
 
+var unknownDigestScheme = fmt.Errorf("unknown digest scheme")
+
 func rawDigest(s string, scheme string) ([]byte, error) {
 	switch scheme {
 	case DigestSha256:
@@ -68,7 +71,7 @@ func rawDigest(s string, scheme string) ([]byte, error) {
 		s := sha512.Sum512([]byte(s))
 		return s[:], nil
 	default:
-		return nil, fmt.Errorf("unknown digest scheme")
+		return nil, unknownDigestScheme
 	}
 }
 
@@ -88,7 +91,7 @@ func validateSchemes(schemes []string) error {
 // "Values" method of the header. Returns nil if validation is successful.
 func ValidateContentDigestHeader(received []string, body *io.ReadCloser, accepted []string) error {
 	if len(accepted) == 0 {
-		return fmt.Errorf("received no digest schemes to accept")
+		return fmt.Errorf("received an empty list of acceptable digest schemes")
 	}
 	err := validateSchemes(accepted)
 	if err != nil {
@@ -118,8 +121,10 @@ found:
 	// But regardless of the list of accepted schemes, all included digest values (if recognized) must be correct
 	for _, scheme := range receivedDict.Names() {
 		raw, err := rawDigest(buff.String(), scheme)
-		if err != nil {
+		if errors.Is(err, unknownDigestScheme) {
 			continue // unknown schemes are ignored
+		} else if err != nil {
+			return err
 		}
 		m, _ := receivedDict.Get(scheme)
 		i, ok := m.(httpsfv.Item)
