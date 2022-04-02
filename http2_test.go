@@ -18,6 +18,7 @@ var wantFields = `"kuku": my awesome header
 "@query": ?k1=v1&k2
 "@method": GET
 "@target-uri": {{.Scheme}}://127.0.0.1:{{.Port}}/path?k1=v1&k2
+"@request-target": /path?k1=v1&k2
 "@authority": 127.0.0.1:{{.Port}}
 "@scheme": {{.Scheme}}
 "@target-uri": {{.Scheme}}://127.0.0.1:{{.Port}}/path?k1=v1&k2
@@ -25,7 +26,7 @@ var wantFields = `"kuku": my awesome header
 "@query": ?k1=v1&k2
 "@query-param";name="k1": v1
 "@query-param";name="k2": 
-"@signature-params": ("kuku" "@query" "@method" "@target-uri" "@authority" "@scheme" "@target-uri" "@path" "@query" "@query-param";name="k1" "@query-param";name="k2");alg="hmac-sha256";keyid="key1"`
+"@signature-params": ("kuku" "@query" "@method" "@target-uri" "@request-target" "@authority" "@scheme" "@target-uri" "@path" "@query" "@query-param";name="k1" "@query-param";name="k2");alg="hmac-sha256";keyid="key1"`
 
 func execTemplate(t template.Template, name string, data interface{}) (string, error) {
 	buf := &bytes.Buffer{}
@@ -116,7 +117,7 @@ func simpleClient(t *testing.T, proto string, simpleHandler func(w http.Response
 
 	signer, err := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{0x03}, 64),
 		NewSignConfig().SignCreated(false),
-		*NewFields().AddHeaders("kuku", "@query", "@method", "@target-uri", "@authority", "@scheme", "@target-uri",
+		*NewFields().AddHeaders("kuku", "@query", "@method", "@target-uri", "@request-target", "@authority", "@scheme", "@target-uri",
 			"@path", "@query").AddQueryParam("k1").AddQueryParam("k2"))
 	if err != nil {
 		t.Errorf("failed to create signer")

@@ -1367,6 +1367,14 @@ Example-Dict:  a=1,    b=2;x=1;y=2,   c=(a   b   c)
 
 `
 
+var httpreq5 = `GET /foo HTTP/1.1
+Host: www.example.com
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Cache-Control: max-age=60
+Cache-Control:    must-revalidate
+
+`
+
 func Test_signRequestDebug(t *testing.T) {
 	type args struct {
 		signatureName string
@@ -1441,6 +1449,30 @@ func Test_signRequestDebug(t *testing.T) {
 			wantSignatureInput: "sig1=(\"cache-control\" \"example-dict\";key=\"a\" \"example-dict\";key=\"b\" \"example-dict\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
 			wantSignature:      "sig1=:ZgRaU7rBGNrMr2aEpKjXYU6sReB0V+Uks2jpm30jh24=:",
 			wantSignatureBase:  "\"cache-control\": max-age=60, must-revalidate\n\"example-dict\";key=\"a\": 1\n\"example-dict\";key=\"b\": 2;x=1;y=2\n\"example-dict\";key=\"c\": (a b c)\n\"@signature-params\": (\"cache-control\" \"example-dict\";key=\"a\" \"example-dict\";key=\"b\" \"example-dict\";key=\"c\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:            false,
+		},
+		{
+			name: "issue #1, @request-target",
+			args: args{
+				signatureName: "sig1",
+				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), Headers("@request-target")),
+				req:           readRequest(httpreq2),
+			},
+			wantSignatureInput: "sig1=(\"@request-target\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:      "sig1=:z8fRhDS1tbmNinLWIUKLGgUT7e/Kk4lda3zwGVxJJGA=:",
+			wantSignatureBase:  "\"@request-target\": /foo?param=value&pet=dog&pet=snake&bar=baz\n\"@signature-params\": (\"@request-target\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:            false,
+		},
+		{
+			name: "issue #1, @request-target, no path params",
+			args: args{
+				signatureName: "sig1",
+				signer:        makeHMACSigner(*NewSignConfig().SignCreated(false), Headers("@request-target")),
+				req:           readRequest(httpreq5),
+			},
+			wantSignatureInput: "sig1=(\"@request-target\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:      "sig1=:QH4dlxNv1P4mbPlWE3PwOc3sp1oeC2rE/OESjve4JJQ=:",
+			wantSignatureBase:  "\"@request-target\": /foo\n\"@signature-params\": (\"@request-target\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
 			wantErr:            false,
 		},
 	}
