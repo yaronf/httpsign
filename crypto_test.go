@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jws"
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"strings"
 	"testing"
@@ -273,7 +274,7 @@ func TestNewJWSVerifier(t *testing.T) {
 				alg:    jwa.SignatureAlgorithm("HS256"),
 				key:    "1234",
 				keyID:  "key200",
-				config: NewVerifyConfig(),
+				config: nil,
 				fields: *NewFields(),
 			},
 			want: &Verifier{
@@ -329,4 +330,22 @@ func TestNewJWSVerifier(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVerify(t *testing.T) {
+	v := Verifier{
+		keyID:           "",
+		key:             nil,
+		alg:             "bad-alg",
+		config:          NewVerifyConfig(),
+		fields:          Fields{},
+		foreignVerifier: nil,
+	}
+	_, err := v.verify([]byte{1, 2, 3}, []byte{4, 5, 6})
+	assert.ErrorContains(t, err, "unknown", "bad algorithm")
+
+	v.alg = "hmac-sha256"
+	v.foreignVerifier = struct{ xx int }{7}
+	_, err = v.verify([]byte{1, 2, 3}, []byte{4, 5, 6})
+	assert.ErrorContains(t, err, "expected", "bad algorithm")
 }

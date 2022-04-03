@@ -9,6 +9,8 @@ require (
 	github.com/stretchr/testify v1.7.1
 )
 
+// TODO bump jwx to v2 when it is stable
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.0-20210816181553-5444fa50b93d // indirect

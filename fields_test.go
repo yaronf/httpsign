@@ -2,6 +2,7 @@ package httpsign
 
 import (
 	"github.com/dunglas/httpsfv"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -50,6 +51,25 @@ func TestFields_asSignatureInput(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("asSignatureBase() got = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func Test_field_String(t *testing.T) {
+	tests := []struct {
+		name string
+		f    field
+		want string
+	}{
+		{
+			name: "field to string",
+			f:    *fromQueryParam("qp1"),
+			want: "\"@query-param\";name=\"qp1\"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, tt.f.String(), "String()")
 		})
 	}
 }

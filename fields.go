@@ -27,10 +27,10 @@ type field httpsfv.Item
 func (f field) String() string {
 	i := httpsfv.Item(f)
 	s, err := httpsfv.Marshal(i)
-	if err != nil {
+	if err == nil {
 		return s
 	}
-	return err.Error()
+	return fmt.Sprintf("malformed field: %v", err)
 }
 
 func (f field) Equal(f2 field) bool {

@@ -1216,7 +1216,7 @@ func TestRequestResponse(t *testing.T) {
 	req.Header.Add("Signature", sig1)
 
 	// Server verifies request and signs response
-	verifier1, err := NewP256Verifier("key9", *pub1, NewVerifyConfig(), Headers("@request-target"))
+	verifier1, err := NewP256Verifier("key9", *pub1, nil, Headers("@request-target"))
 	if err != nil {
 		t.Errorf("Could not create verifier: %v", err)
 	}
