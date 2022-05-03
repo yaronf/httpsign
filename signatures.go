@@ -199,9 +199,6 @@ func signRequestDebug(signatureName string, signer Signer, req *http.Request) (s
 	if signatureName == "" {
 		return "", "", "", fmt.Errorf("empty signature name")
 	}
-	if signer.config.requestResponse != nil {
-		return "", "", "", fmt.Errorf("use request-response only to sign responses")
-	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
 		return "", "", "", err
@@ -229,20 +226,7 @@ func signResponseDebug(signatureName string, signer Signer, res *http.Response) 
 	if err != nil {
 		return "", "", "", err
 	}
-	extendedFields := addPseudoHeaders(parsedMessage, signer.config.requestResponse, signer.fields)
-	return signMessage(*signer.config, signatureName, signer, *parsedMessage, extendedFields)
-}
-
-// Handle the special header-like @request-response
-func addPseudoHeaders(message *parsedMessage, rr *requestResponse, fields Fields) Fields {
-	if rr != nil {
-		rrfield := fromRequestResponse(rr.name)
-		message.headers.Add("@request-response", rr.name+"="+rr.signature)
-
-		fields.f = append(fields.f, *rrfield)
-		return fields
-	}
-	return fields
+	return signMessage(*signer.config, signatureName, signer, *parsedMessage, signer.fields)
 }
 
 //
@@ -258,9 +242,6 @@ func verifyRequestDebug(signatureName string, verifier Verifier, req *http.Reque
 	}
 	if signatureName == "" {
 		return "", fmt.Errorf("empty signature name")
-	}
-	if verifier.config.requestResponse != nil {
-		return "", fmt.Errorf("use request-response only to verify responses")
 	}
 	parsedMessage, err := parseRequest(req)
 	if err != nil {
@@ -303,34 +284,6 @@ func ResponseDetails(signatureName string, res *http.Response) (details *Message
 		return nil, err
 	}
 	return messageDetails(signatureName, *parsedMessage)
-}
-
-// GetRequestSignature returns the base64-encoded signature, parsed from a signed request.
-// This is useful for the request-response feature.
-func GetRequestSignature(req *http.Request, signatureName string) (string, error) {
-	if req == nil {
-		return "", fmt.Errorf("nil request")
-	}
-	if signatureName == "" {
-		return "", fmt.Errorf("empty signature name")
-	}
-	parsedMessage, err := parseRequest(req)
-	if err != nil {
-		return "", err
-	}
-	ws, err := parsedMessage.getDictHeader("signature", signatureName)
-	if err != nil {
-		return "", fmt.Errorf("missing \"Signature\" header for \"%s\"", signatureName)
-	}
-	if len(ws) > 1 {
-		return "", fmt.Errorf("more than one \"Signature\" value for \"%s\"", signatureName)
-	}
-	sigHeader := ws[0]
-	sigRaw, err := parseWantSignature(sigHeader)
-	if err != nil {
-		return "", err
-	}
-	return encodeBytes(sigRaw), nil
 }
 
 func messageDetails(signatureName string, parsedMessage parsedMessage) (details *MessageDetails, err error) {
@@ -383,8 +336,7 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response)
 	if err != nil {
 		return err
 	}
-	extendedFields := addPseudoHeaders(parsedMessage, verifier.config.requestResponse, verifier.fields)
-	_, err = verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, extendedFields)
+	_, err = verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, verifier.fields)
 	return err
 }
 

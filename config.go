@@ -8,16 +8,13 @@ import (
 	"time"
 )
 
-type requestResponse struct{ name, signature string }
-
 // SignConfig contains additional configuration for the signer.
 type SignConfig struct {
-	signAlg         bool
-	signCreated     bool
-	fakeCreated     int64
-	expires         int64
-	nonce           string
-	requestResponse *requestResponse
+	signAlg     bool
+	signCreated bool
+	fakeCreated int64
+	expires     int64
+	nonce       string
 }
 
 // NewSignConfig generates a default configuration.
@@ -64,23 +61,15 @@ func (c *SignConfig) SetNonce(nonce string) *SignConfig {
 	return c
 }
 
-// SetRequestResponse allows the server to indicate the signature name and signature that
-// it had received in a client's request and include them in the signature input of the response.
-func (c *SignConfig) SetRequestResponse(name, signature string) *SignConfig {
-	c.requestResponse = &requestResponse{name, signature}
-	return c
-}
-
 // VerifyConfig contains additional configuration for the verifier.
 type VerifyConfig struct {
-	verifyCreated   bool
-	notNewerThan    time.Duration
-	notOlderThan    time.Duration
-	allowedAlgs     []string
-	rejectExpired   bool
-	requestResponse *requestResponse
-	verifyKeyID     bool
-	dateWithin      time.Duration
+	verifyCreated bool
+	notNewerThan  time.Duration
+	notOlderThan  time.Duration
+	allowedAlgs   []string
+	rejectExpired bool
+	verifyKeyID   bool
+	dateWithin    time.Duration
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,
@@ -116,17 +105,6 @@ func (v *VerifyConfig) SetRejectExpired(rejectExpired bool) *VerifyConfig {
 // Default: an empty list, signifying all values are accepted.
 func (v *VerifyConfig) SetAllowedAlgs(allowedAlgs []string) *VerifyConfig {
 	v.allowedAlgs = allowedAlgs
-	return v
-}
-
-// SetRequestResponse allows the server to indicate signature name and signature that
-// it had received from a client and include it in the signature input. Here this is configured
-// on the client side when verifying the response.
-func (v *VerifyConfig) SetRequestResponse(name, signature string) *VerifyConfig {
-	v.requestResponse = &requestResponse{
-		name:      name,
-		signature: signature,
-	}
 	return v
 }
 

@@ -206,13 +206,6 @@ func (fs *Fields) AddOptionalStructuredField(hdr string) *Fields {
 	return fs
 }
 
-func fromRequestResponse(sigName string) *field {
-	i := httpsfv.NewItem("@request-response")
-	i.Params.Add("key", sigName)
-	f := field(i)
-	return &f
-}
-
 func (f field) toItem() httpsfv.Item {
 	return httpsfv.Item(f)
 }

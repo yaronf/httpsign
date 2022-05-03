@@ -91,7 +91,6 @@ func generateReqDerivedComponents(req *http.Request) components {
 	derivedComponent("@scheme", scScheme(theURL), components)
 	derivedComponent("@request-target", scRequestTarget(theURL), components)
 	derivedComponent("@query", scQuery(theURL), components)
-	// @request-response does not belong here
 	return components
 }
 
