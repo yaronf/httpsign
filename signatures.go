@@ -8,15 +8,15 @@ import (
 	"time"
 )
 
-func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage parsedMessage,
+func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage, parsedAssocMessage *parsedMessage,
 	fields Fields) (signatureInput, signature, signatureBase string, err error) {
-	filtered := filterOptionalFields(fields, parsedMessage)
+	filtered := filterOptionalFields(fields, parsedMessage, parsedAssocMessage)
 	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, signer.foreignSigner, filtered)
 	if err != nil {
 		return "", "", "", err
 	}
 	signatureInput = fmt.Sprintf("%s=%s", signatureName, sigParams)
-	signatureBase, err = generateSignatureBase(parsedMessage, filtered, sigParams)
+	signatureBase, err = generateSignatureBase(parsedMessage, parsedAssocMessage, filtered, sigParams)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -27,17 +27,26 @@ func signMessage(config SignConfig, signatureName string, signer Signer, parsedM
 	return signatureInput, signature, signatureBase, nil
 }
 
-func filterOptionalFields(fields Fields, message parsedMessage) Fields {
+func filterOptionalFields(fields Fields, message, assocMessage *parsedMessage) Fields {
 	filtered := *NewFields()
 	for _, f := range fields.f {
 		if !f.isOptional() {
 			filtered.f = append(filtered.f, f)
 		} else {
-			_, err := generateFieldValues(f, message)
-			if err == nil { // value was found
-				ff := f.copy()
-				ff.unmarkOptional()
-				filtered.f = append(filtered.f, ff)
+			if !f.forAssociatedRequest() {
+				_, err := generateFieldValues(f, *message)
+				if err == nil { // value was found
+					ff := f.copy()
+					ff.unmarkOptional()
+					filtered.f = append(filtered.f, ff)
+				}
+			} else if assocMessage != nil {
+				_, err := generateFieldValues(f, *assocMessage)
+				if err == nil { // value was found
+					ff := f.copy()
+					ff.unmarkOptional()
+					filtered.f = append(filtered.f, ff)
+				}
 			}
 		}
 	}
@@ -58,16 +67,27 @@ func encodeBytes(raw []byte) string {
 	return s
 }
 
-func generateSignatureBase(message parsedMessage, fields Fields, params string) (string, error) {
+func generateSignatureBase(message, assocMessage *parsedMessage, fields Fields, params string) (string, error) {
 	inp := ""
 	for _, c := range fields.f {
 		f, err := c.asSignatureBase()
 		if err != nil {
 			return "", fmt.Errorf("could not marshal %v", f)
 		}
-		fieldValues, err := generateFieldValues(c, message)
-		if err != nil {
-			return "", err
+		var fieldValues []string
+		if !c.forAssociatedRequest() {
+			fieldValues, err = generateFieldValues(c, *message)
+			if err != nil {
+				return "", err
+			}
+		} else {
+			if assocMessage == nil {
+				return "", fmt.Errorf("required field %s but no associated message", c.String())
+			}
+			fieldValues, err = generateFieldValues(c, *assocMessage)
+			if err != nil {
+				return "", err
+			}
 		}
 		for _, v := range fieldValues {
 			inp += fmt.Sprintf("%s: %s\n", f, v)
@@ -203,30 +223,35 @@ func signRequestDebug(signatureName string, signer Signer, req *http.Request) (s
 	if err != nil {
 		return "", "", "", err
 	}
-	return signMessage(*signer.config, signatureName, signer, *parsedMessage, signer.fields)
+	return signMessage(*signer.config, signatureName, signer, parsedMessage, nil, signer.fields)
 }
 
 //
 // SignResponse signs an HTTP response. Returns the Signature-Input and the Signature header values.
+// The req parameter (optional) is the associated request.
 //
-func SignResponse(signatureName string, signer Signer, res *http.Response) (signatureInput, signature string, err error) {
-	signatureInput, signature, signatureBase, err := signResponseDebug(signatureName, signer, res)
+func SignResponse(signatureName string, signer Signer, res *http.Response, req *http.Request) (signatureInput, signature string, err error) {
+	signatureInput, signature, signatureBase, err := signResponseDebug(signatureName, signer, res, req)
 	_ = signatureBase
 	return
 }
 
-func signResponseDebug(signatureName string, signer Signer, res *http.Response) (signatureInput, signature, signatureBase string, err error) {
+func signResponseDebug(signatureName string, signer Signer, res *http.Response, req *http.Request) (signatureInput, signature, signatureBase string, err error) {
 	if res == nil {
 		return "", "", "", fmt.Errorf("nil response")
 	}
 	if signatureName == "" {
 		return "", "", "", fmt.Errorf("empty signature name")
 	}
-	parsedMessage, err := parseResponse(res)
+	parsedRes, err := parseResponse(res)
 	if err != nil {
 		return "", "", "", err
 	}
-	return signMessage(*signer.config, signatureName, signer, *parsedMessage, signer.fields)
+	parsedReq, err := parseRequest(req)
+	if err != nil {
+		return "", "", "", err
+	}
+	return signMessage(*signer.config, signatureName, signer, parsedRes, parsedReq, signer.fields)
 }
 
 //
@@ -247,7 +272,7 @@ func verifyRequestDebug(signatureName string, verifier Verifier, req *http.Reque
 	if err != nil {
 		return "", err
 	}
-	return verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, verifier.fields)
+	return verifyMessage(*verifier.config, signatureName, verifier, parsedMessage, nil, verifier.fields)
 }
 
 // MessageDetails aggregates the details of a signed message
@@ -325,7 +350,7 @@ func messageDetails(signatureName string, parsedMessage parsedMessage) (details 
 //
 // VerifyResponse verifies a signed HTTP response. Returns an error if verification failed for any reason, otherwise nil.
 //
-func VerifyResponse(signatureName string, verifier Verifier, res *http.Response) (err error) {
+func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, req *http.Request) (err error) { // TODO
 	if res == nil {
 		return fmt.Errorf("nil response")
 	}
@@ -336,11 +361,15 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response)
 	if err != nil {
 		return err
 	}
-	_, err = verifyMessage(*verifier.config, signatureName, verifier, *parsedMessage, verifier.fields)
+	parsedAssocMessage, err := parseRequest(req)
+	if err != nil {
+		return err
+	}
+	_, err = verifyMessage(*verifier.config, signatureName, verifier, parsedMessage, parsedAssocMessage, verifier.fields)
 	return err
 }
 
-func verifyMessage(config VerifyConfig, name string, verifier Verifier, message parsedMessage, fields Fields) (string, error) {
+func verifyMessage(config VerifyConfig, name string, verifier Verifier, message, assocMessage *parsedMessage, fields Fields) (string, error) {
 	wsi, err := message.getDictHeader("signature-input", name)
 	if err != nil {
 		return "", fmt.Errorf("missing \"signature-input\" header, or cannot find signature \"%s\": %w", name, err)
@@ -365,15 +394,15 @@ func verifyMessage(config VerifyConfig, name string, verifier Verifier, message 
 	if err != nil {
 		return "", err
 	}
-	filtered := filterOptionalFields(fields, message)
+	filtered := filterOptionalFields(fields, message, assocMessage)
 	if !(psiSig.fields.contains(&filtered)) {
 		return "", fmt.Errorf("actual signature does not cover all required fields")
 	}
-	err = applyVerificationPolicy(verifier, message, psiSig, config)
+	err = applyVerificationPolicy(verifier, *message, psiSig, config)
 	if err != nil {
 		return "", err
 	}
-	signatureBase, err := generateSignatureBase(message, psiSig.fields, psiSig.origSigParams)
+	signatureBase, err := generateSignatureBase(message, assocMessage, psiSig.fields, psiSig.origSigParams)
 	if err != nil {
 		return "", err
 	}

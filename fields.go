@@ -96,16 +96,19 @@ func (f field) headerName() (bool, string) {
 
 // AddHeader appends a bare header name, e.g. "cache-control".
 func (fs *Fields) AddHeader(hdr string) *Fields {
-	f := fromHeaderName(hdr)
-	fs.f = append(fs.f, *f)
-	return fs
+	return fs.AddHeaderExt(hdr, false, false)
 }
 
 // AddOptionalHeader appends a bare header name, e.g. "cache-control". The field is optional, see type documentation
 // for details.
-func (fs *Fields) AddOptionalHeader(hdr string) *Fields {
+func (fs *Fields) AddHeaderExt(hdr string, optional, associatedRequest bool) *Fields {
 	f := fromHeaderName(hdr)
-	f.markOptional()
+	if optional {
+		f.markOptional()
+	}
+	if associatedRequest {
+		f.markAssociatedRequest()
+	}
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -131,16 +134,19 @@ func (f field) queryParam() (bool, string) {
 
 // AddQueryParam indicates a request for a specific query parameter to be signed.
 func (fs *Fields) AddQueryParam(qp string) *Fields {
-	f := fromQueryParam(qp)
-	fs.f = append(fs.f, *f)
-	return fs
+	return fs.AddQueryParamExt(qp, false, false)
 }
 
 // AddOptionalQueryParam indicates a request for a specific query parameter to be signed. The field is optional,
 // see type documentation for details.
-func (fs *Fields) AddOptionalQueryParam(qp string) *Fields {
+func (fs *Fields) AddQueryParamExt(qp string, optional, associatedRequest bool) *Fields {
 	f := fromQueryParam(qp)
-	f.markOptional()
+	if optional {
+		f.markOptional()
+	}
+	if associatedRequest {
+		f.markAssociatedRequest()
+	}
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -163,16 +169,19 @@ func (f field) dictHeader() (ok bool, hdr, key string) {
 
 // AddDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified.
 func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
-	f := fromDictHeader(hdr, key)
-	fs.f = append(fs.f, *f)
-	return fs
+	return fs.AddDictHeaderExt(hdr, key, false, false)
 }
 
 // AddOptionalDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified.
 // The field is optional, see type documentation for details.
-func (fs *Fields) AddOptionalDictHeader(hdr, key string) *Fields {
+func (fs *Fields) AddDictHeaderExt(hdr, key string, optional, associatedRequest bool) *Fields {
 	f := fromDictHeader(hdr, key)
-	f.markOptional()
+	if optional {
+		f.markOptional()
+	}
+	if associatedRequest {
+		f.markAssociatedRequest()
+	}
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -192,16 +201,19 @@ func (f field) structuredField() bool {
 
 // AddStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941.
 func (fs *Fields) AddStructuredField(hdr string) *Fields {
-	f := fromStructuredField(hdr)
-	fs.f = append(fs.f, *f)
-	return fs
+	return fs.AddStructuredFieldExt(hdr, false, false)
 }
 
 // AddOptionalStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941.
 // The field is optional, see type documentation for details.
-func (fs *Fields) AddOptionalStructuredField(hdr string) *Fields {
+func (fs *Fields) AddStructuredFieldExt(hdr string, optional, associatedRequest bool) *Fields {
 	f := fromStructuredField(hdr)
-	f.markOptional()
+	if optional {
+		f.markOptional()
+	}
+	if associatedRequest {
+		f.markAssociatedRequest()
+	}
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -222,6 +234,13 @@ func (f field) markOptional() {
 	f.Params.Add("optional", true)
 }
 
+func (f field) markAssociatedRequest() {
+	if f.Params == nil {
+		f.Params = httpsfv.NewParams()
+	}
+	f.Params.Add("req", true)
+}
+
 func (f field) unmarkOptional() {
 	if f.Params == nil {
 		f.Params = httpsfv.NewParams()
@@ -232,6 +251,19 @@ func (f field) unmarkOptional() {
 func (f field) isOptional() bool {
 	if f.Params != nil {
 		v, ok := f.Params.Get("optional")
+		if ok {
+			vv, ok2 := v.(bool)
+			if ok2 {
+				return vv
+			}
+		}
+	}
+	return false
+}
+
+func (f field) forAssociatedRequest() bool {
+	if f.Params != nil {
+		v, ok := f.Params.Get("req")
 		if ok {
 			vv, ok2 := v.(bool)
 			if ok2 {

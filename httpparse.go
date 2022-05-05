@@ -19,6 +19,9 @@ type parsedMessage struct {
 }
 
 func parseRequest(req *http.Request) (*parsedMessage, error) {
+	if req == nil {
+		return nil, nil
+	}
 	err := validateMessageHeaders(req.Header)
 	if err != nil {
 		return nil, err

@@ -669,7 +669,7 @@ func TestCreated(t *testing.T) {
 		res := readResponse(httpres2)
 		nowStr := time.Now().UTC().Format(http.TimeFormat)
 		res.Header.Set("Date", nowStr)
-		sigInput, sig, _ := SignResponse(signatureName, *signer, res)
+		sigInput, sig, _ := SignResponse(signatureName, *signer, res, nil)
 
 		res2 := readResponse(httpres2)
 		res2.Header.Set("Date", nowStr)
@@ -679,7 +679,7 @@ func TestCreated(t *testing.T) {
 		if err != nil {
 			t.Errorf("could not generate Verifier: %s", err)
 		}
-		err = VerifyResponse(signatureName, *verifier, res2)
+		err = VerifyResponse(signatureName, *verifier, res2, nil)
 
 		if wantSuccess && err != nil {
 			t.Errorf("verification error: %s", err)
@@ -731,7 +731,7 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	config := NewSignConfig().SetExpires(999)                                   // should have expired long ago (but will be ignored by verifier)
 	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields) // default config
 	res := readResponse(httpres2)
-	sigInput, sig, _ := SignResponse(signatureName, *signer, res)
+	sigInput, sig, _ := SignResponse(signatureName, *signer, res, nil)
 
 	res2 := readResponse(httpres2)
 	res2.Header.Add("Signature", sig)
@@ -740,7 +740,7 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
-	err = VerifyResponse(signatureName, *verifier, res2)
+	err = VerifyResponse(signatureName, *verifier, res2, nil)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
 	}
@@ -923,7 +923,7 @@ func TestSignResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := SignResponse(tt.args.signatureName, tt.args.signer, tt.args.res)
+			got, got1, err := SignResponse(tt.args.signatureName, tt.args.signer, tt.args.res, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SignResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1209,7 +1209,7 @@ func TestDictionary(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not create signer")
 	}
-	sigInput2, sig2, err := SignResponse("sig2", *signer2, res)
+	sigInput2, sig2, err := SignResponse("sig2", *signer2, res, nil)
 	if err != nil {
 		t.Errorf("Could not sign response: %v", err)
 	}
@@ -1222,7 +1222,7 @@ func TestDictionary(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not create verifier: %v", err)
 	}
-	err = VerifyResponse("sig2", *verifier2, res)
+	err = VerifyResponse("sig2", *verifier2, res, nil)
 	if err != nil {
 		t.Errorf("Could not verify response: %v", err)
 	}
@@ -1238,7 +1238,7 @@ func TestMultipleSignatures(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not create signer")
 	}
-	sigInput1, sig1, err := SignResponse("sig2", *signer1, res)
+	sigInput1, sig1, err := SignResponse("sig2", *signer1, res, nil)
 	if err != nil {
 		t.Errorf("Could not sign response: %v", err)
 	}
@@ -1253,7 +1253,7 @@ func TestMultipleSignatures(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not create signer")
 	}
-	sigInput2, sig2, err := SignResponse("proxy_sig", *signer2, res)
+	sigInput2, sig2, err := SignResponse("proxy_sig", *signer2, res, nil)
 	if err != nil {
 		t.Errorf("Proxy could not sign response: %v", err)
 	}
@@ -1459,7 +1459,7 @@ func TestVerifyResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := VerifyResponse(tt.args.signatureName, tt.args.verifier, tt.args.res); (err != nil) != tt.wantErr {
+			if err := VerifyResponse(tt.args.signatureName, tt.args.verifier, tt.args.res, nil); (err != nil) != tt.wantErr {
 				t.Errorf("VerifyResponse() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1468,7 +1468,7 @@ func TestVerifyResponse(t *testing.T) {
 
 func TestOptionalSign(t *testing.T) {
 	req := readRequest(httpreq2)
-	f1 := NewFields().AddHeader("date").AddOptionalHeader("x-optional")
+	f1 := NewFields().AddHeader("date").AddHeaderExt("x-optional", true, false)
 	key1 := bytes.Repeat([]byte{0x55}, 64)
 	signer1, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f1)
 	assert.NoError(t, err, "Could not create signer")
@@ -1483,7 +1483,7 @@ func TestOptionalSign(t *testing.T) {
 	assert.Equal(t, "sig1=(\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
 	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@signature-params\": (\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
 
-	f2 := f1.AddOptionalQueryParam("bla").AddOptionalQueryParam("bar")
+	f2 := f1.AddQueryParamExt("bla", true, false).AddQueryParamExt("bar", true, false)
 	signer2, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f2)
 	assert.NoError(t, err, "Could not create signer")
 	signatureInput, _, signatureBase, err = signRequestDebug("sig1", *signer2, req)
@@ -1493,29 +1493,51 @@ func TestOptionalSign(t *testing.T) {
 
 	res1 := readResponse(httpres2)
 	res1.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a b c)")
-	f3 := NewFields().AddOptionalDictHeader("x-dictionary", "a").AddOptionalDictHeader("x-dictionary", "zz")
+	f3 := NewFields().AddDictHeaderExt("x-dictionary", "a", true, false).AddDictHeaderExt("x-dictionary", "zz", true, false)
 	signer3, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f3)
 	assert.NoError(t, err, "Could not create signer")
-	signatureInput, _, signatureBase, err = signResponseDebug("sig1", *signer3, res1)
+	signatureInput, _, signatureBase, err = signResponseDebug("sig1", *signer3, res1, nil)
 	assert.NoError(t, err, "Should not fail with dict headers")
 	assert.Equal(t, "sig1=(\"x-dictionary\";key=\"a\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
 	assert.Equal(t, "\"x-dictionary\";key=\"a\": 1\n\"@signature-params\": (\"x-dictionary\";key=\"a\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
 
 	res2 := readResponse(httpres2)
 	res2.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a  b  c)")
-	f4 := NewFields().AddOptionalStructuredField("x-dictionary").AddOptionalStructuredField("x-not-a-dictionary")
+	f4 := NewFields().AddStructuredFieldExt("x-dictionary", true, false).AddStructuredFieldExt("x-not-a-dictionary", true, false)
 	signer4, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f4)
 	assert.NoError(t, err, "Could not create signer")
-	signatureInput, _, signatureBase, err = signResponseDebug("sig1", *signer4, res2)
+	signatureInput, _, signatureBase, err = signResponseDebug("sig1", *signer4, res2, nil)
 	assert.NoError(t, err, "Should not fail with structured fields")
 	assert.Equal(t, "sig1=(\"x-dictionary\";sf);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
 	assert.Equal(t, "\"x-dictionary\";sf: a=1, b=2;x=1;y=2, c=(a b c)\n\"@signature-params\": (\"x-dictionary\";sf);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
 }
 
+func TestAssocMessage(t *testing.T) {
+	key1 := bytes.Repeat([]byte{0x66}, 64)
+	assocReq := readRequest(httpreq2)
+	res1 := readResponse(httpres2)
+	res1.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a b c)")
+	f3 := NewFields().AddDictHeaderExt("x-dictionary", "a", true, false).AddDictHeaderExt("x-dictionary", "zz", true, false).
+		AddQueryParamExt("pet", false, true)
+	signer3, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f3)
+	assert.NoError(t, err, "Could not create signer")
+	signatureInput, signature, signatureBase, err := signResponseDebug("sig1", *signer3, res1, assocReq)
+	assert.NoError(t, err, "Should not fail with dict headers")
+	assert.Equal(t, "sig1=(\"x-dictionary\";key=\"a\" \"@query-param\";name=\"pet\";req);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
+	assert.Equal(t, "\"x-dictionary\";key=\"a\": 1\n\"@query-param\";name=\"pet\";req: dog\n\"@query-param\";name=\"pet\";req: snake\n\"@signature-params\": (\"x-dictionary\";key=\"a\" \"@query-param\";name=\"pet\";req);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
+	res1.Header.Add("Signature-Input", signatureInput)
+	res1.Header.Add("Signature", signature)
+
+	verifier, err := NewHMACSHA256Verifier("key1", key1, NewVerifyConfig().SetVerifyCreated(false), *f3)
+	assert.NoError(t, err, "Should create verifier")
+	err = VerifyResponse("sig1", *verifier, res1, assocReq)
+	assert.NoError(t, err, "Verification should succeed")
+}
+
 func TestOptionalVerify(t *testing.T) {
 	req := readRequest(httpreq2)
 	req.Header.Add("X-Opt1", "val1")
-	f1 := NewFields().AddHeader("date").AddOptionalHeader("x-opt1")
+	f1 := NewFields().AddHeader("date").AddHeaderExt("x-opt1", true, false)
 	key1 := bytes.Repeat([]byte{0x66}, 64)
 	signer, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(8888), *f1)
 	assert.NoError(t, err, "Could not create signer")

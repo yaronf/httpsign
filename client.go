@@ -93,7 +93,7 @@ func verifyClientResponse(req *http.Request, conf ClientConfig, res *http.Respon
 			return err
 		}
 	}
-	err := VerifyResponse(signatureName, *verifier, res)
+	err := VerifyResponse(signatureName, *verifier, res, nil)
 	if err != nil {
 		return err
 	}
