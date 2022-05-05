@@ -11,8 +11,8 @@ import (
 	"crypto/sha512"
 	"crypto/subtle"
 	"fmt"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jws"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jws"
 )
 
 // Signer includes a cryptographic key (typically a private key) and configuration of what needs to be signed.

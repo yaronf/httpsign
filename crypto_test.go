@@ -3,8 +3,8 @@ package httpsign
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jws"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/stretchr/testify/assert"
 	"reflect"
 	"strings"
