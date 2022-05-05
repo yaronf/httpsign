@@ -108,9 +108,8 @@ func scQuery(url *url.URL) string {
 func scRequestTarget(url *url.URL) string {
 	if url.RawQuery == "" {
 		return url.Path
-	} else {
-		return url.Path + "?" + url.RawQuery
 	}
+	return url.Path + "?" + url.RawQuery
 }
 
 func scScheme(url *url.URL) string {

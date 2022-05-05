@@ -99,7 +99,7 @@ func signServerResponse(wrapped *wrappedResponseWriter, r *http.Request, config 
 		wrapped.Header().Add("Content-Digest", digest)
 	}
 
-	signatureInput, signature, err := SignResponse(sigName, *signer, &response, nil)
+	signatureInput, signature, err := SignResponse(sigName, *signer, &response, r)
 	if err != nil {
 		return fmt.Errorf("failed to sign the response: %w", err)
 	}

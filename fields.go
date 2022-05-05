@@ -99,8 +99,8 @@ func (fs *Fields) AddHeader(hdr string) *Fields {
 	return fs.AddHeaderExt(hdr, false, false)
 }
 
-// AddOptionalHeader appends a bare header name, e.g. "cache-control". The field is optional, see type documentation
-// for details.
+// AddHeaderExt appends a bare header name, e.g. "cache-control". See type documentation
+// for details on optional parameters. The component can be marked as coming from an associated request.
 func (fs *Fields) AddHeaderExt(hdr string, optional, associatedRequest bool) *Fields {
 	f := fromHeaderName(hdr)
 	if optional {
@@ -137,8 +137,8 @@ func (fs *Fields) AddQueryParam(qp string) *Fields {
 	return fs.AddQueryParamExt(qp, false, false)
 }
 
-// AddOptionalQueryParam indicates a request for a specific query parameter to be signed. The field is optional,
-// see type documentation for details.
+// AddQueryParamExt indicates a request for a specific query parameter to be signed. See type documentation
+// for details on optional parameters. The component can be marked as coming from an associated request.
 func (fs *Fields) AddQueryParamExt(qp string, optional, associatedRequest bool) *Fields {
 	f := fromQueryParam(qp)
 	if optional {
@@ -172,8 +172,9 @@ func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
 	return fs.AddDictHeaderExt(hdr, key, false, false)
 }
 
-// AddOptionalDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified.
-// The field is optional, see type documentation for details.
+// AddDictHeaderExt indicates that out of a header structured as a dictionary, a specific key value is signed/verified.
+// See type documentation
+// for details on optional parameters. The component can be marked as coming from an associated request.
 func (fs *Fields) AddDictHeaderExt(hdr, key string, optional, associatedRequest bool) *Fields {
 	f := fromDictHeader(hdr, key)
 	if optional {
@@ -204,8 +205,9 @@ func (fs *Fields) AddStructuredField(hdr string) *Fields {
 	return fs.AddStructuredFieldExt(hdr, false, false)
 }
 
-// AddOptionalStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941.
-// The field is optional, see type documentation for details.
+// AddStructuredFieldExt indicates that a header should be interpreted as a structured field, per RFC 8941.
+// See type documentation
+// for details on optional parameters. The component can be marked as coming from an associated request.
 func (fs *Fields) AddStructuredFieldExt(hdr string, optional, associatedRequest bool) *Fields {
 	f := fromStructuredField(hdr)
 	if optional {

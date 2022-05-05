@@ -60,7 +60,7 @@ func duplicateBody(body *io.ReadCloser) (*bytes.Buffer, error) {
 	return buff, nil
 }
 
-var unknownDigestScheme = fmt.Errorf("unknown digest scheme")
+var errUnknownDigestScheme = fmt.Errorf("unknown digest scheme")
 
 func rawDigest(s string, scheme string) ([]byte, error) {
 	switch scheme {
@@ -71,7 +71,7 @@ func rawDigest(s string, scheme string) ([]byte, error) {
 		s := sha512.Sum512([]byte(s))
 		return s[:], nil
 	default:
-		return nil, unknownDigestScheme
+		return nil, errUnknownDigestScheme
 	}
 }
 
@@ -121,7 +121,7 @@ found:
 	// But regardless of the list of accepted schemes, all included digest values (if recognized) must be correct
 	for _, scheme := range receivedDict.Names() {
 		raw, err := rawDigest(buff.String(), scheme)
-		if errors.Is(err, unknownDigestScheme) {
+		if errors.Is(err, errUnknownDigestScheme) {
 			continue // unknown schemes are ignored
 		} else if err != nil {
 			return err
