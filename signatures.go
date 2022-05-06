@@ -349,24 +349,28 @@ func messageDetails(signatureName string, parsedMessage parsedMessage) (details 
 
 //
 // VerifyResponse verifies a signed HTTP response. Returns an error if verification failed for any reason, otherwise nil.
-//
-func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, req *http.Request) (err error) { // TODO
+func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, req *http.Request) error {
+	_, err := verifyResponseDebug(signatureName, verifier, res, req)
+	return err
+}
+
+func verifyResponseDebug(signatureName string, verifier Verifier, res *http.Response, req *http.Request) (signatureBase string, err error) {
 	if res == nil {
-		return fmt.Errorf("nil response")
+		return "", fmt.Errorf("nil response")
 	}
 	if signatureName == "" {
-		return fmt.Errorf("empty signature name")
+		return "", fmt.Errorf("empty signature name")
 	}
 	parsedMessage, err := parseResponse(res)
 	if err != nil {
-		return err
+		return "", err
 	}
 	parsedAssocMessage, err := parseRequest(req)
 	if err != nil {
-		return err
+		return "", err
 	}
-	_, err = verifyMessage(*verifier.config, signatureName, verifier, parsedMessage, parsedAssocMessage, verifier.fields)
-	return err
+	signatureBase, err = verifyMessage(*verifier.config, signatureName, verifier, parsedMessage, parsedAssocMessage, verifier.fields)
+	return signatureBase, err
 }
 
 func verifyMessage(config VerifyConfig, name string, verifier Verifier, message, assocMessage *parsedMessage, fields Fields) (string, error) {

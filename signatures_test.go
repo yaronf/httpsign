@@ -1534,6 +1534,55 @@ func TestAssocMessage(t *testing.T) {
 	assert.NoError(t, err, "Verification should succeed")
 }
 
+var httpreq6 = `POST /foo?param=Value&Pet=dog HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Content-Type: application/json
+Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+Content-Length: 18
+Signature-Input: sig1=("@method" "@authority" "@path" "content-digest" "content-length" "content-type");created=1618884475;keyid="test-key-rsa-pss"
+Signature:  sig1=:LAH8BjcfcOcLojiuOBFWn0P5keD3xAOuJRGziCLuD8r5MW9S0RoXXLzLSRfGY/3SF8kVIkHjE13SEFdTo4Af/fJ/Pu9wheqoLVdwXyY/UkBIS1M8Brc8IODsn5DFIrG0IrburbLi0uCc+E2ZIIb6HbUJ+o+jP58JelMTe0QE3IpWINTEzpxjqDf5/Df+InHCAkQCTuKsamjWXUpyOT1Wkxi7YPVNOjW4MfNuTZ9HdbD2Tr65+BXeTG9ZS/9SWuXAc+BZ8WyPz0QRz//ec3uWXd7bYYODSjRAxHqX+S1ag3LZElYyUKaAIjZ8MGOt4gXEwCSLDv/zqxZeWLj/PDkn6w==:
+
+{"hello": "world"}
+`
+
+var httpres6 = `HTTP/1.1 503 Service Unavailable
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Content-Type: application/json
+Content-Length: 62
+Signature-Input: reqres=("@status" "content-length" "content-type" "signature";req;key="sig1");created=1618884479;keyid="test-key-ecc-p256"
+Signature: reqres=:vR1E+sDgh0J3dZyVdPc7mK0ZbEMW3N47eDpFjXLE9g95Gx1KQLpdOmDQfedgdLzaFCqfD0WPn9e9/jubyUuZRw==:
+
+{"busy": true, "message": "Your call is very important to us"}
+`
+
+// ";req" use case from draft
+func TestRequestBinding(t *testing.T) {
+	req := readRequest(httpreq6)
+	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+	if err != nil {
+		t.Errorf("cannot read public key: %v", err)
+	}
+	contentDigest := req.Header.Values("Content-Digest")
+	err = ValidateContentDigestHeader(contentDigest, &req.Body, []string{DigestSha512})
+	assert.NoError(t, err, "validate digest")
+	fields := *NewFields()
+	verifier, err := NewRSAPSSVerifier("test-key-rsa-pss", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	assert.NoError(t, err, "create verifier")
+	_, err = verifyRequestDebug("sig1", *verifier, req)
+	// fmt.Println(sigBase)
+	// assert.NoError(t, err, "verify request") // TODO: does not verify
+
+	res := readResponse(httpres6)
+	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
+	assert.NoError(t, err, "read pub key")
+	fields2 := *NewFields()
+	verifier2, err := NewP256Verifier("test-key-ecc-p256", *pubKey2, NewVerifyConfig().SetVerifyCreated(false), fields2)
+	assert.NoError(t, err, "create verifier")
+	err = VerifyResponse("reqres", *verifier2, res, req)
+	assert.NoError(t, err, "verify response")
+}
+
 func TestOptionalVerify(t *testing.T) {
 	req := readRequest(httpreq2)
 	req.Header.Add("X-Opt1", "val1")
