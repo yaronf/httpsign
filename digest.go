@@ -87,7 +87,8 @@ func validateSchemes(schemes []string) error {
 
 // ValidateContentDigestHeader validates that the Content-Digest header complies to policy: at least
 // one of the "accepted" schemes is used, and all known schemes are associated with a correct
-// digest of the message body. Note that "received" is a string array, typically retrieved through the
+// digest of the message body. Schemes are constants defined in this file, e.g. DigestSha256.
+// Note that "received" is a string array, typically retrieved through the
 // "Values" method of the header. Returns nil if validation is successful.
 func ValidateContentDigestHeader(received []string, body *io.ReadCloser, accepted []string) error {
 	if len(accepted) == 0 {

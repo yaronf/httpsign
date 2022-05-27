@@ -1556,7 +1556,7 @@ Signature: reqres=:vR1E+sDgh0J3dZyVdPc7mK0ZbEMW3N47eDpFjXLE9g95Gx1KQLpdOmDQfedgd
 {"busy": true, "message": "Your call is very important to us"}
 `
 
-// ";req" use case from draft
+// ";req" use case from draft, Sec. 2.3 of draft -10
 func TestRequestBinding(t *testing.T) {
 	req := readRequest(httpreq6)
 	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
@@ -1569,9 +1569,10 @@ func TestRequestBinding(t *testing.T) {
 	fields := *NewFields()
 	verifier, err := NewRSAPSSVerifier("test-key-rsa-pss", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	assert.NoError(t, err, "create verifier")
-	_, err = verifyRequestDebug("sig1", *verifier, req)
+	sigBase, err := verifyRequestDebug("sig1", *verifier, req)
+	_ = sigBase
 	// fmt.Println(sigBase)
-	// assert.NoError(t, err, "verify request") // TODO: does not verify
+	// assert.NoError(t, err, "verify request") // Note: does not verify
 
 	res := readResponse(httpres6)
 	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
