@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -45,8 +46,11 @@ func WrapHandler(h http.Handler, config HandlerConfig) http.Handler {
 // This error case is not optional, as it's always a server bug
 func sigFailed(w http.ResponseWriter, _ *http.Request, logger *log.Logger, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
-	if logger != nil {
-		logger.Printf("Failed to sign response: %v\n", err)
+	if logger != nil { // sanitize error string, just in case
+		escapedErr := err.Error()
+		escapedErr = strings.Replace(escapedErr, "\n", "", -1)
+		escapedErr = strings.Replace(escapedErr, "\r", "", -1)
+		logger.Printf("Failed to sign response: %v\n", escapedErr)
 	}
 	_, _ = fmt.Fprintln(w, "Failed to sign response.") // For security reasons, error is not printed
 }
