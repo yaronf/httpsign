@@ -1468,7 +1468,7 @@ func TestVerifyResponse(t *testing.T) {
 
 func TestOptionalSign(t *testing.T) {
 	req := readRequest(httpreq2)
-	f1 := NewFields().AddHeader("date").AddHeaderExt("x-optional", true, false)
+	f1 := NewFields().AddHeader("date").AddHeaderExt("x-optional", true, false, false)
 	key1 := bytes.Repeat([]byte{0x55}, 64)
 	signer1, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f1)
 	assert.NoError(t, err, "Could not create signer")
@@ -1587,7 +1587,7 @@ func TestRequestBinding(t *testing.T) {
 func TestOptionalVerify(t *testing.T) {
 	req := readRequest(httpreq2)
 	req.Header.Add("X-Opt1", "val1")
-	f1 := NewFields().AddHeader("date").AddHeaderExt("x-opt1", true, false)
+	f1 := NewFields().AddHeader("date").AddHeaderExt("x-opt1", true, false, false)
 	key1 := bytes.Repeat([]byte{0x66}, 64)
 	signer, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(8888), *f1)
 	assert.NoError(t, err, "Could not create signer")
@@ -1621,4 +1621,42 @@ func TestOptionalVerify(t *testing.T) {
 	req.Header.Del("X-Opt1")
 	err = VerifyRequest("sig1", *verifier, req)
 	assert.NoError(t, err, "Should not fail: absent and not signed")
+}
+
+func TestBinarySequence(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	assert.NoError(t, err, "failed to generate key")
+	res := readResponse(httpres2)
+	res.Header.Add("Set-Cookie", "a=1, b=2;x=1;y=2, c=(a b c)")
+	res.Header.Add("Set-Cookie", "d=5, eee")
+
+	// First signature try fails
+	signer1, err := NewP256Signer("key20", *priv, NewSignConfig(),
+		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, false, false))
+	assert.NoError(t, err, "could not create signer")
+	sigInput, sig, err := SignResponse("sig2", *signer1, res, nil)
+	assert.Error(t, err, "signature should have failed")
+
+	signer2, err := NewP256Signer("key20", *priv, NewSignConfig().setFakeCreated(1659563420),
+		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, true, false))
+	assert.NoError(t, err, "could not create signer")
+	sigInput, sig, sigBase, err := signResponseDebug("sig2", *signer2, res, nil)
+	assert.NoError(t, err, "could not sign response")
+	assert.Equal(t, "\"@status\": 200\n\"set-cookie\";bs: :YT0xLCBiPTI7eD0xO3k9MiwgYz0oYSBiIGMp:, :ZD01LCBlZWU=:\n\"@signature-params\": (\"@status\" \"set-cookie\";bs);created=1659563420;alg=\"ecdsa-p256-sha256\";keyid=\"key20\"", sigBase, "unexpected signature base")
+	res.Header.Add("Signature-Input", sigInput)
+	res.Header.Add("Signature", sig)
+
+	// Client verifies response - should fail
+	verifier1, err := NewP256Verifier("key20", *pub, NewVerifyConfig().SetVerifyCreated(false),
+		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, false, false))
+	assert.NoError(t, err, "could not create verifier")
+	err = VerifyResponse("sig2", *verifier1, res, nil)
+	assert.Error(t, err, "binary sequence verified as non-bs")
+
+	// Client verifies response - should succeed
+	verifier2, err := NewP256Verifier("key20", *pub, NewVerifyConfig().SetVerifyCreated(false),
+		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, true, false))
+	assert.NoError(t, err, "could not create verifier")
+	err = VerifyResponse("sig2", *verifier2, res, nil)
+	assert.NoError(t, err, "could not verify response")
 }

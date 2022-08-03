@@ -11,6 +11,10 @@ import (
 func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage, parsedAssocMessage *parsedMessage,
 	fields Fields) (signatureInput, signature, signatureBase string, err error) {
 	filtered := filterOptionalFields(fields, parsedMessage, parsedAssocMessage)
+	err = applyFieldConstraints(fields)
+	if err != nil {
+		return "", "", "", err
+	}
 	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, signer.foreignSigner, filtered)
 	if err != nil {
 		return "", "", "", err
@@ -25,6 +29,20 @@ func signMessage(config SignConfig, signatureName string, signer Signer, parsedM
 		return "", "", "", err
 	}
 	return signatureInput, signature, signatureBase, nil
+}
+
+func applyFieldConstraints(fields Fields) error {
+	binaryFields := map[string]bool{"set-cookie": true}
+	for _, f := range fields.f {
+		name, err := f.name()
+		if err != nil {
+			return fmt.Errorf("malformed field")
+		}
+		if binaryFields[name] && !f.isBinarySequence() {
+			return fmt.Errorf("field %s should be a binary sequence", name)
+		}
+	}
+	return nil
 }
 
 func filterOptionalFields(fields Fields, message, assocMessage *parsedMessage) Fields {
@@ -108,7 +126,7 @@ func generateFieldValues(f field, message parsedMessage) ([]string, error) {
 			}
 			return []string{vv}, nil
 		}
-		return message.getHeader(name, f.structuredField())
+		return message.getHeader(name, f.structuredField(), f.binarySequence())
 	}
 	ok, name = f.queryParam()
 	if ok {
@@ -125,23 +143,33 @@ func generateFieldValues(f field, message parsedMessage) ([]string, error) {
 	return nil, fmt.Errorf("unrecognized field %s", f)
 }
 
-func (message *parsedMessage) getHeader(hdr string, structured bool) ([]string, error) {
+func (message *parsedMessage) getHeader(hdr string, structured, binary bool) ([]string, error) {
+	if structured && binary {
+		return nil, fmt.Errorf("the \"bs\" and \"sf\" flags are incompatible")
+	}
 	vv, found := message.headers[hdr] // normal header, cannot use "Values" on lowercased header name
 	if !found {
 		return nil, fmt.Errorf("header %s not found", hdr)
 	}
-	if !structured {
+	if binary {
+		s := encodeBytes([]byte(vv[0]))
+		for _, v := range vv[1:] {
+			s += ", " + encodeBytes([]byte(v))
+		}
+		return []string{s}, nil
+	} else if structured {
+		sfv, err := httpsfv.UnmarshalDictionary(vv)
+		if err != nil {
+			return nil, fmt.Errorf("could not unmarshal %s, possibly not a structured field: %w", hdr, err)
+		}
+		s, err := httpsfv.Marshal(sfv)
+		if err != nil {
+			return nil, fmt.Errorf("could not re-marshal %s", hdr)
+		}
+		return []string{s}, nil
+	} else {
 		return []string{foldFields(vv)}, nil
 	}
-	sfv, err := httpsfv.UnmarshalDictionary(vv)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal %s, possibly not a structured field: %w", hdr, err)
-	}
-	s, err := httpsfv.Marshal(sfv)
-	if err != nil {
-		return nil, fmt.Errorf("could not re-marshal %s", hdr)
-	}
-	return []string{s}, nil
 }
 
 func (message *parsedMessage) getDictHeader(hdr, member string) ([]string, error) {

@@ -44,6 +44,13 @@ func (f field) Equal(f2 field) bool {
 				return false
 			}
 		}
+		for _, p := range f2.Params.Names() {
+			v1, _ := f2.Params.Get(p)
+			v2, ok := f.Params.Get(p)
+			if !ok || v1 != v2 {
+				return false
+			}
+		}
 		return true
 	}
 	return false
@@ -70,8 +77,8 @@ func NewFields() *Fields {
 	return &fs
 }
 
-func (f *field) name() (string, error) {
-	i := httpsfv.Item(*f)
+func (f field) name() (string, error) {
+	i := httpsfv.Item(f)
 	n, ok := i.Value.(string)
 	if !ok {
 		return "", fmt.Errorf("field has a non-string value")
@@ -96,18 +103,16 @@ func (f field) headerName() (bool, string) {
 
 // AddHeader appends a bare header name, e.g. "cache-control".
 func (fs *Fields) AddHeader(hdr string) *Fields {
-	return fs.AddHeaderExt(hdr, false, false)
+	return fs.AddHeaderExt(hdr, false, false, false)
 }
 
 // AddHeaderExt appends a bare header name, e.g. "cache-control". See type documentation
 // for details on optional parameters. The component can be marked as coming from an associated request.
-func (fs *Fields) AddHeaderExt(hdr string, optional, associatedRequest bool) *Fields {
+func (fs *Fields) AddHeaderExt(hdr string, optional, binarySequence, associatedRequest bool) *Fields {
 	f := fromHeaderName(hdr)
-	if optional {
-		f.markOptional()
-	}
-	if associatedRequest {
-		f.markAssociatedRequest()
+	f.markField(optional, associatedRequest)
+	if binarySequence {
+		f.markBinarySequence()
 	}
 	fs.f = append(fs.f, *f)
 	return fs
@@ -141,12 +146,7 @@ func (fs *Fields) AddQueryParam(qp string) *Fields {
 // for details on optional parameters. The component can be marked as coming from an associated request.
 func (fs *Fields) AddQueryParamExt(qp string, optional, associatedRequest bool) *Fields {
 	f := fromQueryParam(qp)
-	if optional {
-		f.markOptional()
-	}
-	if associatedRequest {
-		f.markAssociatedRequest()
-	}
+	f.markField(optional, associatedRequest)
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -177,12 +177,7 @@ func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
 // for details on optional parameters. The component can be marked as coming from an associated request.
 func (fs *Fields) AddDictHeaderExt(hdr, key string, optional, associatedRequest bool) *Fields {
 	f := fromDictHeader(hdr, key)
-	if optional {
-		f.markOptional()
-	}
-	if associatedRequest {
-		f.markAssociatedRequest()
-	}
+	f.markField(optional, associatedRequest)
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -200,6 +195,11 @@ func (f field) structuredField() bool {
 	return ok && v.(bool)
 }
 
+func (f field) binarySequence() bool {
+	v, ok := f.Params.Get("bs")
+	return ok && v.(bool)
+}
+
 // AddStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941.
 func (fs *Fields) AddStructuredField(hdr string) *Fields {
 	return fs.AddStructuredFieldExt(hdr, false, false)
@@ -210,12 +210,7 @@ func (fs *Fields) AddStructuredField(hdr string) *Fields {
 // for details on optional parameters. The component can be marked as coming from an associated request.
 func (fs *Fields) AddStructuredFieldExt(hdr string, optional, associatedRequest bool) *Fields {
 	f := fromStructuredField(hdr)
-	if optional {
-		f.markOptional()
-	}
-	if associatedRequest {
-		f.markAssociatedRequest()
-	}
+	f.markField(optional, associatedRequest)
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -229,11 +224,27 @@ func (f field) asSignatureBase() (string, error) {
 	return s, err
 }
 
+func (f field) markField(optional bool, associatedRequest bool) {
+	if optional {
+		f.markOptional()
+	}
+	if associatedRequest {
+		f.markAssociatedRequest()
+	}
+}
+
 func (f field) markOptional() {
 	if f.Params == nil {
 		f.Params = httpsfv.NewParams()
 	}
 	f.Params.Add("optional", true)
+}
+
+func (f field) markBinarySequence() {
+	if f.Params == nil {
+		f.Params = httpsfv.NewParams()
+	}
+	f.Params.Add("bs", true)
 }
 
 func (f field) markAssociatedRequest() {
@@ -253,6 +264,19 @@ func (f field) unmarkOptional() {
 func (f field) isOptional() bool {
 	if f.Params != nil {
 		v, ok := f.Params.Get("optional")
+		if ok {
+			vv, ok2 := v.(bool)
+			if ok2 {
+				return vv
+			}
+		}
+	}
+	return false
+}
+
+func (f field) isBinarySequence() bool {
+	if f.Params != nil {
+		v, ok := f.Params.Get("bs")
 		if ok {
 			vv, ok2 := v.(bool)
 			if ok2 {
