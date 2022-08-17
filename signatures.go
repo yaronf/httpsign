@@ -203,6 +203,25 @@ func (message *parsedMessage) getDictHeader(hdr, member string) ([]string, error
 	}
 }
 
+// quotedString returns s ready to be quoted per quoted-string in RFC 7230.
+// Credit: https://stackoverflow.com/a/68154993/955670
+func quotedString(s string) (string, error) {
+	var result strings.Builder
+	result.Grow(len(s)) // optimize for case where no \ are added.
+
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if (b < ' ' && b != '\t') || b == 0x7f {
+			return "", fmt.Errorf("invalid byte %0x", b)
+		}
+		if b == '\\' || b == '"' {
+			result.WriteByte('\\')
+		}
+		result.WriteByte(b)
+	}
+	return result.String(), nil
+}
+
 func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner interface{}, fields Fields) (string, error) {
 	p := httpsfv.NewParams()
 	var createdTime int64
@@ -218,7 +237,11 @@ func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner inte
 		p.Add("expires", config.expires)
 	}
 	if config.nonce != "" {
-		p.Add("nonce", config.nonce)
+		qNonce, err := quotedString(config.nonce)
+		if err != nil {
+			return "", fmt.Errorf("malformed nonce: %w", err)
+		}
+		p.Add("nonce", qNonce)
 	}
 	if config.signAlg {
 		if foreignSigner != nil {
@@ -226,13 +249,18 @@ func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner inte
 		}
 		p.Add("alg", alg)
 	}
+	if config.context != "" {
+		qContext, err := quotedString(config.context)
+		if err != nil {
+			return "", fmt.Errorf("malformed context: %w", err)
+		}
+		p.Add("context", qContext)
+	}
 	p.Add("keyid", keyID)
 	return fields.asSignatureInput(p)
 }
 
-//
 // SignRequest signs an HTTP request. Returns the Signature-Input and the Signature header values.
-//
 func SignRequest(signatureName string, signer Signer, req *http.Request) (signatureInput, signature string, err error) {
 	signatureInput, signature, signatureBase, err := signRequestDebug(signatureName, signer, req)
 	_ = signatureBase
@@ -254,10 +282,8 @@ func signRequestDebug(signatureName string, signer Signer, req *http.Request) (s
 	return signMessage(*signer.config, signatureName, signer, parsedMessage, nil, signer.fields)
 }
 
-//
 // SignResponse signs an HTTP response. Returns the Signature-Input and the Signature header values.
 // The req parameter (optional) is the associated request.
-//
 func SignResponse(signatureName string, signer Signer, res *http.Response, req *http.Request) (signatureInput, signature string, err error) {
 	signatureInput, signature, signatureBase, err := signResponseDebug(signatureName, signer, res, req)
 	_ = signatureBase
@@ -282,7 +308,6 @@ func signResponseDebug(signatureName string, signer Signer, res *http.Response, 
 	return signMessage(*signer.config, signatureName, signer, parsedRes, parsedReq, signer.fields)
 }
 
-//
 // VerifyRequest verifies a signed HTTP request. Returns an error if verification failed for any reason, otherwise nil.
 func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) error {
 	_, err := verifyRequestDebug(signatureName, verifier, req)
@@ -375,7 +400,6 @@ func messageDetails(signatureName string, parsedMessage parsedMessage) (details 
 	}, nil
 }
 
-//
 // VerifyResponse verifies a signed HTTP response. Returns an error if verification failed for any reason, otherwise nil.
 func VerifyResponse(signatureName string, verifier Verifier, res *http.Response, req *http.Request) error {
 	_, err := verifyResponseDebug(signatureName, verifier, res, req)
@@ -450,13 +474,17 @@ func applyVerificationPolicy(verifier Verifier, message parsedMessage, psi *psiS
 	if err2 != nil {
 		return err2
 	}
-	err3 := applyPolicyExpired(psi, config)
+	err3 := applyPolicyContexts(psi, config)
 	if err3 != nil {
 		return err3
 	}
-	err4 := applyPolicyOthers(verifier, psi, config)
+	err4 := applyPolicyExpired(psi, config)
 	if err4 != nil {
 		return err4
+	}
+	err5 := applyPolicyOthers(verifier, psi, config)
+	if err5 != nil {
+		return err5
 	}
 	return nil
 }
@@ -513,6 +541,29 @@ func applyPolicyAlgs(psi *psiSignature, config VerifyConfig) error {
 		}
 		if !algFound {
 			return fmt.Errorf("\"alg\" parameter not allowed by policy")
+		}
+	}
+	return nil
+}
+
+func applyPolicyContexts(psi *psiSignature, config VerifyConfig) error {
+	if len(config.allowedContexts) > 0 {
+		ctxParam, ok := psi.params["context"]
+		if !ok {
+			return fmt.Errorf("missing \"context\" parameter")
+		}
+		ctx, ok := ctxParam.(string)
+		if !ok {
+			return fmt.Errorf("malformed \"context\" parameter")
+		}
+		var ctxFound = false
+		for _, c := range config.allowedContexts {
+			if c == ctx {
+				ctxFound = true
+			}
+		}
+		if !ctxFound {
+			return fmt.Errorf("\"context\" parameter not allowed by policy")
 		}
 	}
 	return nil

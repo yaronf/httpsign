@@ -1660,3 +1660,46 @@ func TestBinarySequence(t *testing.T) {
 	err = VerifyResponse("sig2", *verifier2, res, nil)
 	assert.NoError(t, err, "could not verify response")
 }
+
+func TestSignatureContext(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	assert.NoError(t, err, "failed to generate key")
+	res := readResponse(httpres2)
+
+	signer1, err := NewP256Signer("key21", *priv, NewSignConfig().SetContext("ctx1").setFakeCreated(1660755826),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create signer")
+	sigInput, sig, sigBase, err := signResponseDebug("sig2", *signer1, res, nil)
+	assert.NoError(t, err, "signature failed")
+	assert.Equal(t, "\"@status\": 200\n\"@signature-params\": (\"@status\");created=1660755826;alg=\"ecdsa-p256-sha256\";context=\"ctx1\";keyid=\"key21\"", sigBase, "unexpected signature base")
+	res.Header.Add("Signature-Input", sigInput)
+	res.Header.Add("Signature", sig)
+
+	// Signature should fail with malformed context
+	signer2, err := NewP256Signer("key21", *priv, NewSignConfig().SetContext("ctx1\x00"),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create signer")
+	sigInput, sig, _, err = signResponseDebug("sig2", *signer2, res, nil)
+	assert.Error(t, err, "signature should fail")
+
+	// Client verifies response - should succeed, no context constraint
+	verifier1, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create verifier")
+	err = VerifyResponse("sig2", *verifier1, res, nil)
+	assert.NoError(t, err, "failed to verify response")
+
+	// Client verifies response - should succeed, correct context
+	verifier2, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedContexts([]string{"ctx3", "ctx2", "ctx1"}),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create verifier")
+	err = VerifyResponse("sig2", *verifier2, res, nil)
+	assert.NoError(t, err, "failed to verify response")
+
+	// Client verifies response - should fail, incorrect contexts
+	verifier3, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedContexts([]string{"ctx5", "ctx6", "ctx7"}),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create verifier")
+	err = VerifyResponse("sig2", *verifier3, res, nil)
+	assert.Error(t, err, "should have failed to verify response")
+}

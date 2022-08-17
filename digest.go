@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/dunglas/httpsfv"
 	"io"
-	"io/ioutil"
 )
 
 // Constants define the hash algorithm to be used for the digest
@@ -55,7 +54,7 @@ func duplicateBody(body *io.ReadCloser) (*bytes.Buffer, error) {
 
 		_ = (*body).Close()
 
-		*body = ioutil.NopCloser(bytes.NewReader(buff.Bytes()))
+		*body = io.NopCloser(bytes.NewReader(buff.Bytes()))
 	}
 	return buff, nil
 }
@@ -79,7 +78,7 @@ func validateSchemes(schemes []string) error {
 	valid := map[string]bool{DigestSha256: true, DigestSha512: true}
 	for _, s := range schemes {
 		if !valid[s] {
-			return fmt.Errorf("invalid scheme: s")
+			return fmt.Errorf("invalid scheme %s", s)
 		}
 	}
 	return nil
