@@ -615,7 +615,8 @@ func TestSignRequestDiscardSig(t *testing.T) {
 
 func readRequest(s string) *http.Request {
 	in := strings.NewReader(s)
-	req, _ := http.ReadRequest(bufio.NewReader(in))
+	req, err := http.ReadRequest(bufio.NewReader(in))
+	_ = err
 	return req
 }
 
@@ -1702,4 +1703,91 @@ func TestSignatureContext(t *testing.T) {
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier3, res, nil)
 	assert.Error(t, err, "should have failed to verify response")
+}
+
+var httpTransform1 = `GET /demo?name1=Value1&Name2=value2 HTTP/1.1
+Host: example.org
+Date: Fri, 15 Jul 2022 14:24:55 GMT
+Accept: application/json
+Accept: */*
+Signature-Input: transform=("@method" "@path" "@authority" "accept");created=1618884473;keyid="test-key-ed25519"
+Signature: transform=:ZT1kooQsEHpZ0I1IjCqtQppOmIqlJPeo7DHR3SoMn0s5JZ1eRGS0A+vyYP9t/LXlh5QMFFQ6cpLt2m0pmj3NDA==:
+
+`
+
+var httpTransform2 = `GET /demo?name1=Value1&Name2=value2&param=added HTTP/1.1
+Host: example.org
+Date: Fri, 15 Jul 2022 14:24:55 GMT
+Accept: application/json
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Signature-Input: transform=("@method" "@path" "@authority" "accept");created=1618884473;keyid="test-key-ed25519"
+Signature: transform=:ZT1kooQsEHpZ0I1IjCqtQppOmIqlJPeo7DHR3SoMn0s5JZ1eRGS0A+vyYP9t/LXlh5QMFFQ6cpLt2m0pmj3NDA==:
+
+`
+
+var httpTransform3 = `GET /demo?name1=Value1&Name2=value2 HTTP/1.1
+Host: example.org
+Referer: https://developer.example.org/demo
+Accept: application/json, */*
+Signature-Input: transform=("@method" "@path" "@authority" "accept");created=1618884473;keyid="test-key-ed25519"
+Signature: transform=:ZT1kooQsEHpZ0I1IjCqtQppOmIqlJPeo7DHR3SoMn0s5JZ1eRGS0A+vyYP9t/LXlh5QMFFQ6cpLt2m0pmj3NDA==:
+
+`
+
+var httpTransform4 = `GET /demo?name1=Value1&Name2=value2 HTTP/1.1
+Accept: application/json
+Accept: */*
+Date: Fri, 15 Jul 2022 14:24:55 GMT
+Host: example.org
+Signature-Input: transform=("@method" "@path" "@authority" "accept");created=1618884473;keyid="test-key-ed25519"
+Signature: transform=:ZT1kooQsEHpZ0I1IjCqtQppOmIqlJPeo7DHR3SoMn0s5JZ1eRGS0A+vyYP9t/LXlh5QMFFQ6cpLt2m0pmj3NDA==:
+
+`
+
+var httpTransform5 = `POST /demo?name1=Value1&Name2=value2 HTTP/1.1
+Host: example.com
+Date: Fri, 15 Jul 2022 14:24:55 GMT
+Accept: application/json
+Accept: */*
+Signature-Input: transform=("@method" "@path" "@authority" "accept");created=1618884473;keyid="test-key-ed25519"
+Signature: transform=:ZT1kooQsEHpZ0I1IjCqtQppOmIqlJPeo7DHR3SoMn0s5JZ1eRGS0A+vyYP9t/LXlh5QMFFQ6cpLt2m0pmj3NDA==:
+
+`
+
+var httpTransform6 = `GET /demo?name1=Value1&Name2=value2 HTTP/1.1
+Host: example.org
+Date: Fri, 15 Jul 2022 14:24:55 GMT
+Accept: */*
+Accept: application/json
+Signature-Input: transform=("@method" "@path" "@authority" "accept");created=1618884473;keyid="test-key-ed25519"
+Signature: transform=:ZT1kooQsEHpZ0I1IjCqtQppOmIqlJPeo7DHR3SoMn0s5JZ1eRGS0A+vyYP9t/LXlh5QMFFQ6cpLt2m0pmj3NDA==:
+
+`
+
+func testOneTransformation(t *testing.T, msg string, verifies bool) {
+	// Initial verification successful
+	prvKey, err := parseEdDSAPrivateKeyFromPemStr(ed25519PrvKey)
+	if err != nil {
+		t.Errorf("cannot parse public key: %v", err)
+	}
+	pubKey := prvKey.Public().(ed25519.PublicKey)
+	verifier, err := NewEd25519Verifier("test-key-ed25519", pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+	assert.NoError(t, err, "could not create verifier")
+	req := readRequest(msg)
+	err = VerifyRequest("transform", *verifier, req)
+	if verifies {
+		assert.NoError(t, err, "failed to verify request")
+	} else {
+		assert.Error(t, err, "should fail to verify request")
+	}
+}
+
+func TestTransformations(t *testing.T) {
+	testOneTransformation(t, httpTransform1, true)
+	testOneTransformation(t, httpTransform2, true)
+	testOneTransformation(t, httpTransform3, true)
+	testOneTransformation(t, httpTransform4, true)
+	testOneTransformation(t, httpTransform5, false)
+	testOneTransformation(t, httpTransform6, false)
 }
