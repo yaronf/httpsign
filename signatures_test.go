@@ -60,8 +60,8 @@ Date: Tue, 20 Apr 2021 02:07:55 GMT
 Content-Type: application/json
 Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
 Content-Length: 18
-Signature-Input: sig-b22=("@authority" "content-digest");created=1618884473;keyid="test-key-rsa-pss"
-Signature: sig-b22=:Fee1uy9YGZq5UUwwYU6vz4dZNvfw3GYrFl1L6YlVIyUMuWswWDNSvql4dVtSeidYjYZUm7SBCENIb5KYy2ByoC3bI+7gydd2i4OAT5lyDtmeapnAa8uP/b9xUpg+VSPElbBs6JWBIQsd+nMdHDe+ls/IwVMwXktC37SqsnbNyhNp6kcvcWpevjzFcD2VqdZleUz4jN7P+W5A3wHiMGfIjIWn36KXNB+RKyrlGnIS8yaBBrom5rcZWLrLbtg6VlrH1+/07RV+kgTh/l10h8qgpl9zQHu7mWbDKTq0tJ8K4ywcPoC4s2I4rU88jzDKDGdTTQFZoTVZxZmuTM1FvHfzIw==:
+Signature-Input: sig-b22=("@authority" "content-digest" "@query-param";name="Pet");created=1618884473;keyid="test-key-rsa-pss";context="header-example"
+Signature: sig-b22=:SW3AKyCPY7PQSARlOEg8+tb43JD4uYGBrt6G+RWKgrOZ9ZJWq8VnVM1qTcdjChi6HGZI4xDwKZteoQH8mj2HT1cWdUTxu2JaUvcJDINpa0m20NYywRu/HLXmh/FfeefGIUpkAneT/X/sWL/ShiTtp7REtxdJaiLCjQidY9eUpFmBXPMdR/FiYI3hGWarGGiGmTpgbjI713ywhKoGPm7Q8lpfhz5T59tOsZVPxlqdpwPD0RVGOwZMzI5VzoY4YaGrB2fqvPOxNUNuh5bveYQOYAmzmpDaLfgkQB/C4AHzKWAYs9yV6Wf78u4en7AP1Y+iM0G6MviZvX1/lcgC2n1bDg==:
 
 {"hello": "world"}
 `
