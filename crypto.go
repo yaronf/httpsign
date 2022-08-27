@@ -86,11 +86,21 @@ func NewRSAPSSSigner(keyID string, key rsa.PrivateKey, config *SignConfig, field
 // NewP256Signer returns a new Signer structure. Key is an elliptic curve P-256 private key.
 // Config may be nil for a default configuration.
 func NewP256Signer(keyID string, key ecdsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
+	return newECCSigner(keyID, key, config, fields, elliptic.P256(), "P-256", "ecdsa-p256-sha256")
+}
+
+// NewP384Signer returns a new Signer structure. Key is an elliptic curve P-384 private key.
+// Config may be nil for a default configuration.
+func NewP384Signer(keyID string, key ecdsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
+	return newECCSigner(keyID, key, config, fields, elliptic.P384(), "P-384", "ecdsa-p384-sha384")
+}
+
+func newECCSigner(keyID string, key ecdsa.PrivateKey, config *SignConfig, fields Fields, curve elliptic.Curve, curveName, alg string) (*Signer, error) {
 	if keyID == "" {
 		return nil, fmt.Errorf("keyID must not be empty")
 	}
-	if key.Curve != elliptic.P256() {
-		return nil, fmt.Errorf("key curve must be P-256")
+	if key.Curve != curve {
+		return nil, fmt.Errorf("key curve must be %s", curveName)
 	}
 	if config == nil {
 		config = NewSignConfig()
@@ -98,7 +108,7 @@ func NewP256Signer(keyID string, key ecdsa.PrivateKey, config *SignConfig, field
 	return &Signer{
 		keyID:  keyID,
 		key:    key,
-		alg:    "ecdsa-p256-sha256",
+		alg:    alg,
 		config: config,
 		fields: fields,
 	}, nil
@@ -196,6 +206,10 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		hashed := sha256.Sum256(buff)
 		key := s.key.(ecdsa.PrivateKey)
 		return ecdsaSignRaw(rand.Reader, &key, hashed[:])
+	case "ecdsa-p384-sha384":
+		hashed := sha512.Sum384(buff)
+		key := s.key.(ecdsa.PrivateKey)
+		return ecdsaSignRaw(rand.Reader, &key, hashed[:])
 	case "ed25519":
 		key := s.key.(ed25519.PrivateKey)
 		return ed25519.Sign(key, buff), nil
@@ -277,19 +291,29 @@ func NewRSAPSSVerifier(keyID string, key rsa.PublicKey, config *VerifyConfig, fi
 // NewP256Verifier generates a new Verifier for ECDSA (P-256) signatures. Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
 func NewP256Verifier(keyID string, key ecdsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
+	return newECCVerifier(keyID, key, config, fields, elliptic.P256(), "P-256", "ecdsa-p256-sha256")
+}
+
+// NewP384Verifier generates a new Verifier for ECDSA (P-384) signatures. Set config to nil for a default configuration.
+// Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
+func NewP384Verifier(keyID string, key ecdsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
+	return newECCVerifier(keyID, key, config, fields, elliptic.P384(), "P-384", "ecdsa-p384-sha384")
+}
+
+func newECCVerifier(keyID string, key ecdsa.PublicKey, config *VerifyConfig, fields Fields, curve elliptic.Curve, curveName, alg string) (*Verifier, error) {
 	if config == nil {
 		config = NewVerifyConfig()
 	}
 	if config.verifyKeyID && keyID == "" {
 		return nil, fmt.Errorf("keyID should not be empty")
 	}
-	if key.Curve != elliptic.P256() {
-		return nil, fmt.Errorf("key curve must be P-256")
+	if key.Curve != curve {
+		return nil, fmt.Errorf("key curve must be %s", curveName)
 	}
 	return &Verifier{
 		keyID:  keyID,
 		key:    key,
-		alg:    "ecdsa-p256-sha256",
+		alg:    alg,
 		config: config,
 		fields: fields,
 	}, nil
@@ -383,6 +407,10 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		return true, nil
 	case "ecdsa-p256-sha256":
 		hashed := sha256.Sum256(buff)
+		key := v.key.(ecdsa.PublicKey)
+		return ecdsaVerifyRaw(&key, hashed[:], sig)
+	case "ecdsa-p384-sha384":
+		hashed := sha512.Sum384(buff)
 		key := v.key.(ecdsa.PublicKey)
 		return ecdsaVerifyRaw(&key, hashed[:], sig)
 	case "ed25519":

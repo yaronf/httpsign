@@ -269,19 +269,6 @@ rOjr9w349JooGXhOxbu8nOxX
 -----END RSA PRIVATE KEY-----
 `
 
-var p256PubKey = `-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEWAO+Y/BP3c7Aw7dSWYGkuckwl/e6
-H54D/P9uzXDjby0Frysdpcny/NL807iRVfVDDg+ctHhuRTzBwP+lwVdN2g==
------END PUBLIC KEY-----
-`
-
-var p256PrvKey = `-----BEGIN EC PRIVATE KEY-----
-MHcCAQEEIMLnTZwmWikcBCrKlXZVUjaq9jwsv22sy/P7yIIonkVwoAoGCCqGSM49
-AwEHoUQDQgAEWAO+Y/BP3c7Aw7dSWYGkuckwl/e6H54D/P9uzXDjby0Frysdpcny
-/NL807iRVfVDDg+ctHhuRTzBwP+lwVdN2g==
------END EC PRIVATE KEY-----
-`
-
 // Note: the private key from the draft is never used
 var p256PubKey2 = `-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqIVYZVLCrPZHGHjP17CTW0/+D9Lf
@@ -349,18 +336,6 @@ func parseRsaPublicKeyFromPemStr(pemString string) (*rsa.PublicKey, error) {
 		return nil, err
 	}
 	return k.(*rsa.PublicKey), nil
-}
-
-func parseECPrivateKeyFromPemStr(pemString string) (*ecdsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(pemString))
-	if block == nil {
-		return nil, fmt.Errorf("cannot decode PEM")
-	}
-	k, err := x509.ParseECPrivateKey(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-	return k, nil
 }
 
 func parseECPublicKeyFromPemStr(pemString string) (*ecdsa.PublicKey, error) {
@@ -804,9 +779,9 @@ func TestSignAndVerifyRSA(t *testing.T) {
 func TestSignAndVerifyP256(t *testing.T) {
 	config := NewSignConfig().setFakeCreated(1618884475)
 	signatureName := "sig1"
-	prvKey, err := parseECPrivateKeyFromPemStr(p256PrvKey)
+	prvKey, pubKey, err := genP256KeyPair()
 	if err != nil {
-		t.Errorf("cannot read private key")
+		t.Errorf("cannot generate P-256 keypair")
 	}
 	fields := *NewFields().AddHeader("@method").AddHeader("Date").AddHeader("Content-Type").AddQueryParam("pet")
 	signer, _ := NewP256Signer("test-key-p256", *prvKey, config, fields)
@@ -817,11 +792,33 @@ func TestSignAndVerifyP256(t *testing.T) {
 	}
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	pubKey, err := parseECPublicKeyFromPemStr(p256PubKey)
-	if err != nil {
-		t.Errorf("cannot read public key: %v", err)
-	}
 	verifier, err := NewP256Verifier("test-key-p256", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	err = VerifyRequest(signatureName, *verifier, req)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
+func TestSignAndVerifyP384(t *testing.T) {
+	config := NewSignConfig().setFakeCreated(1618884475)
+	signatureName := "sig1"
+	prvKey, pubKey, err := genP384KeyPair()
+	if err != nil {
+		t.Errorf("cannot generate P-384 keypair")
+	}
+	fields := *NewFields().AddHeader("@method").AddHeader("Date").AddHeader("Content-Type").AddQueryParam("pet")
+	signer, _ := NewP384Signer("test-key-p384", *prvKey, config, fields)
+	req := readRequest(httpreq2)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	if err != nil {
+		t.Errorf("signature failed: %v", err)
+	}
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewP384Verifier("test-key-p384", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -1190,7 +1187,15 @@ func TestResponseDetails(t *testing.T) {
 }
 
 func genP256KeyPair() (priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey, err error) {
-	priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	return genECCKeypair(elliptic.P256())
+}
+
+func genP384KeyPair() (priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey, err error) {
+	return genECCKeypair(elliptic.P384())
+}
+
+func genECCKeypair(curve elliptic.Curve) (priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey, err error) {
+	priv, err = ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		return nil, nil, err
 	}

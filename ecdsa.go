@@ -58,6 +58,9 @@ func sigComponentLen(curve string) (int, int, error) {
 	case "P-256":
 		lr = 32
 		ls = 32
+	case "P-384":
+		lr = 48
+		ls = 48
 	default:
 		return 0, 0, fmt.Errorf("unknown curve \"%s\"", curve)
 	}
