@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
@@ -87,6 +88,9 @@ func NewRSAPSSSigner(keyID string, key rsa.PrivateKey, config *SignConfig, field
 func NewP256Signer(keyID string, key ecdsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
 	if keyID == "" {
 		return nil, fmt.Errorf("keyID must not be empty")
+	}
+	if key.Curve != elliptic.P256() {
+		return nil, fmt.Errorf("key curve must be P-256")
 	}
 	if config == nil {
 		config = NewSignConfig()
@@ -278,6 +282,9 @@ func NewP256Verifier(keyID string, key ecdsa.PublicKey, config *VerifyConfig, fi
 	}
 	if config.verifyKeyID && keyID == "" {
 		return nil, fmt.Errorf("keyID should not be empty")
+	}
+	if key.Curve != elliptic.P256() {
+		return nil, fmt.Errorf("key curve must be P-256")
 	}
 	return &Verifier{
 		keyID:  keyID,
