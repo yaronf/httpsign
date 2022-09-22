@@ -1,6 +1,6 @@
 HTTP Message Signatures, implementing [draft-ietf-httpbis-message-signatures](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-message-signatures).
 
-This is a nearly feature-complete implementation of draft -10, including all test vectors.
+This is a nearly feature-complete implementation of draft -12, including all test vectors.
 
 The code follows the latest version of the draft, which may be the [Editor's Copy](https://httpwg.org/http-extensions/draft-ietf-httpbis-message-signatures.html) rather than the published draft.
 
