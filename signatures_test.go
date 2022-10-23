@@ -60,8 +60,8 @@ Date: Tue, 20 Apr 2021 02:07:55 GMT
 Content-Type: application/json
 Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
 Content-Length: 18
-Signature-Input: sig-b22=("@authority" "content-digest" "@query-param";name="Pet");created=1618884473;keyid="test-key-rsa-pss";context="header-example"
-Signature: sig-b22=:SW3AKyCPY7PQSARlOEg8+tb43JD4uYGBrt6G+RWKgrOZ9ZJWq8VnVM1qTcdjChi6HGZI4xDwKZteoQH8mj2HT1cWdUTxu2JaUvcJDINpa0m20NYywRu/HLXmh/FfeefGIUpkAneT/X/sWL/ShiTtp7REtxdJaiLCjQidY9eUpFmBXPMdR/FiYI3hGWarGGiGmTpgbjI713ywhKoGPm7Q8lpfhz5T59tOsZVPxlqdpwPD0RVGOwZMzI5VzoY4YaGrB2fqvPOxNUNuh5bveYQOYAmzmpDaLfgkQB/C4AHzKWAYs9yV6Wf78u4en7AP1Y+iM0G6MviZvX1/lcgC2n1bDg==:
+Signature-Input: sig-b22=("@authority" "content-digest" "@query-param";name="Pet");created=1618884473;keyid="test-key-rsa-pss";tag="header-example"
+Signature: sig-b22=:LjbtqUbfmvjj5C5kr1Ugj4PmLYvx9wVjZvD9GsTT4F7GrcQEdJzgI9qHxICagShLRiLMlAJjtq6N4CDfKtjvuJyE5qH7KT8UCMkSowOB4+ECxCmT8rtAmj/0PIXxi0A0nxKyB09RNrCQibbUjsLS/2YyFYXEu4TRJQzRw1rLEuEfY17SARYhpTlaqwZVtR8NV7+4UKkjqpcAoFqWFQh62s7Cl+H2fjBSpqfZUJcsIk4N6wiKYd4je2U/lankenQ99PZfB4jY3I5rSV2DSBVkSFsURIjYErOs0tFTQosMTAoxk//0RoKUqiYY8Bh0aaUEb0rQl3/XaVe4bXTugEjHSw==:
 
 {"hello": "world"}
 `
@@ -1575,10 +1575,7 @@ func TestRequestBinding(t *testing.T) {
 	fields := *NewFields()
 	verifier, err := NewRSAPSSVerifier("test-key-rsa-pss", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 	assert.NoError(t, err, "create verifier")
-	sigBase, err := verifyRequestDebug("sig1", *verifier, req)
-	_ = sigBase
-	// fmt.Println(sigBase)
-	// assert.NoError(t, err, "verify request") // Note: does not verify
+	_, err = verifyRequestDebug("sig1", *verifier, req)
 
 	res := readResponse(httpres6)
 	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
@@ -1640,7 +1637,7 @@ func TestBinarySequence(t *testing.T) {
 	signer1, err := NewP256Signer("key20", *priv, NewSignConfig(),
 		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, false, false))
 	assert.NoError(t, err, "could not create signer")
-	sigInput, sig, err := SignResponse("sig2", *signer1, res, nil)
+	_, _, err = SignResponse("sig2", *signer1, res, nil)
 	assert.Error(t, err, "signature should have failed")
 
 	signer2, err := NewP256Signer("key20", *priv, NewSignConfig().setFakeCreated(1659563420),
@@ -1667,43 +1664,43 @@ func TestBinarySequence(t *testing.T) {
 	assert.NoError(t, err, "could not verify response")
 }
 
-func TestSignatureContext(t *testing.T) {
+func TestSignatureTag(t *testing.T) {
 	priv, pub, err := genP256KeyPair()
 	assert.NoError(t, err, "failed to generate key")
 	res := readResponse(httpres2)
 
-	signer1, err := NewP256Signer("key21", *priv, NewSignConfig().SetContext("ctx1").setFakeCreated(1660755826),
+	signer1, err := NewP256Signer("key21", *priv, NewSignConfig().SetTag("ctx1").setFakeCreated(1660755826),
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create signer")
 	sigInput, sig, sigBase, err := signResponseDebug("sig2", *signer1, res, nil)
 	assert.NoError(t, err, "signature failed")
-	assert.Equal(t, "\"@status\": 200\n\"@signature-params\": (\"@status\");created=1660755826;alg=\"ecdsa-p256-sha256\";context=\"ctx1\";keyid=\"key21\"", sigBase, "unexpected signature base")
+	assert.Equal(t, "\"@status\": 200\n\"@signature-params\": (\"@status\");created=1660755826;alg=\"ecdsa-p256-sha256\";tag=\"ctx1\";keyid=\"key21\"", sigBase, "unexpected signature base")
 	res.Header.Add("Signature-Input", sigInput)
 	res.Header.Add("Signature", sig)
 
-	// Signature should fail with malformed context
-	signer2, err := NewP256Signer("key21", *priv, NewSignConfig().SetContext("ctx1\x00"),
+	// Signature should fail with malformed tag
+	signer2, err := NewP256Signer("key21", *priv, NewSignConfig().SetTag("ctx1\x00"),
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create signer")
-	sigInput, sig, _, err = signResponseDebug("sig2", *signer2, res, nil)
+	_, _, _, err = signResponseDebug("sig2", *signer2, res, nil)
 	assert.Error(t, err, "signature should fail")
 
-	// Client verifies response - should succeed, no context constraint
+	// Client verifies response - should succeed, no tag constraint
 	verifier1, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false),
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier1, res, nil)
 	assert.NoError(t, err, "failed to verify response")
 
-	// Client verifies response - should succeed, correct context
-	verifier2, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedContexts([]string{"ctx3", "ctx2", "ctx1"}),
+	// Client verifies response - should succeed, correct tag
+	verifier2, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedTags([]string{"ctx3", "ctx2", "ctx1"}),
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier2, res, nil)
 	assert.NoError(t, err, "failed to verify response")
 
-	// Client verifies response - should fail, incorrect contexts
-	verifier3, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedContexts([]string{"ctx5", "ctx6", "ctx7"}),
+	// Client verifies response - should fail, incorrect tags
+	verifier3, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedTags([]string{"ctx5", "ctx6", "ctx7"}),
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier3, res, nil)

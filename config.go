@@ -15,7 +15,7 @@ type SignConfig struct {
 	fakeCreated int64
 	expires     int64
 	nonce       string
-	context     string
+	tag         string
 }
 
 // NewSignConfig generates a default configuration.
@@ -26,7 +26,7 @@ func NewSignConfig() *SignConfig {
 		fakeCreated: 0,
 		expires:     0,
 		nonce:       "",
-		context:     "", // we disallow an empty context
+		tag:         "", // we disallow an empty tag
 	}
 }
 
@@ -63,23 +63,23 @@ func (c *SignConfig) SetNonce(nonce string) *SignConfig {
 	return c
 }
 
-// SetContext adds a "context" string parameter that defines a per-application or per-protocol signature
-// context, to mitigate cross-protocol attacks.
-func (c *SignConfig) SetContext(ctx string) *SignConfig {
-	c.context = ctx
+// SetTag adds a "tag" string parameter that defines a per-application or per-protocol signature
+// tag, to mitigate cross-protocol attacks.
+func (c *SignConfig) SetTag(tag string) *SignConfig {
+	c.tag = tag
 	return c
 }
 
 // VerifyConfig contains additional configuration for the verifier.
 type VerifyConfig struct {
-	verifyCreated   bool
-	notNewerThan    time.Duration
-	notOlderThan    time.Duration
-	allowedAlgs     []string
-	rejectExpired   bool
-	verifyKeyID     bool
-	dateWithin      time.Duration
-	allowedContexts []string
+	verifyCreated bool
+	notNewerThan  time.Duration
+	notOlderThan  time.Duration
+	allowedAlgs   []string
+	rejectExpired bool
+	verifyKeyID   bool
+	dateWithin    time.Duration
+	allowedTags   []string
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,
@@ -135,24 +135,24 @@ func (v *VerifyConfig) SetVerifyDateWithin(d time.Duration) *VerifyConfig {
 	return v
 }
 
-// SetAllowedContexts defines the allowed values of the "context" parameter.
+// SetAllowedTags defines the allowed values of the "tag" parameter.
 // Default: an empty list, signifying all values are accepted.
-func (v *VerifyConfig) SetAllowedContexts(allowedCtx []string) *VerifyConfig {
-	v.allowedContexts = allowedCtx
+func (v *VerifyConfig) SetAllowedTags(allowedTags []string) *VerifyConfig {
+	v.allowedTags = allowedTags
 	return v
 }
 
 // NewVerifyConfig generates a default configuration.
 func NewVerifyConfig() *VerifyConfig {
 	return &VerifyConfig{
-		verifyCreated:   true,
-		notNewerThan:    2 * time.Second,
-		notOlderThan:    10 * time.Second,
-		rejectExpired:   true,
-		allowedAlgs:     []string{},
-		verifyKeyID:     true,
-		dateWithin:      0,   // meaning no constraint
-		allowedContexts: nil, // no constraint
+		verifyCreated: true,
+		notNewerThan:  2 * time.Second,
+		notOlderThan:  10 * time.Second,
+		rejectExpired: true,
+		allowedAlgs:   []string{},
+		verifyKeyID:   true,
+		dateWithin:    0,   // meaning no constraint
+		allowedTags:   nil, // no constraint
 	}
 }
 

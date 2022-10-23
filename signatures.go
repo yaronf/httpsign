@@ -249,12 +249,12 @@ func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner inte
 		}
 		p.Add("alg", alg)
 	}
-	if config.context != "" {
-		qContext, err := quotedString(config.context)
+	if config.tag != "" {
+		qContext, err := quotedString(config.tag)
 		if err != nil {
-			return "", fmt.Errorf("malformed context: %w", err)
+			return "", fmt.Errorf("malformed tag: %w", err)
 		}
-		p.Add("context", qContext)
+		p.Add("tag", qContext)
 	}
 	p.Add("keyid", keyID)
 	return fields.asSignatureInput(p)
@@ -547,23 +547,23 @@ func applyPolicyAlgs(psi *psiSignature, config VerifyConfig) error {
 }
 
 func applyPolicyContexts(psi *psiSignature, config VerifyConfig) error {
-	if len(config.allowedContexts) > 0 {
-		ctxParam, ok := psi.params["context"]
+	if len(config.allowedTags) > 0 {
+		ctxParam, ok := psi.params["tag"]
 		if !ok {
-			return fmt.Errorf("missing \"context\" parameter")
+			return fmt.Errorf("missing \"tag\" parameter")
 		}
 		ctx, ok := ctxParam.(string)
 		if !ok {
-			return fmt.Errorf("malformed \"context\" parameter")
+			return fmt.Errorf("malformed \"tag\" parameter")
 		}
 		var ctxFound = false
-		for _, c := range config.allowedContexts {
+		for _, c := range config.allowedTags {
 			if c == ctx {
 				ctxFound = true
 			}
 		}
 		if !ctxFound {
-			return fmt.Errorf("\"context\" parameter not allowed by policy")
+			return fmt.Errorf("\"tag\" parameter not allowed by policy")
 		}
 	}
 	return nil

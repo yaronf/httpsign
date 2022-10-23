@@ -61,7 +61,7 @@ func TestMessages(t *testing.T) {
 	assert.NotEqual(t, h, d)
 
 	res4 := readResponse(resdigest3)
-	d, err = GenerateContentDigestHeader(&res4.Body, []string{DigestSha256, "sha-999"})
+	_, err = GenerateContentDigestHeader(&res4.Body, []string{DigestSha256, "sha-999"})
 	assert.Error(t, err, "bad digest scheme")
 
 	res5 := readResponse(resdigest5)
