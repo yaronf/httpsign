@@ -4,6 +4,7 @@ This is a nearly feature-complete implementation of draft -12, including all tes
 
 The code follows the latest version of the draft, which may be the [Editor's Copy](https://httpwg.org/http-extensions/draft-ietf-httpbis-message-signatures.html) rather than the published draft.
 
+For a more hands-on experience, try the [HTTP Message Signatures sandbox](https://httpsig.org/).
 ### Usage
 
 The library provides natural integration points with Go HTTP clients and servers, as well as direct usage of the
