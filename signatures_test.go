@@ -589,14 +589,15 @@ func TestSignRequestDiscardSig(t *testing.T) {
 }
 
 func readRequest(s string) *http.Request {
-	in := strings.NewReader(s)
+	// Go replaces \n by CRLF automatically, but not for chunked encodings, so we do it manually
+	in := strings.NewReader(strings.ReplaceAll(s, "\n", "\r\n"))
 	req, err := http.ReadRequest(bufio.NewReader(in))
 	_ = err
 	return req
 }
 
 func readResponse(s string) *http.Response {
-	in := strings.NewReader(s)
+	in := strings.NewReader(strings.ReplaceAll(s, "\n", "\r\n"))
 	res, err := http.ReadResponse(bufio.NewReader(in), nil)
 	_ = err
 	return res

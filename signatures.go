@@ -38,7 +38,7 @@ func applyFieldConstraints(fields Fields) error {
 		if err != nil {
 			return fmt.Errorf("malformed field")
 		}
-		if binaryFields[name] && !f.isBinarySequence() {
+		if binaryFields[name] && !f.binarySequence() {
 			return fmt.Errorf("field %s should be a binary sequence", name)
 		}
 	}
@@ -48,10 +48,10 @@ func applyFieldConstraints(fields Fields) error {
 func filterOptionalFields(fields Fields, message, assocMessage *parsedMessage) Fields {
 	filtered := *NewFields()
 	for _, f := range fields.f {
-		if !f.isOptional() {
+		if !f.optional() {
 			filtered.f = append(filtered.f, f)
 		} else {
-			if !f.forAssociatedRequest() {
+			if !f.associatedRequest() {
 				_, err := generateFieldValues(f, *message)
 				if err == nil { // value was found
 					ff := f.copy()
@@ -93,7 +93,7 @@ func generateSignatureBase(message, assocMessage *parsedMessage, fields Fields, 
 			return "", fmt.Errorf("could not marshal %v", f)
 		}
 		var fieldValues []string
-		if !c.forAssociatedRequest() {
+		if !c.associatedRequest() {
 			fieldValues, err = generateFieldValues(c, *message)
 			if err != nil {
 				return "", err
