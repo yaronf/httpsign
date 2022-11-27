@@ -103,14 +103,14 @@ func (f field) headerName() (bool, string) {
 
 // AddHeader appends a bare header name, e.g. "cache-control".
 func (fs *Fields) AddHeader(hdr string) *Fields {
-	return fs.AddHeaderExt(hdr, false, false, false)
+	return fs.AddHeaderExt(hdr, false, false, false, false)
 }
 
 // AddHeaderExt appends a bare header name, e.g. "cache-control". See type documentation
 // for details on optional parameters. The component can be marked as coming from an associated request.
-func (fs *Fields) AddHeaderExt(hdr string, optional, binarySequence, associatedRequest bool) *Fields {
+func (fs *Fields) AddHeaderExt(hdr string, optional bool, binarySequence bool, associatedRequest bool, trailer bool) *Fields {
 	f := fromHeaderName(hdr)
-	f.markField(optional, associatedRequest)
+	f.markField(optional, associatedRequest, trailer)
 	if binarySequence {
 		f.markBinarySequence()
 	}
@@ -139,14 +139,14 @@ func (f field) queryParam() (bool, string) {
 
 // AddQueryParam indicates a request for a specific query parameter to be signed.
 func (fs *Fields) AddQueryParam(qp string) *Fields {
-	return fs.AddQueryParamExt(qp, false, false)
+	return fs.AddQueryParamExt(qp, false, false, false)
 }
 
 // AddQueryParamExt indicates a request for a specific query parameter to be signed. See type documentation
 // for details on optional parameters. The component can be marked as coming from an associated request.
-func (fs *Fields) AddQueryParamExt(qp string, optional, associatedRequest bool) *Fields {
+func (fs *Fields) AddQueryParamExt(qp string, optional, associatedRequest, trailer bool) *Fields {
 	f := fromQueryParam(qp)
-	f.markField(optional, associatedRequest)
+	f.markField(optional, associatedRequest, trailer)
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -169,15 +169,15 @@ func (f field) dictHeader() (ok bool, hdr, key string) {
 
 // AddDictHeader indicates that out of a header structured as a dictionary, a specific key value is signed/verified.
 func (fs *Fields) AddDictHeader(hdr, key string) *Fields {
-	return fs.AddDictHeaderExt(hdr, key, false, false)
+	return fs.AddDictHeaderExt(hdr, key, false, false, false)
 }
 
 // AddDictHeaderExt indicates that out of a header structured as a dictionary, a specific key value is signed/verified.
 // See type documentation
 // for details on optional parameters. The component can be marked as coming from an associated request.
-func (fs *Fields) AddDictHeaderExt(hdr, key string, optional, associatedRequest bool) *Fields {
+func (fs *Fields) AddDictHeaderExt(hdr, key string, optional, associatedRequest, trailer bool) *Fields {
 	f := fromDictHeader(hdr, key)
-	f.markField(optional, associatedRequest)
+	f.markField(optional, associatedRequest, trailer)
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -200,17 +200,32 @@ func (f field) binarySequence() bool {
 	return ok && v.(bool)
 }
 
+func (f field) trailer() bool {
+	v, ok := f.Params.Get("tr")
+	return ok && v.(bool)
+}
+
+func (f field) optional() bool {
+	v, ok := f.Params.Get("optional")
+	return ok && v.(bool)
+}
+
+func (f field) associatedRequest() bool {
+	v, ok := f.Params.Get("req")
+	return ok && v.(bool)
+}
+
 // AddStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941.
 func (fs *Fields) AddStructuredField(hdr string) *Fields {
-	return fs.AddStructuredFieldExt(hdr, false, false)
+	return fs.AddStructuredFieldExt(hdr, false, false, false)
 }
 
 // AddStructuredFieldExt indicates that a header should be interpreted as a structured field, per RFC 8941.
 // See type documentation
 // for details on optional parameters. The component can be marked as coming from an associated request.
-func (fs *Fields) AddStructuredFieldExt(hdr string, optional, associatedRequest bool) *Fields {
+func (fs *Fields) AddStructuredFieldExt(hdr string, optional, associatedRequest, trailer bool) *Fields {
 	f := fromStructuredField(hdr)
-	f.markField(optional, associatedRequest)
+	f.markField(optional, associatedRequest, trailer)
 	fs.f = append(fs.f, *f)
 	return fs
 }
@@ -224,34 +239,39 @@ func (f field) asSignatureBase() (string, error) {
 	return s, err
 }
 
-func (f field) markField(optional bool, associatedRequest bool) {
+func (f field) markField(optional bool, associatedRequest bool, trailer bool) {
 	if optional {
 		f.markOptional()
 	}
 	if associatedRequest {
 		f.markAssociatedRequest()
 	}
+	if trailer {
+		f.markTrailer()
+	}
+}
+
+func (f field) markFlag(name string) {
+	if f.Params == nil {
+		f.Params = httpsfv.NewParams()
+	}
+	f.Params.Add(name, true)
 }
 
 func (f field) markOptional() {
-	if f.Params == nil {
-		f.Params = httpsfv.NewParams()
-	}
-	f.Params.Add("optional", true)
+	f.markFlag("optional")
 }
 
 func (f field) markBinarySequence() {
-	if f.Params == nil {
-		f.Params = httpsfv.NewParams()
-	}
-	f.Params.Add("bs", true)
+	f.markFlag("bs")
 }
 
 func (f field) markAssociatedRequest() {
-	if f.Params == nil {
-		f.Params = httpsfv.NewParams()
-	}
-	f.Params.Add("req", true)
+	f.markFlag("req")
+}
+
+func (f field) markTrailer() {
+	f.markFlag("tr")
 }
 
 func (f field) unmarkOptional() {
@@ -259,45 +279,6 @@ func (f field) unmarkOptional() {
 		f.Params = httpsfv.NewParams()
 	}
 	f.Params.Del("optional")
-}
-
-func (f field) isOptional() bool {
-	if f.Params != nil {
-		v, ok := f.Params.Get("optional")
-		if ok {
-			vv, ok2 := v.(bool)
-			if ok2 {
-				return vv
-			}
-		}
-	}
-	return false
-}
-
-func (f field) isBinarySequence() bool {
-	if f.Params != nil {
-		v, ok := f.Params.Get("bs")
-		if ok {
-			vv, ok2 := v.(bool)
-			if ok2 {
-				return vv
-			}
-		}
-	}
-	return false
-}
-
-func (f field) forAssociatedRequest() bool {
-	if f.Params != nil {
-		v, ok := f.Params.Get("req")
-		if ok {
-			vv, ok2 := v.(bool)
-			if ok2 {
-				return vv
-			}
-		}
-	}
-	return false
 }
 
 // Not a full deep copy, but good enough for mutating params
@@ -330,7 +311,7 @@ func (fs *Fields) asSignatureInput(p *httpsfv.Params) (string, error) {
 	return s, err
 }
 
-//  contains verifies that all required fields are in the given list of fields (yes, this is O(n^2)).
+// contains verifies that all required fields are in the given list of fields (yes, this is O(n^2)).
 func (fs *Fields) contains(requiredFields *Fields) bool {
 outer:
 	for _, f1 := range requiredFields.f {

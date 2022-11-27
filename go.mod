@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
-	github.com/dunglas/httpsfv v1.0.0
+	github.com/dunglas/httpsfv v1.0.1
 	github.com/lestrrat-go/jwx/v2 v2.0.6
 	github.com/stretchr/testify v1.8.0
 )
