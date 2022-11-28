@@ -8,10 +8,7 @@ import (
 	"testing"
 )
 
-var rawPost1 = "POST /foo HTTP/1.1\nContent-Type: text/plain\nTransfer-Encoding: chunked\nTrailer: Expires\n\n4\nHTTP\r\n7\r\nMessage\r\na\r\nSignatures\r\n0\r\nExpires: Wed, 9 Nov 2022 07:28:00 GMT\r\n\r\n"
-
-// This identical representation fails, see https://github.com/golang/go/issues/56835
-var rawPost2 = `POST /foo HTTP/1.1
+var rawPost1 = `POST /foo HTTP/1.1
 Content-Type: text/plain
 Transfer-Encoding: chunked
 Trailer: Expires
@@ -43,7 +40,7 @@ func _TestTrailer_Get(t *testing.T) {
 	},
 		client: *http.DefaultClient,
 	}
-	req := readRequest(rawPost1)
+	req := readRequestChunked(rawPost1)
 
 	req.RequestURI = "" // otherwise Do will complain
 	u, err := url.Parse(ts.URL + "/foo")

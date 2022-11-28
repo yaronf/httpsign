@@ -589,7 +589,16 @@ func TestSignRequestDiscardSig(t *testing.T) {
 }
 
 func readRequest(s string) *http.Request {
+	in := strings.NewReader(s)
+	req, err := http.ReadRequest(bufio.NewReader(in))
+	_ = err
+	return req
+}
+
+func readRequestChunked(s string) *http.Request {
 	// Go replaces \n by CRLF automatically, but not for chunked encodings, so we do it manually
+	// We can't do this simple substitution by default because it would change message bodies
+	// For more details, see https://github.com/golang/go/issues/56835
 	in := strings.NewReader(strings.ReplaceAll(s, "\n", "\r\n"))
 	req, err := http.ReadRequest(bufio.NewReader(in))
 	_ = err
@@ -1392,6 +1401,19 @@ func Test_signRequestDebug(t *testing.T) {
 			wantErr:            false,
 		},
 		{
+			name: "URL encoding, Sec. 2.2.7",
+			args: args{
+				signatureName: "sig1",
+				signer: makeHMACSigner(*NewSignConfig().SignCreated(false),
+					*NewFields().AddHeaders("@method", "@query")),
+				req: readRequest(httpreq7),
+			},
+			wantSignatureInput: "sig1=(\"@method\" \"@query\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantSignature:      "sig1=:uRzbky9o4AYp/yKqqPLHjOJ0SHYFRWRmczj9cb6tMTo=:",
+			wantSignatureBase:  "\"@method\": POST\n\"@query\": ?param=value&foo=bar&baz=bat%2Dman\n\"@signature-params\": (\"@method\" \"@query\");alg=\"hmac-sha256\";keyid=\"test-key-hmac\"",
+			wantErr:            false,
+		},
+		{
 			name: "issue #1, @request-target",
 			args: args{
 				signatureName: "sig1",
@@ -1561,6 +1583,11 @@ Signature-Input: reqres=("@status" "content-length" "content-type" "signature";r
 Signature: reqres=:vR1E+sDgh0J3dZyVdPc7mK0ZbEMW3N47eDpFjXLE9g95Gx1KQLpdOmDQfedgdLzaFCqfD0WPn9e9/jubyUuZRw==:
 
 {"busy": true, "message": "Your call is very important to us"}
+`
+
+var httpreq7 = `POST /path?param=value&foo=bar&baz=bat%2Dman HTTP/1.1
+Host: www.example.com
+
 `
 
 // ";req" use case from draft, Sec. 2.3 of draft -10
