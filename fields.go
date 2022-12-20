@@ -325,10 +325,25 @@ outer:
 	return true
 }
 
+// TODO: should only compare the header name, Equal() would fail if there are params
 func (fs *Fields) hasHeader(name string) bool {
 	h := *fromHeaderName(name)
 	for _, f := range fs.f {
 		if f.Equal(h) {
+			return true
+		}
+	}
+	return false
+}
+
+func (fs *Fields) hasTrailerFields(forAssocRequest bool) bool {
+	for _, f := range fs.f {
+		_, tr := f.Params.Get("tr")
+		_, req := f.Params.Get("req")
+		if tr && (req && forAssocRequest) {
+			return true
+		}
+		if tr && (!req && !forAssocRequest) {
 			return true
 		}
 	}

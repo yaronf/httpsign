@@ -44,9 +44,10 @@ func GenerateContentDigestHeader(body *io.ReadCloser, schemes []string) (string,
 	return httpsfv.Marshal(dict)
 }
 
+// Note side effect: the value of body is replaced
 func duplicateBody(body *io.ReadCloser) (*bytes.Buffer, error) {
 	buff := &bytes.Buffer{}
-	if body != nil {
+	if body != nil && *body != nil {
 		_, err := buff.ReadFrom(*body)
 		if err != nil {
 			return nil, err

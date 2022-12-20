@@ -628,6 +628,31 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 	assert.NoError(t, err, "verification error")
 }
 
+func TestSignAndVerifyHMACNoHeader(t *testing.T) {
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+	fields := Headers("@authority", "content-type")
+	signatureName := "sig1"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+	req := readRequest(longReq1)
+	_, sig, err := SignRequest(signatureName, *signer, req)
+	assert.NoError(t, err, "failed to sign")
+	req.Header.Add("Signature", sig)
+	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
+	assert.NoError(t, err, "could not generate Verifier")
+	err = VerifyRequest(signatureName, *verifier, req)
+	assert.Error(t, err, "verification should fail, header not found")
+
+	req = readRequest(longReq1)
+	sigInput, _, err := SignRequest(signatureName, *signer, req)
+	assert.NoError(t, err, "failed to sign")
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err = NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
+	assert.NoError(t, err, "could not generate Verifier")
+	err = VerifyRequest(signatureName, *verifier, req)
+	assert.Error(t, err, "verification should fail, header not found")
+}
+
 func TestSignAndVerifyHMACBad(t *testing.T) {
 	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
 	fields := Headers("@authority", "date", "content-type")
@@ -1196,6 +1221,20 @@ func TestResponseDetails(t *testing.T) {
 	}
 }
 
+func TestRequestSignatureNames(t *testing.T) {
+	req := readRequest(httpreq8)
+	names, err := RequestSignatureNames(req, false)
+	assert.NoError(t, err, "failed to fetch signature names")
+	assert.ElementsMatch(t, names, []string{"sig3", "sig2", "sig1"}, "did not find all signature names")
+}
+
+func TestResponseSignatureNames(t *testing.T) {
+	res := readResponse(httpres8)
+	names, err := ResponseSignatureNames(res, false)
+	assert.NoError(t, err, "failed to fetch signature names")
+	assert.ElementsMatch(t, names, []string{"sig3", "sig2", "sig1"}, "did not find all signature names")
+}
+
 func genP256KeyPair() (priv *ecdsa.PrivateKey, pub *ecdsa.PublicKey, err error) {
 	return genECCKeypair(elliptic.P256())
 }
@@ -1590,20 +1629,42 @@ Host: www.example.com
 
 `
 
+var httpreq8 = `POST /foo?param=Value&Pet=dog HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Content-Type: application/json
+Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+Content-Length: 18
+Signature-Input: sig1=("@method" "@authority" "@path" "content-digest" "content-length" "content-type");created=1618884475;keyid="test-key-rsa-pss"
+Signature:  sig1=:LAH8BjcfcOcLojiuOBFWn0P5keD3xAOuJRGziCLuD8r5MW9S0RoXXLzLSRfGY/3SF8kVIkHjE13SEFdTo4Af/fJ/Pu9wheqoLVdwXyY/UkBIS1M8Brc8IODsn5DFIrG0IrburbLi0uCc+E2ZIIb6HbUJ+o+jP58JelMTe0QE3IpWINTEzpxjqDf5/Df+InHCAkQCTuKsamjWXUpyOT1Wkxi7YPVNOjW4MfNuTZ9HdbD2Tr65+BXeTG9ZS/9SWuXAc+BZ8WyPz0QRz//ec3uWXd7bYYODSjRAxHqX+S1ag3LZElYyUKaAIjZ8MGOt4gXEwCSLDv/zqxZeWLj/PDkn6w==:
+Signature:  sig2=:LAH8BjcfcOcLojiuOBFWn0P5keD3xAOuJRGziCLuD8r5MW9S0RoXXLzLSRfGY/3SF8kVIkHjE13SEFdTo4Af/fJ/Pu9wheqoLVdwXyY/UkBIS1M8Brc8IODsn5DFIrG0IrburbLi0uCc+E2ZIIb6HbUJ+o+jP58JelMTe0QE3IpWINTEzpxjqDf5/Df+InHCAkQCTuKsamjWXUpyOT1Wkxi7YPVNOjW4MfNuTZ9HdbD2Tr65+BXeTG9ZS/9SWuXAc+BZ8WyPz0QRz//ec3uWXd7bYYODSjRAxHqX+S1ag3LZElYyUKaAIjZ8MGOt4gXEwCSLDv/zqxZeWLj/PDkn6w==:
+Signature-Input: sig3=("@method" "@authority" "@path" "content-digest" "content-length" "content-type");created=1618884475;keyid="test-key-rsa-pss"
+Signature-Input: sig2=("@method" "@authority" "@path" "content-digest" "content-length" "content-type");created=1618884475;keyid="test-key-rsa-pss"
+Signature:  sig3=:LAH8BjcfcOcLojiuOBFWn0P5keD3xAOuJRGziCLuD8r5MW9S0RoXXLzLSRfGY/3SF8kVIkHjE13SEFdTo4Af/fJ/Pu9wheqoLVdwXyY/UkBIS1M8Brc8IODsn5DFIrG0IrburbLi0uCc+E2ZIIb6HbUJ+o+jP58JelMTe0QE3IpWINTEzpxjqDf5/Df+InHCAkQCTuKsamjWXUpyOT1Wkxi7YPVNOjW4MfNuTZ9HdbD2Tr65+BXeTG9ZS/9SWuXAc+BZ8WyPz0QRz//ec3uWXd7bYYODSjRAxHqX+S1ag3LZElYyUKaAIjZ8MGOt4gXEwCSLDv/zqxZeWLj/PDkn6w==:
+
+{"hello": "world"}
+`
+
+var httpres8 = `HTTP/1.1 503 Service Unavailable
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Content-Type: application/json
+Content-Length: 62
+Signature-Input: sig2=("@status" "content-length" "content-type" "signature";req;key="sig1");created=1618884479;keyid="test-key-ecc-p256"
+Signature: sig2=:vR1E+sDgh0J3dZyVdPc7mK0ZbEMW3N47eDpFjXLE9g95Gx1KQLpdOmDQfedgdLzaFCqfD0WPn9e9/jubyUuZRw==:
+Signature-Input: sig1=("@status" "content-length" "content-type" "signature";req;key="sig1");created=1618884479;keyid="test-key-ecc-p256"
+Signature-Input: sig3=("@status" "content-length" "content-type" "signature";req;key="sig1");created=1618884479;keyid="test-key-ecc-p256"
+Signature: sig3=:vR1E+sDgh0J3dZyVdPc7mK0ZbEMW3N47eDpFjXLE9g95Gx1KQLpdOmDQfedgdLzaFCqfD0WPn9e9/jubyUuZRw==:
+Signature: sig1=:vR1E+sDgh0J3dZyVdPc7mK0ZbEMW3N47eDpFjXLE9g95Gx1KQLpdOmDQfedgdLzaFCqfD0WPn9e9/jubyUuZRw==:
+
+{"busy": true, "message": "Your call is very important to us"}
+`
+
 // ";req" use case from draft, Sec. 2.3 of draft -10
 func TestRequestBinding(t *testing.T) {
 	req := readRequest(httpreq6)
-	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
-	if err != nil {
-		t.Errorf("cannot read public key: %v", err)
-	}
 	contentDigest := req.Header.Values("Content-Digest")
-	err = ValidateContentDigestHeader(contentDigest, &req.Body, []string{DigestSha512})
+	err := ValidateContentDigestHeader(contentDigest, &req.Body, []string{DigestSha512})
 	assert.NoError(t, err, "validate digest")
-	fields := *NewFields()
-	verifier, err := NewRSAPSSVerifier("test-key-rsa-pss", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
-	assert.NoError(t, err, "create verifier")
-	_, err = verifyRequestDebug("sig1", *verifier, req)
 
 	res := readResponse(httpres6)
 	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)

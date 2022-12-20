@@ -12,19 +12,29 @@ import (
 type components map[string]string
 
 type parsedMessage struct {
-	derived components
-	url     *url.URL
-	headers http.Header
-	qParams url.Values
+	derived           components
+	url               *url.URL
+	headers, trailers http.Header // we abuse this type: names are lowercase instead of canonicalized
+	qParams           url.Values
 }
 
-func parseRequest(req *http.Request) (*parsedMessage, error) {
+func parseRequest(req *http.Request, withTrailers bool) (*parsedMessage, error) {
 	if req == nil {
 		return nil, nil
 	}
 	err := validateMessageHeaders(req.Header)
 	if err != nil {
 		return nil, err
+	}
+	if withTrailers {
+		_, err = duplicateBody(&req.Body) // read the entire body to populate the trailers
+		if err != nil {
+			return nil, fmt.Errorf("cannot duplicate request body: %w", err)
+		}
+		err = validateMessageHeaders(req.Trailer)
+		if err != nil {
+			return nil, fmt.Errorf("could not validate trailers: %w", err)
+		}
 	}
 	values, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
@@ -41,10 +51,14 @@ func parseRequest(req *http.Request) (*parsedMessage, error) {
 			u.Scheme = "https"
 		}
 	}
-	return &parsedMessage{derived: generateReqDerivedComponents(req), url: u, headers: normalizeHeaderNames(req.Header), qParams: values}, nil
+	return &parsedMessage{derived: generateReqDerivedComponents(req), url: u, headers: normalizeHeaderNames(req.Header),
+		trailers: normalizeHeaderNames(req.Trailer), qParams: values}, nil
 }
 
 func normalizeHeaderNames(header http.Header) http.Header {
+	if header == nil {
+		return nil
+	}
 	var t = http.Header{}
 	for k, v := range header {
 		t[strings.ToLower(k)] = v
@@ -52,10 +66,20 @@ func normalizeHeaderNames(header http.Header) http.Header {
 	return t
 }
 
-func parseResponse(res *http.Response) (*parsedMessage, error) {
+func parseResponse(res *http.Response, withTrailers bool) (*parsedMessage, error) {
 	err := validateMessageHeaders(res.Header)
 	if err != nil {
 		return nil, err
+	}
+	if withTrailers {
+		_, err = duplicateBody(&res.Body) // read the entire body to populate the trailers
+		if err != nil {
+			return nil, fmt.Errorf("cannot duplicate request body: %w", err)
+		}
+		err = validateMessageHeaders(res.Trailer)
+		if err != nil {
+			return nil, fmt.Errorf("could not validate trailers: %w", err)
+		}
 	}
 
 	return &parsedMessage{derived: generateResDerivedComponents(res), url: nil,

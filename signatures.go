@@ -1,8 +1,10 @@
 package httpsign
 
 import (
+	"errors"
 	"fmt"
 	"github.com/dunglas/httpsfv"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -126,7 +128,7 @@ func generateFieldValues(f field, message parsedMessage) ([]string, error) {
 			}
 			return []string{vv}, nil
 		}
-		return message.getHeader(name, f.structuredField(), f.binarySequence())
+		return message.getHeader(name, f.structuredField(), f.binarySequence(), f.trailer())
 	}
 	ok, name = f.queryParam()
 	if ok {
@@ -138,18 +140,18 @@ func generateFieldValues(f field, message parsedMessage) ([]string, error) {
 	}
 	ok, hdr, key := f.dictHeader()
 	if ok {
-		return message.getDictHeader(hdr, key)
+		return message.getDictHeader(hdr, f.trailer(), key)
 	}
 	return nil, fmt.Errorf("unrecognized field %s", f)
 }
 
-func (message *parsedMessage) getHeader(hdr string, structured, binary bool) ([]string, error) {
+func (message *parsedMessage) getHeader(hdr string, structured, binary, trailer bool) ([]string, error) {
 	if structured && binary {
 		return nil, fmt.Errorf("the \"bs\" and \"sf\" flags are incompatible")
 	}
-	vv, found := message.headers[hdr] // normal header, cannot use "Values" on lowercased header name
-	if !found {
-		return nil, fmt.Errorf("header %s not found", hdr)
+	vv, err := message.getRawHeader(hdr, trailer)
+	if err != nil {
+		return nil, err
 	}
 	if binary {
 		s := encodeBytes([]byte(vv[0]))
@@ -172,11 +174,44 @@ func (message *parsedMessage) getHeader(hdr string, structured, binary bool) ([]
 	}
 }
 
-func (message *parsedMessage) getDictHeader(hdr, member string) ([]string, error) {
-	vals, found := message.headers[hdr]
-	if !found {
-		return nil, fmt.Errorf("dictionary header %s not found", hdr)
+func (message *parsedMessage) getRawHeader(hdr string, trailer bool) ([]string, error) {
+	var vv []string
+	var found bool
+	if !trailer {
+		vv, found = message.headers[hdr] // normal header, cannot use "Values" on lowercased header name
+	} else {
+		vv, found = message.trailers[hdr]
 	}
+	if !found {
+		return nil, fmt.Errorf("header %s not found", hdr)
+	}
+	return vv, nil
+}
+
+func (message *parsedMessage) getDictHeader(hdr string, trailer bool, member string) ([]string, error) {
+	vals, err := message.getRawHeader(hdr, trailer)
+	if err != nil {
+		return nil, err
+	}
+	return lookupMember(hdr, vals, member)
+}
+
+var errHeaderNotFound = fmt.Errorf("header not found")
+
+// Note: no support for Signature headers that straddle header and trailer (which is probably illegal HTTP)
+func getDictHeader(headers http.Header, hdr string, member string) ([]string, error) {
+	if headers == nil {
+		return nil, errHeaderNotFound
+	}
+	normalized := normalizeHeaderNames(headers)
+	vals, found := normalized[hdr]
+	if !found {
+		return nil, errHeaderNotFound
+	}
+	return lookupMember(hdr, vals, member)
+}
+
+func lookupMember(hdr string, vals []string, member string) ([]string, error) {
 	dict, err := httpsfv.UnmarshalDictionary(vals)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse dictionary for %s: %w", hdr, err)
@@ -185,15 +220,15 @@ func (message *parsedMessage) getDictHeader(hdr, member string) ([]string, error
 	if !found {
 		return nil, fmt.Errorf("cannot find member %s of dictionary %s", member, hdr)
 	}
-	switch v.(type) {
+	switch v := v.(type) { // fixed per Staticcheck S1034
 	case httpsfv.Item:
-		vv, err := httpsfv.Marshal(v.(httpsfv.Item))
+		vv, err := httpsfv.Marshal(v)
 		if err != nil {
 			return nil, fmt.Errorf("malformed dictionry member %s: %v", hdr, err)
 		}
 		return []string{vv}, nil
 	case httpsfv.InnerList:
-		vv, err := httpsfv.Marshal(v.(httpsfv.InnerList))
+		vv, err := httpsfv.Marshal(v)
 		if err != nil {
 			return nil, fmt.Errorf("malformed dictionry member %s: %v", hdr, err)
 		}
@@ -275,7 +310,8 @@ func signRequestDebug(signatureName string, signer Signer, req *http.Request) (s
 	if signatureName == "" {
 		return "", "", "", fmt.Errorf("empty signature name")
 	}
-	parsedMessage, err := parseRequest(req)
+	withTrailers := signer.fields.hasTrailerFields(false)
+	parsedMessage, err := parseRequest(req, withTrailers)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -297,11 +333,13 @@ func signResponseDebug(signatureName string, signer Signer, res *http.Response, 
 	if signatureName == "" {
 		return "", "", "", fmt.Errorf("empty signature name")
 	}
-	parsedRes, err := parseResponse(res)
+	resWithTrailers := signer.fields.hasTrailerFields(false)
+	parsedRes, err := parseResponse(res, resWithTrailers)
 	if err != nil {
 		return "", "", "", err
 	}
-	parsedReq, err := parseRequest(req)
+	reqWithTrailers := signer.fields.hasTrailerFields(true)
+	parsedReq, err := parseRequest(req, reqWithTrailers)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -321,14 +359,19 @@ func verifyRequestDebug(signatureName string, verifier Verifier, req *http.Reque
 	if signatureName == "" {
 		return "", fmt.Errorf("empty signature name")
 	}
-	parsedMessage, err := parseRequest(req)
+	withTrailers, wantSigRaw, psiSig, err := extractSignatureFields(signatureName, &verifier, req.Header, req.Trailer, &req.Body)
 	if err != nil {
 		return "", err
 	}
-	return verifyMessage(*verifier.config, signatureName, verifier, parsedMessage, nil, verifier.fields)
+	parsedMessage, err := parseRequest(req, withTrailers)
+	if err != nil {
+		return "", err
+	}
+	return verifyMessage(*verifier.config, verifier, parsedMessage, nil, verifier.fields,
+		wantSigRaw, psiSig)
 }
 
-// MessageDetails aggregates the details of a signed message
+// MessageDetails aggregates the details of a signed message, for a given signature
 type MessageDetails struct {
 	KeyID, Alg string
 	Fields     Fields
@@ -342,11 +385,11 @@ func RequestDetails(signatureName string, req *http.Request) (details *MessageDe
 	if signatureName == "" {
 		return nil, fmt.Errorf("empty signature name")
 	}
-	parsedMessage, err := parseRequest(req)
+	_, _, psiSig, err := extractSignatureFields(signatureName, nil, req.Header, req.Trailer, &req.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not extract signature: %w", err)
 	}
-	return messageDetails(signatureName, *parsedMessage)
+	return signatureDetails(psiSig)
 }
 
 // ResponseDetails parses a signed response and returns the key ID and optionally the algorithm used in the given signature.
@@ -357,27 +400,61 @@ func ResponseDetails(signatureName string, res *http.Response) (details *Message
 	if signatureName == "" {
 		return nil, fmt.Errorf("empty signature name")
 	}
-	parsedMessage, err := parseResponse(res)
+	_, _, psiSig, err := extractSignatureFields(signatureName, nil, res.Header, res.Trailer, &res.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not extract signature: %w", err)
 	}
-	return messageDetails(signatureName, *parsedMessage)
+	return signatureDetails(psiSig)
 }
 
-func messageDetails(signatureName string, parsedMessage parsedMessage) (details *MessageDetails, err error) {
-	si, err := parsedMessage.getDictHeader("signature-input", signatureName)
+// RequestSignatureNames returns the list of signature names present in a request (empty list if none found).
+// This is useful
+// if signature names are not known in advance. Set withTrailers only if the entire message
+// needs to be read because signature headers appear in trailers. Trailers are very uncommon
+// and come at a performance cost.
+func RequestSignatureNames(req *http.Request, withTrailers bool) ([]string, error) {
+	parsedMessage, err := parseRequest(req, withTrailers)
 	if err != nil {
-		return nil, fmt.Errorf("missing \"Signature-Input\" header, or cannot find \"%s\": %w", signatureName, err)
+		return nil, fmt.Errorf("could not parse request: %w", err)
 	}
-	if len(si) > 1 {
-		return nil, fmt.Errorf("more than one \"Signature-Input\" for %s", signatureName)
-	}
-	signatureInput := si[0]
-	psi, err := parseSignatureInput(signatureInput, signatureName)
+	return messageSignatureNames(parsedMessage, withTrailers)
+}
+
+// ResponseSignatureNames returns the list of signature names present in a response (empty list if none found).
+// This is useful
+// if signature names are not known in advance. Set withTrailers only if the entire message
+// needs to be read because signature headers appear in trailers. Trailers are very uncommon
+// and come at a performance cost.
+func ResponseSignatureNames(res *http.Response, withTrailers bool) ([]string, error) {
+	parsedMessage, err := parseResponse(res, withTrailers)
 	if err != nil {
-		return
+		return nil, fmt.Errorf("could not parse response: %w", err)
 	}
-	keyIDParam, ok := psi.params["keyid"]
+	return messageSignatureNames(parsedMessage, withTrailers)
+}
+
+func messageSignatureNames(parsedMessage *parsedMessage, withTrailers bool) ([]string, error) {
+	//lint:ignore SA1008 the Header type expects canonicalized names, tough
+	signatureField := parsedMessage.headers["signature"]
+	dict, err := httpsfv.UnmarshalDictionary(signatureField)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse signature field: %w", err)
+	}
+	names := dict.Names()
+	if withTrailers {
+		//lint:ignore SA1008 the Header type expects canonicalized names, tough
+		signatureField := parsedMessage.trailers["signature"]
+		dict, err := httpsfv.UnmarshalDictionary(signatureField)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse signature field in trailers: %w", err)
+		}
+		names = append(names, dict.Names()...)
+	}
+	return names, nil
+}
+
+func signatureDetails(signature *psiSignature) (details *MessageDetails, err error) {
+	keyIDParam, ok := signature.params["keyid"]
 	if !ok {
 		return nil, fmt.Errorf("missing \"keyid\" parameter")
 	}
@@ -386,7 +463,7 @@ func messageDetails(signatureName string, parsedMessage parsedMessage) (details 
 		return nil, fmt.Errorf("malformed \"keyid\" parameter")
 	}
 	var alg string
-	algParam, ok := psi.params["alg"] // "alg" is optional
+	algParam, ok := signature.params["alg"] // "alg" is optional
 	if ok {
 		alg, ok = algParam.(string)
 		if !ok {
@@ -396,7 +473,7 @@ func messageDetails(signatureName string, parsedMessage parsedMessage) (details 
 	return &MessageDetails{
 		KeyID:  keyID,
 		Alg:    alg,
-		Fields: psi.fields,
+		Fields: signature.fields,
 	}, nil
 }
 
@@ -413,48 +490,65 @@ func verifyResponseDebug(signatureName string, verifier Verifier, res *http.Resp
 	if signatureName == "" {
 		return "", fmt.Errorf("empty signature name")
 	}
-	parsedMessage, err := parseResponse(res)
+	resWithTrailers, wantSigRaw, psiSig, err := extractSignatureFields(signatureName, &verifier, res.Header, res.Trailer, &res.Body)
 	if err != nil {
 		return "", err
 	}
-	parsedAssocMessage, err := parseRequest(req)
+	parsedMessage, err := parseResponse(res, resWithTrailers)
 	if err != nil {
 		return "", err
 	}
-	signatureBase, err = verifyMessage(*verifier.config, signatureName, verifier, parsedMessage, parsedAssocMessage, verifier.fields)
+	// Read the associated request with trailers if the verifier requests its trailers, or there are signed trailer
+	// covered in the signature
+	reqWithTrailers := verifier.fields.hasTrailerFields(true) || psiSig.fields.hasTrailerFields(true)
+	parsedAssocMessage, err := parseRequest(req, reqWithTrailers)
+	if err != nil {
+		return "", err
+	}
+	signatureBase, err = verifyMessage(*verifier.config, verifier, parsedMessage, parsedAssocMessage,
+		verifier.fields, wantSigRaw, psiSig)
 	return signatureBase, err
 }
 
-func verifyMessage(config VerifyConfig, name string, verifier Verifier, message, assocMessage *parsedMessage, fields Fields) (string, error) {
-	wsi, err := message.getDictHeader("signature-input", name)
+func extractSignatureFields(signatureName string, verifier *Verifier,
+	headers http.Header, trailers http.Header, body *io.ReadCloser) (bool, []byte, *psiSignature, error) {
+	/*
+		Parse trailers if:
+		- A trailer field needs to be verified
+		- The Signature or Signature-Input headers are not found
+		- A trailer field was covered in the signature
+	*/
+	var needTrailers = false
+	if verifier != nil {
+		needTrailers = needTrailers || verifier.fields.hasTrailerFields(false)
+	}
+	sigRaw, parsedSigInput, err := signatureFieldsFromHeaders(headers, signatureName)
 	if err != nil {
-		return "", fmt.Errorf("missing \"signature-input\" header, or cannot find signature \"%s\": %w", name, err)
+		if errors.Is(err, errHeaderNotFound) {
+			_, err := duplicateBody(body)
+			if err != nil {
+				return false, nil, nil, err
+			}
+			sigRaw, parsedSigInput, err = signatureFieldsFromHeaders(trailers, signatureName)
+			if err != nil {
+				return false, nil, nil, err
+			}
+			needTrailers = true
+		} else {
+			return false, nil, nil, err
+		}
 	}
-	if len(wsi) > 1 {
-		return "", fmt.Errorf("multiple \"signature-header\" values for %s", name)
-	}
-	wantSignatureInput := wsi[0]
-	ws, err := message.getDictHeader("signature", name)
-	if err != nil {
-		return "", fmt.Errorf("missing \"signature\" header")
-	}
-	if len(ws) > 1 {
-		return "", fmt.Errorf("multiple \"signature\" values for %s", name)
-	}
-	wantSignature := ws[0]
-	wantSigRaw, err := parseWantSignature(wantSignature)
-	if err != nil {
-		return "", err
-	}
-	psiSig, err := parseSignatureInput(wantSignatureInput, name)
-	if err != nil {
-		return "", err
-	}
+	needTrailers = needTrailers || parsedSigInput.fields.hasTrailerFields(false)
+	return needTrailers, sigRaw, parsedSigInput, nil
+}
+
+func verifyMessage(config VerifyConfig, verifier Verifier, message, assocMessage *parsedMessage,
+	fields Fields, wantSigRaw []byte, psiSig *psiSignature) (string, error) {
 	filtered := filterOptionalFields(fields, message, assocMessage)
 	if !(psiSig.fields.contains(&filtered)) {
 		return "", fmt.Errorf("actual signature does not cover all required fields")
 	}
-	err = applyVerificationPolicy(verifier, *message, psiSig, config)
+	err := applyVerificationPolicy(verifier, *message, psiSig, config)
 	if err != nil {
 		return "", err
 	}
@@ -463,6 +557,34 @@ func verifyMessage(config VerifyConfig, name string, verifier Verifier, message,
 		return "", err
 	}
 	return signatureBase, verifySignature(verifier, signatureBase, wantSigRaw)
+}
+
+func signatureFieldsFromHeaders(header http.Header, name string) ([]byte, *psiSignature, error) {
+	wsi, err := getDictHeader(header, "signature-input", name)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(wsi) > 1 {
+		return nil, nil, fmt.Errorf("multiple \"signature-header\" values for %s", name)
+	}
+	wantSignatureInput := wsi[0]
+	ws, err := getDictHeader(header, "signature", name)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(ws) > 1 {
+		return nil, nil, fmt.Errorf("multiple \"signature\" values for %s", name)
+	}
+	wantSignature := ws[0]
+	wantSigRaw, err := parseWantSignature(wantSignature)
+	if err != nil {
+		return nil, nil, err
+	}
+	psiSig, err := parseSignatureInput(wantSignatureInput, name)
+	if err != nil {
+		return nil, nil, err
+	}
+	return wantSigRaw, psiSig, nil
 }
 
 func applyVerificationPolicy(verifier Verifier, message parsedMessage, psi *psiSignature, config VerifyConfig) error {
@@ -592,7 +714,7 @@ func applyPolicyCreated(psi *psiSignature, message parsedMessage, config VerifyC
 		}
 
 		if config.dateWithin != 0 {
-			dateHdr, ok := message.headers["date"]
+			dateHdr, ok := message.headers["Date"]
 			if ok {
 				if len(dateHdr) > 1 {
 					return fmt.Errorf("multiple Date headers")

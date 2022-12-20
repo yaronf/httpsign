@@ -272,7 +272,7 @@ func TestClient_PostForm(t *testing.T) {
 			args: args{
 				url: ts.URL,
 				data: func() url.Values {
-					var v url.Values = url.Values{}
+					var v = url.Values{}
 					v.Add("k1", "v1")
 					v.Set("k2", "v2")
 					return v

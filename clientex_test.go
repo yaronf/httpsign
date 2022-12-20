@@ -116,7 +116,7 @@ func TestClientUsage(t *testing.T) {
 	body := `{"hello": "world"}`
 	res, err := client.Post(ts.URL, "application/json", bufio.NewReader(strings.NewReader(body)))
 	if err != nil {
-		// handle error
+		_ = err // handle error
 	}
 
 	// Read the response
