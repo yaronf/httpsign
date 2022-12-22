@@ -9,6 +9,7 @@ require (
 	github.com/stretchr/testify v1.8.0
 )
 
+// TODO: remove local reference when this is fixed upstream
 replace github.com/dunglas/httpsfv v1.0.1 => /Users/ysheffer/IdeaProjects/httpsfv
 
 require (
