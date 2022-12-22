@@ -1126,11 +1126,15 @@ func TestVerifyRequest(t *testing.T) {
 	}
 }
 
-func makeRSAVerifier(t *testing.T, keyID string, fields Fields) Verifier {
+type failer interface {
+	Errorf(format string, args ...any)
+}
+
+func makeRSAVerifier(f failer, keyID string, fields Fields) Verifier {
 	return (func() Verifier {
 		pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
 		if err != nil {
-			t.Errorf("cannot parse public key: %v", err)
+			f.Errorf("cannot parse public key: %v", err)
 		}
 		verifier, _ := NewRSAPSSVerifier(keyID, *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
 		return *verifier

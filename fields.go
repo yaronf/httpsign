@@ -96,7 +96,12 @@ func (f field) headerName() (bool, string) {
 	_, ok1 := f.Params.Get("name")
 	_, ok2 := f.Params.Get("key")
 	if !ok1 && !ok2 {
-		return true, f.Value.(string)
+		s, ok := f.Value.(string)
+		if ok {
+			return true, s
+		} else {
+			return false, ""
+		}
 	}
 	return false, ""
 }
@@ -131,7 +136,12 @@ func (f field) queryParam() (bool, string) {
 	if err == nil && name == "@query-param" {
 		v, ok := httpsfv.Item(f).Params.Get("name")
 		if ok {
-			return true, v.(string)
+			s, ok := v.(string)
+			if ok {
+				return true, s
+			} else {
+				return false, ""
+			}
 		}
 	}
 	return false, ""
@@ -162,7 +172,13 @@ func fromDictHeader(hdr, key string) *field {
 func (f field) dictHeader() (ok bool, hdr, key string) {
 	v, ok := f.Params.Get("key")
 	if ok {
-		return true, f.Value.(string), v.(string)
+		s1, ok1 := f.Value.(string)
+		s2, ok2 := v.(string)
+		if ok1 && ok2 {
+			return true, s1, s2
+		} else {
+			return false, "", ""
+		}
 	}
 	return false, "", ""
 }

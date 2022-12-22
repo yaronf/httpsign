@@ -9,6 +9,8 @@ require (
 	github.com/stretchr/testify v1.8.0
 )
 
+replace github.com/dunglas/httpsfv v1.0.1 => /Users/ysheffer/IdeaProjects/httpsfv
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
