@@ -10,7 +10,7 @@ require (
 )
 
 // TODO: remove local reference when this is fixed upstream
-replace github.com/dunglas/httpsfv v1.0.1 => /Users/ysheffer/IdeaProjects/httpsfv
+// replace github.com/dunglas/httpsfv v1.0.1 => /Users/ysheffer/IdeaProjects/httpsfv
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

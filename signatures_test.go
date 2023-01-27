@@ -185,7 +185,47 @@ Signature: ttrp=:xVMHVpawaAC/0SbHrKRs9i8I3eOs5RtTMGCWXm/9nvZzoHsIg6Mce9315T6xokl
 
 {"hello": "world"}`
 
-var rsaPubKey = `-----BEGIN PUBLIC KEY-----
+var rsaPubKey = `
+-----BEGIN RSA PUBLIC KEY-----
+MIIBCgKCAQEAhAKYdtoeoy8zcAcR874L8cnZxKzAGwd7v36APp7Pv6Q2jdsPBRrw
+WEBnez6d0UDKDwGbc6nxfEXAy5mbhgajzrw3MOEt8uA5txSKobBpKDeBLOsdJKFq
+MGmXCQvEG7YemcxDTRPxAleIAgYYRjTSd/QBwVW9OwNFhekro3RtlinV0a75jfZg
+kne/YiktSvLG34lw2zqXBDTC5NHROUqGTlML4PlNZS5Ri2U4aCNx2rUPRcKIlE0P
+uKxI4T+HIaFpv8+rdV6eUgOrB2xeI1dSFFn/nnv5OoZJEIB+VmuKn3DCUcCZSFlQ
+PSXSfBDiUGhwOw76WuSSsf1D4b/vLoJ10wIDAQAB
+-----END RSA PUBLIC KEY-----
+`
+
+var rsaPrvKey = `
+-----BEGIN RSA PRIVATE KEY-----
+MIIEqAIBAAKCAQEAhAKYdtoeoy8zcAcR874L8cnZxKzAGwd7v36APp7Pv6Q2jdsP
+BRrwWEBnez6d0UDKDwGbc6nxfEXAy5mbhgajzrw3MOEt8uA5txSKobBpKDeBLOsd
+JKFqMGmXCQvEG7YemcxDTRPxAleIAgYYRjTSd/QBwVW9OwNFhekro3RtlinV0a75
+jfZgkne/YiktSvLG34lw2zqXBDTC5NHROUqGTlML4PlNZS5Ri2U4aCNx2rUPRcKI
+lE0PuKxI4T+HIaFpv8+rdV6eUgOrB2xeI1dSFFn/nnv5OoZJEIB+VmuKn3DCUcCZ
+SFlQPSXSfBDiUGhwOw76WuSSsf1D4b/vLoJ10wIDAQABAoIBAG/JZuSWdoVHbi56
+vjgCgkjg3lkO1KrO3nrdm6nrgA9P9qaPjxuKoWaKO1cBQlE1pSWp/cKncYgD5WxE
+CpAnRUXG2pG4zdkzCYzAh1i+c34L6oZoHsirK6oNcEnHveydfzJL5934egm6p8DW
++m1RQ70yUt4uRc0YSor+q1LGJvGQHReF0WmJBZHrhz5e63Pq7lE0gIwuBqL8SMaA
+yRXtK+JGxZpImTq+NHvEWWCu09SCq0r838ceQI55SvzmTkwqtC+8AT2zFviMZkKR
+Qo6SPsrqItxZWRty2izawTF0Bf5S2VAx7O+6t3wBsQ1sLptoSgX3QblELY5asI0J
+YFz7LJECgYkAsqeUJmqXE3LP8tYoIjMIAKiTm9o6psPlc8CrLI9CH0UbuaA2JCOM
+cCNq8SyYbTqgnWlB9ZfcAm/cFpA8tYci9m5vYK8HNxQr+8FS3Qo8N9RJ8d0U5Csw
+DzMYfRghAfUGwmlWj5hp1pQzAuhwbOXFtxKHVsMPhz1IBtF9Y8jvgqgYHLbmyiu1
+mwJ5AL0pYF0G7x81prlARURwHo0Yf52kEw1dxpx+JXER7hQRWQki5/NsUEtv+8RT
+qn2m6qte5DXLyn83b1qRscSdnCCwKtKWUug5q2ZbwVOCJCtmRwmnP131lWRYfj67
+B/xJ1ZA6X3GEf4sNReNAtaucPEelgR2nsN0gKQKBiGoqHWbK1qYvBxX2X3kbPDkv
+9C+celgZd2PW7aGYLCHq7nPbmfDV0yHcWjOhXZ8jRMjmANVR/eLQ2EfsRLdW69bn
+f3ZD7JS1fwGnO3exGmHO3HZG+6AvberKYVYNHahNFEw5TsAcQWDLRpkGybBcxqZo
+81YCqlqidwfeO5YtlO7etx1xLyqa2NsCeG9A86UjG+aeNnXEIDk1PDK+EuiThIUa
+/2IxKzJKWl1BKr2d4xAfR0ZnEYuRrbeDQYgTImOlfW6/GuYIxKYgEKCFHFqJATAG
+IxHrq1PDOiSwXd2GmVVYyEmhZnbcp8CxaEMQoevxAta0ssMK3w6UsDtvUvYvF22m
+qQKBiD5GwESzsFPy3Ga0MvZpn3D6EJQLgsnrtUPZx+z2Ep2x0xc5orneB5fGyF1P
+WtP+fG5Q6Dpdz3LRfm+KwBCWFKQjg7uTxcjerhBWEYPmEMKYwTJF5PBG9/ddvHLQ
+EQeNC8fHGg4UXU8mhHnSBt3EA10qQJfRDs15M38eG2cYwB1PZpDHScDnDA0=
+-----END RSA PRIVATE KEY-----`
+
+var rsaPubKey2 = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyD6Hrh5mV16s/jQngCF1
 IfpzLuJTraeqJFlNESsvbeNMcA4dQjU/LMX2XA3vyF7nOyleTisdmzFZb9TLoC1H
 UkcEBb1lkEh0ecm6Kz6wI6imKloeoDoASlXpIa6vr5dT3hcfek15SDBkOgbfEJoe
@@ -196,7 +236,7 @@ OQIDAQAB
 -----END PUBLIC KEY-----
 `
 
-var rsaPrvKey = `-----BEGIN PRIVATE KEY-----
+var rsaPrvKey2 = `-----BEGIN PRIVATE KEY-----
 MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDIPoeuHmZXXqz+
 NCeAIXUh+nMu4lOtp6okWU0RKy9t40xwDh1CNT8sxfZcDe/IXuc7KV5OKx2bMVlv
 1MugLUdSRwQFvWWQSHR5yborPrAjqKYqWh6gOgBKVekhrq+vl1PeFx96TXlIMGQ6
@@ -336,6 +376,18 @@ func parseRsaPublicKeyFromPemStr(pemString string) (*rsa.PublicKey, error) {
 		return nil, err
 	}
 	return k.(*rsa.PublicKey), nil
+}
+
+func parseRsaPublicKey(pkey string) (*rsa.PublicKey, error) {
+	block, _ := pem.Decode([]byte(pkey))
+	if block == nil {
+		return nil, fmt.Errorf("cannot decode PEM")
+	}
+	k, err := x509.ParsePKCS1PublicKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return k, nil
 }
 
 func parseECPublicKeyFromPemStr(pemString string) (*ecdsa.PublicKey, error) {
@@ -788,7 +840,7 @@ func TestSignAndVerifyRSA(t *testing.T) {
 	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
 	fields := Headers("@authority", "date", "content-type")
 	signatureName := "sig1"
-	prvKey, err := parseRsaPrivateKeyFromPemStr(rsaPrvKey)
+	prvKey, err := parseRsaPrivateKeyFromPemStr(rsaPrvKey2)
 	if err != nil {
 		t.Errorf("cannot read private key")
 	}
@@ -797,7 +849,7 @@ func TestSignAndVerifyRSA(t *testing.T) {
 	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPubKey)
+	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPubKey2)
 	if err != nil {
 		t.Errorf("cannot read public key: %v", err)
 	}
@@ -1287,7 +1339,7 @@ func TestDictionary(t *testing.T) {
 	}
 }
 
-func TestMultipleSignatures(t *testing.T) {
+func TestMultipleSignaturesOld(t *testing.T) {
 	priv1, _, err := genP256KeyPair() // no pub, no verify
 	if err != nil {
 		t.Errorf("Could not create keypair")
@@ -1323,6 +1375,40 @@ func TestMultipleSignatures(t *testing.T) {
 	if gotSigInput != wantSigInput {
 		t.Errorf("Signature-Header, want %s, got %s", wantSigInput, gotSigInput)
 	}
+}
+
+var httpreq9 = `POST /foo?param=Value&Pet=dog HTTP/1.1
+Host: origin.host.internal.example
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Content-Type: application/json
+Content-Length: 18
+Forwarded: for=192.0.2.123
+Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+Signature-Input: sig1=("@method" "@authority" "@path" "content-digest" "content-type" "content-length");created=1618884475;keyid="test-key-ecc-p256", proxy_sig=("signature";key="sig1" "@authority" "forwarded");created=1618884480;keyid="test-key-rsa";alg="rsa-v1_5-sha256";expires=1618884540
+Signature: sig1=:hNojB+wWw4A7SYF3qK1S01Y4UP5i2JZFYa2WOlMB4Np5iWmJSO0bDe2hrYRbcIWqVAFjuuCBRsB7lYQJkzbb6g==:, proxy_sig=:YvYVO11F+Q+N4WZNeBdjFKluswwE3vQ4cTXpBwEiMz2hwu0J+wSJLRhHlIZ1N83epfnKDxY9cbNaVlbtr2UOLkw5O5Q5M5yrjx3s1mgDOsV7fuItD6iDyNISCiKRuevl+M+TyYBo10ubG83As5CeeoUdmrtI4G6QX7RqEeX0Xj/CYofHljr/dVzARxskjHEQbTztYVg4WD+LWo1zjx9w5fw26tsOMagfXLpDb4zb4/lgpgyNKoXFwG7c89KId5q+0BC+kryWuA35ZcQGaRPAz/NqzeKq/c7p7b/fmHS71fy1jOaFgWFmD+Z77bJLO8AVKuF0y2fpL3KUYHyITQHOsA==:
+
+{"hello": "world"}
+
+`
+
+func TestMultipleSignatures(t *testing.T) {
+	req := readRequest(httpreq9)
+	pubKey1, err := parseECPublicKeyFromPemStr(p256PubKey2)
+	assert.NoError(t, err, "cannot parse ECC public key")
+	verifier1, err := NewP256Verifier("test-key-ecc-p256", *pubKey1, NewVerifyConfig().
+		SetVerifyCreated(false), Headers("@method", "@authority", "@path", "content-digest",
+		"content-type", "content-length"))
+	assert.NoError(t, err, "cannot create verifier1")
+	_, err = verifyRequestDebug("sig1", *verifier1, req)
+	assert.Error(t, err, "sig1 cannot be verified, because the proxy modified the authority field")
+
+	pubKey2, err := parseRsaPublicKey(rsaPubKey)
+	assert.NoError(t, err, "cannot parse RSA public key")
+	verifier2, err := NewRSAVerifier("test-key-rsa", *pubKey2, NewVerifyConfig().
+		SetVerifyCreated(false).SetRejectExpired(false), *NewFields().AddDictHeader("Signature", "sig1").AddHeaders("@authority", "forwarded"))
+	assert.NoError(t, err, "cannot create verifier2")
+	_, err = verifyRequestDebug("proxy_sig", *verifier2, req)
+	assert.NoError(t, err, "proxy signature not verified")
 }
 
 func fold(vs []string) string {

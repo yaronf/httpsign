@@ -70,6 +70,7 @@ func testHTTP(t *testing.T, proto string) {
 			Port   int
 			Scheme string
 		}
+		// Use the Template facility to create the list of expected signed fields
 		wf, err := execTemplate(*tpl, "fields", inputs{Port: portval, Scheme: scheme})
 		if err != nil {
 			t.Errorf("execTemplate failed")
@@ -86,7 +87,6 @@ func testHTTP(t *testing.T, proto string) {
 		}
 
 		if sigInput != wf {
-			// t.Errorf("expected: %s\ngot: %s\n", wantFields, sigInput)
 			t.Errorf("unexpected fields: %s\n", diff.CharacterDiff(sigInput, wantFields))
 		}
 		w.WriteHeader(200)
@@ -110,11 +110,6 @@ func simpleClient(t *testing.T, proto string, simpleHandler func(w http.Response
 	}
 	defer ts.Close()
 
-	tr := &http.Transport{
-		TLSClientConfig:   &tls.Config{InsecureSkipVerify: true}, // Do not verify server certificate
-		ForceAttemptHTTP2: true,
-	}
-
 	signer, err := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{0x03}, 64),
 		NewSignConfig().SignCreated(false),
 		*NewFields().AddHeaders("kuku", "@query", "@method", "@target-uri", "@request-target", "@authority", "@scheme", "@target-uri",
@@ -128,6 +123,10 @@ func simpleClient(t *testing.T, proto string, simpleHandler func(w http.Response
 	case "HTTP/1.1":
 		client = NewDefaultClient(NewClientConfig().SetSignatureName("sig1").SetSigner(signer))
 	case "HTTP/2.0":
+		tr := &http.Transport{
+			TLSClientConfig:   &tls.Config{InsecureSkipVerify: true}, // Do not verify server certificate
+			ForceAttemptHTTP2: true,
+		}
 		c := &http.Client{Transport: tr}
 		client = NewClient(*c, NewClientConfig().SetSignatureName("sig1").SetSigner(signer))
 	default:
