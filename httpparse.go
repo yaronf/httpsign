@@ -63,7 +63,7 @@ func reEncodeQPs(values url.Values) url.Values {
 	for key, v := range values { // Re-escape query parameters, both names and values
 		escapedKey := QueryEscapeForSignature(key)
 		escaped[escapedKey] = make([]string, len(values[key]))
-		for key2, _ := range v {
+		for key2 := range v {
 			escaped[escapedKey][key2] = QueryEscapeForSignature(values[key][key2])
 		}
 	}
