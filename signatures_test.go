@@ -1972,3 +1972,24 @@ func TestTransformations(t *testing.T) {
 	testOneTransformation(t, httpTransform5, false)
 	testOneTransformation(t, httpTransform6, false)
 }
+
+var httpreq10 = `GET /parameters?var=this%20is%20a%20big%0Amultiline%20value&bar=with+plus+whitespace&fa%C3%A7ade%22%3A%20=something HTTP/1.1
+Host: www.example.com	
+Date: Tue, 20 Apr 2021 02:07:56 GMT	
+
+`
+
+func TestQPEncoding(t *testing.T) {
+	req := readRequest(httpreq10)
+	f1 := NewFields().AddQueryParam("var").AddQueryParam("bar").AddQueryParam("façade\": ")
+	key1 := bytes.Repeat([]byte{0x67}, 64)
+	signer, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(8888), *f1)
+	assert.NoError(t, err, "Could not create signer")
+	_, _, sigBase, err := signRequestDebug("sig1", *signer, req)
+	assert.NoError(t, err, "Should not fail while signing weird QPs")
+	expected := `"@query-param";name="var": this%20is%20a%20big%0Amultiline%20value
+"@query-param";name="bar": with%20plus%20whitespace
+"@query-param";name="fa%C3%A7ade%22%3A%20": something
+"@signature-params": ("@query-param";name="var" "@query-param";name="bar" "@query-param";name="fa%C3%A7ade%22%3A%20");created=8888;alg="hmac-sha256";keyid="key1"`
+	assert.Equal(t, expected, sigBase)
+}

@@ -124,9 +124,8 @@ func (fs *Fields) AddHeaderExt(hdr string, optional bool, binarySequence bool, a
 }
 
 func fromQueryParam(qp string) *field {
-	q := strings.ToLower(qp)
 	i := httpsfv.NewItem("@query-param")
-	i.Params.Add("name", q)
+	i.Params.Add("name", QueryEscapeForSignature(qp))
 	f := field(i)
 	return &f
 }

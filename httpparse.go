@@ -36,10 +36,13 @@ func parseRequest(req *http.Request, withTrailers bool) (*parsedMessage, error) 
 			return nil, fmt.Errorf("could not validate trailers: %w", err)
 		}
 	}
+	// Query params are only obtained from the URL (i.e. not from the message body, when using application/x-www-form-urlencoded)
+	// So we are not vulnerable to the issue described in Sec. "Ambiguous Handling of Query Elements" of the draft.
 	values, err := url.ParseQuery(req.URL.RawQuery)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse query: %s", req.URL.RawQuery)
 	}
+	escaped := reEncodeQPs(values)
 	u := req.URL
 	if u.Host == "" {
 		u.Host = req.Host
@@ -52,7 +55,19 @@ func parseRequest(req *http.Request, withTrailers bool) (*parsedMessage, error) 
 		}
 	}
 	return &parsedMessage{derived: generateReqDerivedComponents(req), url: u, headers: normalizeHeaderNames(req.Header),
-		trailers: normalizeHeaderNames(req.Trailer), qParams: values}, nil
+		trailers: normalizeHeaderNames(req.Trailer), qParams: escaped}, nil
+}
+
+func reEncodeQPs(values url.Values) url.Values {
+	escaped := url.Values{}
+	for key, v := range values { // Re-escape query parameters, both names and values
+		escapedKey := QueryEscapeForSignature(key)
+		escaped[escapedKey] = make([]string, len(values[key]))
+		for key2, _ := range v {
+			escaped[escapedKey][key2] = QueryEscapeForSignature(values[key][key2])
+		}
+	}
+	return escaped
 }
 
 func normalizeHeaderNames(header http.Header) http.Header {
