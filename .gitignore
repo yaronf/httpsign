@@ -1,3 +1,4 @@
 /http2/
 /fuzz/go.sum
 /.idea/inspectionProfiles/Project_Default.xml
+/testdata/fuzz/FuzzSignAndVerifyHMAC/
