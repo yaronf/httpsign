@@ -1391,6 +1391,7 @@ Signature: sig1=:hNojB+wWw4A7SYF3qK1S01Y4UP5i2JZFYa2WOlMB4Np5iWmJSO0bDe2hrYRbcIW
 
 `
 
+// This was superseded once again in draft -17. See TestMultipleSignatures17.
 func TestMultipleSignatures(t *testing.T) {
 	req := readRequest(httpreq9)
 	pubKey1, err := parseECPublicKeyFromPemStr(p256PubKey2)
@@ -2049,4 +2050,55 @@ func TestRequestBinding17(t *testing.T) {
 	responseContentDigest := res.Header.Values("Content-Digest")
 	err = ValidateContentDigestHeader(responseContentDigest, &res.Body, []string{DigestSha512})
 	assert.NoError(t, err, "validate response digest")
+}
+
+var httpreq12 = `POST /foo?param=Value&Pet=dog HTTP/1.1
+Host: origin.host.internal.example
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Content-Type: application/json
+Content-Length: 18
+Forwarded: for=192.0.2.123;host=example.com;proto=https
+Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+Signature-Input: sig1=("@method" "@authority" "@path" "content-digest" "content-type" "content-length");created=1618884475;keyid="test-key-ecc-p256", proxy_sig=("@method" "@authority" "@path" "content-digest" "content-type" "content-length" "forwarded");created=1618884480;keyid="test-key-rsa";alg="rsa-v1_5-sha256";expires=1618884540
+Signature: sig1=:X5spyd6CFnAG5QnDyHfqoSNICd+BUP4LYMz2Q0JXlb//4Ijpzp+kve2w4NIyqeAuM7jTDX+sNalzA8ESSaHD3A==:, proxy_sig=:S6ZzPXSdAMOPjN/6KXfXWNO/f7V6cHm7BXYUh3YD/fRad4BCaRZxP+JH+8XY1I6+8Cy+CM5g92iHgxtRPz+MjniOaYmdkDcnL9cCpXJleXsOckpURl49GwiyUpZ10KHgOEe11sx3G2gxI8S0jnxQB+Pu68U9vVcasqOWAEObtNKKZd8tSFu7LB5YAv0RAGhB8tmpv7sFnIm9y+7X5kXQfi8NMaZaA8i2ZHwpBdg7a6CMfwnnrtflzvZdXAsD3LH2TwevU+/PBPv0B6NMNk93wUs/vfJvye+YuI87HU38lZHowtznbLVdp770I6VHR6WfgS9ddzirrswsE1w5o0LV/g==:
+
+{"hello": "world"}
+`
+
+var httpreq13 = `POST /foo?param=Value&Pet=dog HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Content-Type: application/json
+Content-Length: 18
+Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+Signature-Input: sig1=("@method" "@authority" "@path" "content-digest" "content-type" "content-length");created=1618884475;keyid="test-key-ecc-p256"
+Signature: sig1=:X5spyd6CFnAG5QnDyHfqoSNICd+BUP4LYMz2Q0JXlb//4Ijpzp+kve2w4NIyqeAuM7jTDX+sNalzA8ESSaHD3A==:
+
+{"hello": "world"}
+`
+
+// New in draft -17, signing the message components instead of the signature.
+func TestMultipleSignatures17(t *testing.T) {
+	req := readRequest(httpreq12)
+	pubKey1, err := parseECPublicKeyFromPemStr(p256PubKey2)
+	assert.NoError(t, err, "cannot parse ECC public key")
+	verifier1, err := NewP256Verifier("test-key-ecc-p256", *pubKey1, NewVerifyConfig().
+		SetVerifyCreated(false), Headers("@method", "@authority", "@path", "content-digest",
+		"content-type", "content-length"))
+	assert.NoError(t, err, "cannot create verifier1")
+	_, err = verifyRequestDebug("sig1", *verifier1, req)
+	assert.Error(t, err, "sig1 cannot be verified, because the proxy modified the authority field")
+
+	pubKey2, err := parseRsaPublicKey(rsaPubKey)
+	assert.NoError(t, err, "cannot parse RSA public key")
+	verifier2, err := NewRSAVerifier("test-key-rsa", *pubKey2, NewVerifyConfig().
+		SetVerifyCreated(false).SetRejectExpired(false), *NewFields().AddHeaders("@authority", "forwarded"))
+	assert.NoError(t, err, "cannot create verifier2")
+	_, err = verifyRequestDebug("proxy_sig", *verifier2, req)
+	assert.NoError(t, err, "proxy signature not verified")
+
+	req = readRequest(httpreq13)
+	sigBase, err := verifyRequestDebug("sig1", *verifier1, req)
+	assert.NotEmpty(t, sigBase)
+	assert.NoError(t, err, "sig1 should verify for the original message that the proxy received")
 }
