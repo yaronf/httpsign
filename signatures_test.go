@@ -196,6 +196,7 @@ PSXSfBDiUGhwOw76WuSSsf1D4b/vLoJ10wIDAQAB
 -----END RSA PUBLIC KEY-----
 `
 
+/*
 var rsaPrvKey = `
 -----BEGIN RSA PRIVATE KEY-----
 MIIEqAIBAAKCAQEAhAKYdtoeoy8zcAcR874L8cnZxKzAGwd7v36APp7Pv6Q2jdsP
@@ -224,6 +225,8 @@ qQKBiD5GwESzsFPy3Ga0MvZpn3D6EJQLgsnrtUPZx+z2Ep2x0xc5orneB5fGyF1P
 WtP+fG5Q6Dpdz3LRfm+KwBCWFKQjg7uTxcjerhBWEYPmEMKYwTJF5PBG9/ddvHLQ
 EQeNC8fHGg4UXU8mhHnSBt3EA10qQJfRDs15M38eG2cYwB1PZpDHScDnDA0=
 -----END RSA PRIVATE KEY-----`
+
+*/
 
 var rsaPubKey2 = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyD6Hrh5mV16s/jQngCF1
@@ -1996,12 +1999,11 @@ func TestQPEncoding(t *testing.T) {
 	assert.Equal(t, expected, sigBase)
 }
 
-// TODO: this is changed from the example in the draft, specifically the Host header is different
 var httpreq11 = `POST /foo?param=Value&Pet=dog HTTP/1.1
-Host: origin.host.internal.example
+Host: example.com
 Date: Tue, 20 Apr 2021 02:07:55 GMT
-Content-Type: application/json
 Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+Content-Type: application/json
 Content-Length: 18
 
 {"hello": "world"}
@@ -2013,12 +2015,12 @@ Content-Type: application/json
 Content-Length: 62
 Content-Digest: sha-512=:0Y6iCBzGg5rZtoXS95Ijz03mslf6KAMCloESHObfwnHJDbkkWWQz6PhhU9kxsTbARtY2PTBOzq24uJFpHsMuAg==:
 Signature-Input: reqres=("@status" "content-digest" "content-type" "@authority";req "@method";req "@path";req "content-digest";req);created=1618884479;keyid="test-key-ecc-p256"
-Signature: reqres=:9MG6AOgykOZTc/h2rnDc/g8L+/aXgdkV4hNDvpCxfbVrmLevWPfyvEC/8jBh+3XnVwBqqcJyhUXoFgWv1SMI7A==:
+Signature: reqres=:dMT/A/76ehrdBTD/2Xx8QuKV6FoyzEP/I9hdzKN8LQJLNgzU4W767HK05rx1i8meNQQgQPgQp8wq2ive3tV5Ag==:
 
 {"busy": true, "message": "Your call is very important to us"}
 `
 
-// ";req" use case from draft, with the latest draft -17 corrections (Sec. 2.4)
+// ";req" use case from draft, with the latest draft -17 corrections (Sec. 2.4), and fixed with PR #2591
 func TestRequestBinding17(t *testing.T) {
 	req := readRequest(httpreq11)
 	reqContentDigest := req.Header.Values("Content-Digest")
@@ -2039,7 +2041,7 @@ func TestRequestBinding17(t *testing.T) {
 	expected := `"@status": 503
 "content-digest": sha-512=:0Y6iCBzGg5rZtoXS95Ijz03mslf6KAMCloESHObfwnHJDbkkWWQz6PhhU9kxsTbARtY2PTBOzq24uJFpHsMuAg==:
 "content-type": application/json
-"@authority";req: origin.host.internal.example
+"@authority";req: example.com
 "@method";req: POST
 "@path";req: /foo
 "content-digest";req: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
@@ -2101,4 +2103,67 @@ func TestMultipleSignatures17(t *testing.T) {
 	sigBase, err := verifyRequestDebug("sig1", *verifier1, req)
 	assert.NotEmpty(t, sigBase)
 	assert.NoError(t, err, "sig1 should verify for the original message that the proxy received")
+}
+
+var httpreq14 = `POST /foo?param=Value&Pet=dog HTTP/1.1
+Host: example.com
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+Content-Digest: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+Content-Type: application/json
+Content-Length: 18
+Signature-Input: sig1=("@method" "@authority" "@path" "@query" "content-digest" "content-type" "content-length");created=1618884475;keyid="test-key-rsa-pss"
+Signature: sig1=:mZuBiiKDzg+s8eJiMYc0GwSkyurjSbPX7xSKpYe7EcfolW3DUFRjlpneJoDkt5zNZo3N5tjn1e0sZZlBbrhHPhD9aQtE/qJPHrjwLUOY9eYtUWw261FXxpp2Dsqa9jeE1r0or4TGalZnEiNl5cNFv7ze8ox5G6TNNyam/3GeB2N8t8P56XOG03g50CsN/4QZGWs4AjJcD5gMzcQhq/9JoKDUJDbcEyIetxEYvQCjWKbSb4yBevGmYPWJ2ezfIFiwmUuvrs/Ab9tYzIjEw1hHP70RF67HSazjT+YsI2y5jpzjx8SerihGSNQwr57yQaTt4vK1eRDL2758LnsEYtO8lg==:
+Signature: sig1=:e8UJ5wMiRaonlth5ERtE8GIiEH7Akcr493nQ07VPNo6y3qvjdKt0fo8VHO8xXDjmtYoatGYBGJVlMfIp06eVMEyNW2I4vN7XDAz7m5v1108vGzaDljrd0H8+SJ28g7bzn6h2xeL/8q+qUwahWA/JmC8aOC9iVnwbOKCc0WSrLgWQwTY6VLp42Qt7jjhYT5W7/wCvfK9A1VmHH1lJXsV873Z6hpxesd50PSmO+xaNeYvDLvVdZlhtw5PCtUYzKjHqwmaQ6DEuM8udRjYsoNqp2xZKcuCO1nKc0V3RjpqMZLuuyVbHDAbCzr0pg2d2VM/OC33JAU7meEjjaNz+d7LWPg==:
+
+{"hello": "world"}
+`
+
+var httpres10 = `HTTP/1.1 503 Service Unavailable
+Date: Tue, 20 Apr 2021 02:07:56 GMT
+Content-Type: application/json
+Content-Length: 62
+Content-Digest: sha-512=:0Y6iCBzGg5rZtoXS95Ijz03mslf6KAMCloESHObfwnHJDbkkWWQz6PhhU9kxsTbARtY2PTBOzq24uJFpHsMuAg==:
+Signature-Input: reqres=("@status" "content-digest" "content-type" "@authority";req "@method";req "@path";req "@query";req "content-digest";req "content-type";req "content-length";req);created=1618884479;keyid="test-key-ecc-p256"
+Signature: reqres=:C73J41GVKc+TYXbSobvZf0CmNcptRiWN+NY1Or0A36ISg6ymdRN6ZgR2QfrtopFNzqAyv+CeWrMsNbcV2Ojsgg==:
+
+{"busy": true, "message": "Your call is very important to us"}
+`
+
+// Second test case from Sec. 2.4 of -17, with fixes from PR #2591
+func TestRequestBindingSignedResponse17(t *testing.T) {
+	req := readRequest(httpreq14)
+	reqContentDigest := req.Header.Values("Content-Digest")
+	err := ValidateContentDigestHeader(reqContentDigest, &req.Body, []string{DigestSha512})
+	assert.NoError(t, err, "validate request digest")
+
+	res := readResponse(httpres10)
+	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
+	assert.NoError(t, err, "read pub key")
+	fields2 := *NewFields().AddHeaders("@status", "content-digest", "content-type").
+		AddHeaderExt("@authority", false, false, true, false).
+		AddHeaderExt("@method", false, false, true, false).
+		AddHeaderExt("@path", false, false, true, false).
+		AddHeaderExt("@query", false, false, true, false).
+		AddHeaderExt("content-digest", false, false, true, false)
+	verifier2, err := NewP256Verifier("test-key-ecc-p256", *pubKey2, NewVerifyConfig().SetVerifyCreated(false), fields2)
+	assert.NoError(t, err, "create verifier")
+	sigBase, err := verifyResponseDebug("reqres", *verifier2, res, req)
+	expected := `"@status": 503
+"content-digest": sha-512=:0Y6iCBzGg5rZtoXS95Ijz03mslf6KAMCloESHObfwnHJDbkkWWQz6PhhU9kxsTbARtY2PTBOzq24uJFpHsMuAg==:
+"content-type": application/json
+"@authority";req: example.com
+"@method";req: POST
+"@path";req: /foo
+"@query";req: ?param=Value&Pet=dog
+"content-digest";req: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+"content-type";req: application/json
+"content-length";req: 18
+"@signature-params": ("@status" "content-digest" "content-type" "@authority";req "@method";req "@path";req "@query";req "content-digest";req "content-type";req "content-length";req);created=1618884479;keyid="test-key-ecc-p256"`
+
+	assert.NoError(t, err, "verify response")
+	assert.Equal(t, expected, sigBase, "Incorrect signature base for response")
+
+	responseContentDigest := res.Header.Values("Content-Digest")
+	err = ValidateContentDigestHeader(responseContentDigest, &res.Body, []string{DigestSha512})
+	assert.NoError(t, err, "validate response digest")
 }
