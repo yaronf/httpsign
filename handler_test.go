@@ -39,13 +39,13 @@ func Test_WrapHandler(t *testing.T) {
 	defer ts.Close()
 
 	signer, err := NewHMACSHA256Signer("key", bytes.Repeat([]byte{1}, 64), nil,
-		Headers("@method", "content-digest"))
+		Headers("@method", "content-digest", "@request-target"))
 	assert.NoError(t, err)
 
 	verifier, err := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), NewVerifyConfig(), *NewFields())
 	assert.NoError(t, err)
 	client := NewDefaultClient(NewClientConfig().SetSignatureName("sig1").SetSigner(signer).SetVerifier(verifier).SetDigestSchemesSend([]string{DigestSha256}))
-	res, err := client.Post(ts.URL, "text/plain", strings.NewReader("Message body here"))
+	res, err := client.Post(ts.URL+"?foo", "text/plain", strings.NewReader("Message body here"))
 	assert.NoError(t, err)
 	if res != nil {
 		_, err = io.ReadAll(res.Body)

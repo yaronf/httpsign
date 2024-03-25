@@ -145,10 +145,14 @@ func scQuery(url *url.URL) string {
 }
 
 func scRequestTarget(url *url.URL) string {
-	if url.RawQuery == "" {
-		return url.Path
+	path := url.Path
+	if path == "" {
+		path = "/" // Normalize path, issue #8, and see https://www.rfc-editor.org/rfc/rfc9110#section-4.2.3
 	}
-	return url.Path + "?" + url.RawQuery
+	if url.RawQuery == "" {
+		return path
+	}
+	return path + "?" + url.RawQuery
 }
 
 func scScheme(url *url.URL) string {
