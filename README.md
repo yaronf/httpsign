@@ -1,4 +1,4 @@
-HTTP Message Signatures, implementing
+A Golang implementation of HTTP Message Signatures, as defined by
 [RFC 9421](https://www.rfc-editor.org/rfc/rfc9421.html)
 (the former [draft-ietf-httpbis-message-signatures](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-message-signatures)).
 
