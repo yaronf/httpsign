@@ -36,7 +36,7 @@ func TestClient_Get(t *testing.T) {
 			fields: fields{
 				sigName: "sig1",
 				signer: func() *Signer {
-					signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64), NewSignConfig(), Headers("@method"))
+					signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{1}, 64), NewSignConfig().SetKeyID("key1"), Headers("@method"))
 					return signer
 				}(),
 				verifier:      nil,
@@ -54,7 +54,7 @@ func TestClient_Get(t *testing.T) {
 			fields: fields{
 				sigName: "sig1",
 				signer: func() *Signer {
-					signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64), NewSignConfig(), Headers("@method"))
+					signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{1}, 64), NewSignConfig().SetKeyID("key1"), Headers("@method"))
 					return signer
 				}(),
 				verifier:      nil,
@@ -72,7 +72,7 @@ func TestClient_Get(t *testing.T) {
 			fields: fields{
 				sigName: "",
 				signer: func() *Signer {
-					signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64), NewSignConfig(), Headers("@method"))
+					signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{1}, 64), NewSignConfig().SetKeyID("key1"), Headers("@method"))
 					return signer
 				}(),
 				verifier:      nil,
@@ -90,7 +90,7 @@ func TestClient_Get(t *testing.T) {
 			fields: fields{
 				sigName: "sig1",
 				signer: func() *Signer {
-					signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64), NewSignConfig(), Headers("@method"))
+					signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{1}, 64), NewSignConfig().SetKeyID("key1"), Headers("@method"))
 					return signer
 				}(),
 				verifier: nil,
@@ -110,12 +110,12 @@ func TestClient_Get(t *testing.T) {
 			fields: fields{
 				sigName: "sig1",
 				signer: func() *Signer {
-					signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64), NewSignConfig(), Headers("@method"))
+					signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{1}, 64), NewSignConfig().SetKeyID("key1"), Headers("@method"))
 					return signer
 				}(),
 				verifier: nil,
 				fetchVerifier: func(res *http.Response, req *http.Request) (sigName string, verifier *Verifier) {
-					verifier, _ = NewHMACSHA256Verifier("key1", bytes.Repeat([]byte{2}, 64), NewVerifyConfig(), Headers("@method"))
+					verifier, _ = NewHMACSHA256Verifier(bytes.Repeat([]byte{2}, 64), NewVerifyConfig(), Headers("@method"))
 					return "name", verifier
 				},
 				Client: *http.DefaultClient,
@@ -196,7 +196,7 @@ func TestClient_Head(t *testing.T) {
 			fields: fields{
 				sigName: "sig1",
 				signer: func() *Signer {
-					signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64), NewSignConfig(),
+					signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{1}, 64), NewSignConfig().SetKeyID("key1"),
 						Headers("@method"))
 					return signer
 				}(),

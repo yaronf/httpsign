@@ -75,8 +75,8 @@ func testHTTP(t *testing.T, proto string) {
 		if err != nil {
 			t.Errorf("execTemplate failed")
 		}
-		verifier, err := NewHMACSHA256Verifier("key1", bytes.Repeat([]byte{0x03}, 64),
-			NewVerifyConfig().SetVerifyCreated(false),
+		verifier, err := NewHMACSHA256Verifier(bytes.Repeat([]byte{0x03}, 64),
+			NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"),
 			Headers("@query"))
 		if err != nil {
 			t.Errorf("could not create verifier")
@@ -110,8 +110,8 @@ func simpleClient(t *testing.T, proto string, simpleHandler func(w http.Response
 	}
 	defer ts.Close()
 
-	signer, err := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{0x03}, 64),
-		NewSignConfig().SignCreated(false),
+	signer, err := NewHMACSHA256Signer(bytes.Repeat([]byte{0x03}, 64),
+		NewSignConfig().SetKeyID("key1").SignCreated(false),
 		*NewFields().AddHeaders("kuku", "@query", "@method", "@target-uri", "@request-target", "@authority", "@scheme", "@target-uri",
 			"@path", "@query").AddQueryParam("k1").AddQueryParam("k2"))
 	if err != nil {

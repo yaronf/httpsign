@@ -17,7 +17,7 @@ func ExampleWrapHandler_clientSigns() {
 	// Callback to let the server locate its verifying key and configuration
 	fetchVerifier := func(r *http.Request) (string, *httpsign.Verifier) {
 		sigName := "sig1"
-		verifier, _ := httpsign.NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0x99}, 64), nil,
+		verifier, _ := httpsign.NewHMACSHA256Verifier(bytes.Repeat([]byte{0x99}, 64), httpsign.NewVerifyConfig().SetKeyID("key1"),
 			httpsign.Headers("@method"))
 		return sigName, verifier
 	}
@@ -35,7 +35,7 @@ func ExampleWrapHandler_clientSigns() {
 	defer ts.Close()
 
 	// HTTP client code, with a signer
-	signer, _ := httpsign.NewHMACSHA256Signer("key", bytes.Repeat([]byte{0x99}, 64), nil,
+	signer, _ := httpsign.NewHMACSHA256Signer(bytes.Repeat([]byte{0x99}, 64), httpsign.NewSignConfig().SetKeyID("key1"),
 		*httpsign.NewFields().AddHeader("content-type").AddQueryParam("pet").AddHeader("@method"))
 
 	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig1").SetSigner(signer))
@@ -58,7 +58,7 @@ func ExampleWrapHandler_serverSigns() {
 	// Callback to let the server locate its signing key and configuration
 	fetchSigner := func(res http.Response, r *http.Request) (string, *httpsign.Signer) {
 		sigName := "sig1"
-		signer, _ := httpsign.NewHMACSHA256Signer("key", bytes.Repeat([]byte{0}, 64), nil,
+		signer, _ := httpsign.NewHMACSHA256Signer(bytes.Repeat([]byte{0}, 64), httpsign.NewSignConfig().SetKeyID("key"),
 			httpsign.Headers("@status", "bar", "date", "content-type"))
 		return sigName, signer
 	}
@@ -76,7 +76,7 @@ func ExampleWrapHandler_serverSigns() {
 	defer ts.Close()
 
 	// HTTP client code
-	verifier, _ := httpsign.NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), httpsign.NewVerifyConfig(), *httpsign.NewFields())
+	verifier, _ := httpsign.NewHMACSHA256Verifier(bytes.Repeat([]byte{0}, 64), httpsign.NewVerifyConfig().SetKeyID("key"), *httpsign.NewFields())
 	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig1").SetVerifier(verifier))
 	res, err := client.Get(ts.URL)
 	if err != nil {

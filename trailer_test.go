@@ -57,7 +57,7 @@ var longReq1 = rawHeaders1 + "5000\r\n" + strings.Repeat("x", 0x5000) + "\r\n\r\
 func TestTrailer_Get(t *testing.T) {
 	fetchVerifier := func(r *http.Request) (string, *Verifier) {
 		sigName := "sig1"
-		verifier, _ := NewHMACSHA256Verifier("key1", bytes.Repeat([]byte{1}, 64), nil,
+		verifier, _ := NewHMACSHA256Verifier(bytes.Repeat([]byte{1}, 64), NewVerifyConfig().SetKeyID("key1"),
 			*NewFields().AddHeader("@method").
 				AddHeaderExt("hdr", false, false, false, true))
 		return sigName, verifier
@@ -65,7 +65,7 @@ func TestTrailer_Get(t *testing.T) {
 
 	fetchSigner := func(res http.Response, r *http.Request) (string, *Signer) {
 		sigName := "sig1"
-		signer, _ := NewHMACSHA256Signer("key", bytes.Repeat([]byte{0}, 64), nil,
+		signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{0}, 64), NewSignConfig().SetKeyID("key"),
 			Headers("@status", "bar", "date", "Content-Digest"))
 		return sigName, signer
 	}
@@ -84,7 +84,7 @@ func TestTrailer_Get(t *testing.T) {
 	c := &Client{config: ClientConfig{
 		signatureName: "sig1",
 		signer: func() *Signer {
-			signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64), NewSignConfig(),
+			signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{1}, 64), NewSignConfig().SetKeyID("key1"),
 				*NewFields().AddHeader("@method").
 					AddHeaderExt("hdr", false, false, false, true))
 			return signer
@@ -139,11 +139,11 @@ func TestTrailer_Get(t *testing.T) {
 }
 
 func TestTrailer_SigFields(t *testing.T) {
-	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
 	fields := Headers("@authority", "@method", "content-type")
 	signatureName := "sig1"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
 	req := readRequest(rawPost2)
 	sigInput, sig, err := SignRequest(signatureName, *signer, req)
 	assert.NoError(t, err, "signature failed")
@@ -152,7 +152,7 @@ func TestTrailer_SigFields(t *testing.T) {
 	signedMessage = strings.Replace(signedMessage, "Trailer: Expires, Hdr", "Trailer: Expires, Hdr, Signature, Signature-Input",
 		1)
 	req2 := readRequestChunked(signedMessage)
-	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
 	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req2)
 	assert.NoError(t, err, "verification error")
@@ -162,7 +162,7 @@ func TestTrailer_SigFields(t *testing.T) {
 	signedMessage = strings.Replace(signedMessage, "Trailer: Expires, Hdr", "Trailer: Expires, Hdr, Signature, Signature-Input",
 		1)
 	req2 = readRequestChunked(signedMessage)
-	verifier, err = NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err = NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
 	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req2)
 	assert.Error(t, err, "verification error")
@@ -172,7 +172,7 @@ func TestTrailer_SigFields(t *testing.T) {
 	signedMessage = strings.Replace(signedMessage, "Trailer: Expires, Hdr", "Trailer: Expires, Hdr, Signature, Signature-Input",
 		1)
 	req2 = readRequestChunked(signedMessage)
-	verifier, err = NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err = NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
 	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req2)
 	assert.Error(t, err, "verification error")

@@ -70,13 +70,13 @@ func FuzzSignAndVerifyHMAC(f *testing.F) {
 		fields := Headers("@authority", "date", "content-type")
 		signatureName := "sig1"
 		key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-		signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+		signer, _ := NewHMACSHA256Signer(key, config.SetKeyID("test-shared-secret"), fields)
 		req := readRequest(reqString)
 		sigInput, sig, err := SignRequest(signatureName, *signer, req)
 		if err == nil {
 			req.Header.Add("Signature", sig)
 			req.Header.Add("Signature-Input", sigInput)
-			verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
+			verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
 			assert.NoError(t, err, "could not generate Verifier")
 			err = VerifyRequest(signatureName, *verifier, req)
 			assert.NoError(t, err, "verification error")

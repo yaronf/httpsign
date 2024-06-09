@@ -30,8 +30,8 @@ func ExampleClient_Get() {
 	// Client code starts here
 	// Create a signer and a wrapped HTTP client (we set SignCreated to false to make the response deterministic,
 	// don't do that in production.)
-	signer, _ := httpsign.NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64),
-		httpsign.NewSignConfig().SignCreated(false), httpsign.Headers("@method"))
+	signer, _ := httpsign.NewHMACSHA256Signer(bytes.Repeat([]byte{1}, 64),
+		httpsign.NewSignConfig().SignCreated(false).SetKeyID("key1"), httpsign.Headers("@method"))
 	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig22").SetSigner(signer)) // sign, don't verify
 
 	// Send an HTTP GET, get response -- signing and verification happen behind the scenes
@@ -107,8 +107,8 @@ func TestClientUsage(t *testing.T) {
 
 	// Client code starts here
 	// Create a signer and a wrapped HTTP client
-	signer, _ := httpsign.NewRSAPSSSigner("key1", *prvKey,
-		httpsign.NewSignConfig(),
+	signer, _ := httpsign.NewRSAPSSSigner(*prvKey,
+		httpsign.NewSignConfig().SetKeyID("key1"),
 		httpsign.Headers("@request-target", "content-digest")) // The Content-Digest header will be auto-generated
 	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig1").SetSigner(signer)) // sign requests, don't verify responses
 

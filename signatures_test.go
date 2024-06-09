@@ -461,10 +461,10 @@ func TestSignRequest(t *testing.T) {
 			args: args{
 				signatureName: "sig-b25",
 				signer: (func() Signer {
-					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884473)
+					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884473).SetKeyID("test-shared-secret")
 					fields := Headers("date", "@authority", "content-type")
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+					signer, _ := NewHMACSHA256Signer(key, config, fields)
 					return *signer
 				})(),
 				req: readRequest(httpreq1),
@@ -478,10 +478,10 @@ func TestSignRequest(t *testing.T) {
 			args: args{
 				signatureName: "sig1",
 				signer: (func() Signer {
-					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
 					fields := Headers("@authorityxx", "date", "content-type")
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+					signer, _ := NewHMACSHA256Signer(key, config, fields)
 					return *signer
 				})(),
 				req: readRequest(httpreq1),
@@ -495,10 +495,10 @@ func TestSignRequest(t *testing.T) {
 			args: args{
 				signatureName: "sig1",
 				signer: (func() Signer {
-					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
 					fields := Headers("@authority", "date-not-really", "content-type")
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+					signer, _ := NewHMACSHA256Signer(key, config, fields)
 					return *signer
 				})(),
 				req: readRequest(httpreq1),
@@ -516,9 +516,9 @@ func TestSignRequest(t *testing.T) {
 					if err != nil {
 						t.Errorf("cannot parse private key: %v", err)
 					}
-					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+					config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-key-rsa-pss")
 					fields := *NewFields()
-					signer, _ := NewRSAPSSSigner("test-key-rsa-pss", *prvKey, config, fields)
+					signer, _ := NewRSAPSSSigner(*prvKey, config, fields)
 					return *signer
 				})(),
 				req: nil,
@@ -581,12 +581,14 @@ func TestSignRequest(t *testing.T) {
 func makeRSAPSSSigner(t *testing.T, config SignConfig, fields Fields) Signer {
 	prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
 	assert.NoError(t, err, "cannot parse private key")
-	signer, _ := NewRSAPSSSigner("test-key-rsa-pss", *prvKey, &config, fields)
+	config.SetKeyID("test-key-rsa-pss")
+	signer, _ := NewRSAPSSSigner(*prvKey, &config, fields)
 	return *signer
 }
 
 func makeHMACSigner(config SignConfig, fields Fields) Signer {
-	signer, _ := NewHMACSHA256Signer("test-key-hmac", bytes.Repeat([]byte{0x33}, 64), &config, fields)
+	config.SetKeyID("test-key-hmac")
+	signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{0x33}, 64), &config, fields)
 	return *signer
 }
 
@@ -610,13 +612,13 @@ func TestSignRequestDiscardSig(t *testing.T) {
 				signatureName: "sig-b21",
 				signer: (func() Signer {
 					config := NewSignConfig().SignAlg(false).
-						setFakeCreated(1618884473).SetNonce("b3k2pp5k7z-50gnwp.yemd")
+						setFakeCreated(1618884473).SetNonce("b3k2pp5k7z-50gnwp.yemd").SetKeyID("test-key-rsa-pss")
 					fields := *NewFields()
 					prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
 					if err != nil {
 						t.Errorf("cannot parse private key: %v", err)
 					}
-					signer, _ := NewRSAPSSSigner("test-key-rsa-pss", *prvKey, config, fields)
+					signer, _ := NewRSAPSSSigner(*prvKey, config, fields)
 					return *signer
 				})(),
 				req: readRequest(httpreq1),
@@ -668,32 +670,32 @@ func readResponse(s string) *http.Response {
 }
 
 func TestSignAndVerifyHMAC(t *testing.T) {
-	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
 	fields := Headers("@authority", "date", "content-type")
 	signatureName := "sig1"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
 	req := readRequest(httpreq1)
 	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
 	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req)
 	assert.NoError(t, err, "verification error")
 }
 
 func TestSignAndVerifyHMACNoHeader(t *testing.T) {
-	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
 	fields := Headers("@authority", "content-type")
 	signatureName := "sig1"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
 	req := readRequest(longReq1)
 	_, sig, err := SignRequest(signatureName, *signer, req)
 	assert.NoError(t, err, "failed to sign")
 	req.Header.Add("Signature", sig)
-	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
 	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req)
 	assert.Error(t, err, "verification should fail, header not found")
@@ -702,24 +704,24 @@ func TestSignAndVerifyHMACNoHeader(t *testing.T) {
 	sigInput, _, err := SignRequest(signatureName, *signer, req)
 	assert.NoError(t, err, "failed to sign")
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err = NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err = NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
 	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req)
 	assert.Error(t, err, "verification should fail, header not found")
 }
 
 func TestSignAndVerifyHMACBad(t *testing.T) {
-	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
 	fields := Headers("@authority", "date", "content-type")
 	signatureName := "sig1"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields)
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
 	req := readRequest(httpreq1)
 	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
 	badkey := append(key, byte(0x77))
-	verifier, err := NewHMACSHA256Verifier("test-shared-secret", badkey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewHMACSHA256Verifier(badkey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
 	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req)
 	assert.Error(t, err, "verification should have failed")
@@ -730,8 +732,8 @@ func TestCreated(t *testing.T) {
 		fields := Headers("@status", "date", "content-type")
 		signatureName := "sigres"
 		key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-		signConfig := NewSignConfig().SignCreated(true).setFakeCreated(createdTime)
-		signer, _ := NewHMACSHA256Signer("test-shared-secret", key, signConfig, fields)
+		signConfig := NewSignConfig().SignCreated(true).setFakeCreated(createdTime).SetKeyID("test-shared-secret")
+		signer, _ := NewHMACSHA256Signer(key, signConfig, fields)
 		res := readResponse(httpres2)
 		nowStr := time.Now().UTC().Format(http.TimeFormat)
 		res.Header.Set("Date", nowStr)
@@ -741,7 +743,7 @@ func TestCreated(t *testing.T) {
 		res2.Header.Set("Date", nowStr)
 		res2.Header.Add("Signature", sig)
 		res2.Header.Add("Signature-Input", sigInput)
-		verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, verifyConfig, fields)
+		verifier, err := NewHMACSHA256Verifier(key, verifyConfig, fields)
 		if err != nil {
 			t.Errorf("could not generate Verifier: %s", err)
 		}
@@ -794,15 +796,15 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	fields := Headers("@status", "date", "content-type")
 	signatureName := "sigres"
 	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-	config := NewSignConfig().SetExpires(999)                                   // should have expired long ago (but will be ignored by verifier)
-	signer, _ := NewHMACSHA256Signer("test-shared-secret", key, config, fields) // default config
+	config := NewSignConfig().SetExpires(999).SetKeyID("test-shared-secret") // should have expired long ago (but will be ignored by verifier)
+	signer, _ := NewHMACSHA256Signer(key, config, fields)                    // default config
 	res := readResponse(httpres2)
 	sigInput, sig, _ := SignResponse(signatureName, *signer, res, nil)
 
 	res2 := readResponse(httpres2)
 	res2.Header.Add("Signature", sig)
 	res2.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewHMACSHA256Verifier("test-shared-secret", key, NewVerifyConfig().SetRejectExpired(false), fields)
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetRejectExpired(false).SetKeyID("test-shared-secret"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -813,14 +815,14 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 }
 
 func TestSignAndVerifyRSAPSS(t *testing.T) {
-	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-key-rsa-pss")
 	fields := Headers("@authority", "date", "content-type")
 	signatureName := "sig1"
 	prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
 	if err != nil {
 		t.Errorf("cannot read private key")
 	}
-	signer, _ := NewRSAPSSSigner("test-key-rsa-pss", *prvKey, config, fields)
+	signer, _ := NewRSAPSSSigner(*prvKey, config, fields)
 	req := readRequest(httpreq1)
 	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
 	req.Header.Add("Signature", sig)
@@ -829,7 +831,7 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot read public key: %v", err)
 	}
-	verifier, err := NewRSAPSSVerifier("test-key-rsa-pss", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -840,14 +842,14 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 }
 
 func TestSignAndVerifyRSA(t *testing.T) {
-	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475)
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-key-rsa")
 	fields := Headers("@authority", "date", "content-type")
 	signatureName := "sig1"
 	prvKey, err := parseRsaPrivateKeyFromPemStr(rsaPrvKey2)
 	if err != nil {
 		t.Errorf("cannot read private key")
 	}
-	signer, _ := NewRSASigner("test-key-rsa", *prvKey, config, fields)
+	signer, _ := NewRSASigner(*prvKey, config, fields)
 	req := readRequest(httpreq1)
 	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
 	req.Header.Add("Signature", sig)
@@ -856,7 +858,7 @@ func TestSignAndVerifyRSA(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot read public key: %v", err)
 	}
-	verifier, err := NewRSAVerifier("test-key-rsa", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewRSAVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -867,14 +869,14 @@ func TestSignAndVerifyRSA(t *testing.T) {
 }
 
 func TestSignAndVerifyP256(t *testing.T) {
-	config := NewSignConfig().setFakeCreated(1618884475)
+	config := NewSignConfig().setFakeCreated(1618884475).SetKeyID("test-key-p256")
 	signatureName := "sig1"
 	prvKey, pubKey, err := genP256KeyPair()
 	if err != nil {
 		t.Errorf("cannot generate P-256 keypair")
 	}
 	fields := *NewFields().AddHeader("@method").AddHeader("Date").AddHeader("Content-Type").AddQueryParam("pet")
-	signer, _ := NewP256Signer("test-key-p256", *prvKey, config, fields)
+	signer, _ := NewP256Signer(*prvKey, config, fields)
 	req := readRequest(httpreq2)
 	sigInput, sig, err := SignRequest(signatureName, *signer, req)
 	if err != nil {
@@ -882,7 +884,7 @@ func TestSignAndVerifyP256(t *testing.T) {
 	}
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewP256Verifier("test-key-p256", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewP256Verifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-p256"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -893,14 +895,14 @@ func TestSignAndVerifyP256(t *testing.T) {
 }
 
 func TestSignAndVerifyP384(t *testing.T) {
-	config := NewSignConfig().setFakeCreated(1618884475)
+	config := NewSignConfig().setFakeCreated(1618884475).SetKeyID("test-key-p384")
 	signatureName := "sig1"
 	prvKey, pubKey, err := genP384KeyPair()
 	if err != nil {
 		t.Errorf("cannot generate P-384 keypair")
 	}
 	fields := *NewFields().AddHeader("@method").AddHeader("Date").AddHeader("Content-Type").AddQueryParam("pet")
-	signer, _ := NewP384Signer("test-key-p384", *prvKey, config, fields)
+	signer, _ := NewP384Signer(*prvKey, config, fields)
 	req := readRequest(httpreq2)
 	sigInput, sig, err := SignRequest(signatureName, *signer, req)
 	if err != nil {
@@ -908,7 +910,7 @@ func TestSignAndVerifyP384(t *testing.T) {
 	}
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewP384Verifier("test-key-p384", *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewP384Verifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-p384"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -923,9 +925,9 @@ func TestSignAndVerifyEdDSA(t *testing.T) {
 	if err != nil {
 		t.Errorf("cannot generate keypair: %s", err)
 	}
-	config := NewSignConfig().setFakeCreated(1618884475)
+	config := NewSignConfig().setFakeCreated(1618884475).SetKeyID("test-key-ed25519")
 	fields := *NewFields().AddHeader("@method").AddHeader("Date").AddHeader("Content-Type").AddQueryParam("pet")
-	signer1, _ := NewEd25519Signer("test-key-ed25519", prvKey1, config, fields)
+	signer1, _ := NewEd25519Signer(prvKey1, config, fields)
 
 	signAndVerifyEdDSA(t, signer1, pubKey1, fields)
 
@@ -934,10 +936,11 @@ func TestSignAndVerifyEdDSA(t *testing.T) {
 	if err != nil {
 		t.Errorf("rand failed?")
 	}
+	config.SetKeyID("test-key-ed25519")
 	prvKey2 := ed25519.NewKeyFromSeed(seed2)
 	pubKey2 := prvKey2.Public().(ed25519.PublicKey)
 
-	signer2, _ := NewEd25519SignerFromSeed("test-key-ed25519", seed2, config, fields)
+	signer2, _ := NewEd25519SignerFromSeed(seed2, config, fields)
 
 	signAndVerifyEdDSA(t, signer2, pubKey2, fields)
 }
@@ -951,7 +954,7 @@ func signAndVerifyEdDSA(t *testing.T, signer *Signer, pubKey ed25519.PublicKey, 
 	}
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewEd25519Verifier("test-key-ed25519", pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewEd25519Verifier(pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ed25519"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -980,8 +983,8 @@ func TestSignResponse(t *testing.T) {
 				signatureName: "sig1",
 				signer: (func() Signer {
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, NewSignConfig().setFakeCreated(1618889999), Headers(
-						"@status", "date", "content-type"))
+					signer, _ := NewHMACSHA256Signer(key, NewSignConfig().setFakeCreated(1618889999).
+						SetKeyID("test-shared-secret"), Headers("@status", "date", "content-type"))
 					return *signer
 				})(),
 				res: readResponse(httpres1),
@@ -996,7 +999,7 @@ func TestSignResponse(t *testing.T) {
 				signatureName: "sig1",
 				signer: (func() Signer {
 					key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
-					signer, _ := NewHMACSHA256Signer("test-shared-secret", key, NewSignConfig().setFakeCreated(1618889999), Headers(
+					signer, _ := NewHMACSHA256Signer(key, NewSignConfig().setFakeCreated(1618889999).SetKeyID("test-shared-secret"), Headers(
 
 						"@status", "date", "content-type",
 					))
@@ -1057,7 +1060,7 @@ func TestVerifyRequest(t *testing.T) {
 					if err != nil {
 						t.Errorf("cannot parse public key: %v", err)
 					}
-					verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", *pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+					verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss"), *NewFields())
 					return *verifier
 				})(),
 				req: readRequest(httpreq1pssSelective),
@@ -1074,7 +1077,7 @@ func TestVerifyRequest(t *testing.T) {
 					if err != nil {
 						t.Errorf("cannot parse public key: %v", err)
 					}
-					verifier, _ := NewRSAPSSVerifier("test-key-rsa-pss", *pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+					verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss"), *NewFields())
 					return *verifier
 				})(),
 				req: readRequest(httpreq1pssFull),
@@ -1092,7 +1095,7 @@ func TestVerifyRequest(t *testing.T) {
 						t.Errorf("cannot parse public key: %v", err)
 					}
 					pubKey := prvKey.Public().(ed25519.PublicKey)
-					verifier, _ := NewEd25519Verifier("test-key-ed25519", pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+					verifier, _ := NewEd25519Verifier(pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ed25519"), *NewFields())
 					return *verifier
 				})(),
 				req: readRequest(httpreq1ed25519),
@@ -1106,7 +1109,7 @@ func TestVerifyRequest(t *testing.T) {
 				signatureName: "ttrp",
 				verifier: (func() Verifier {
 					pubKey, _ := parseECPublicKeyFromPemStr(p256PubKey2)
-					verifier, _ := NewP256Verifier("test-key-ecc-p256", *pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+					verifier, _ := NewP256Verifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), *NewFields())
 					return *verifier
 				})(),
 				req: readRequest(httpreqtlsproxy),
@@ -1143,7 +1146,7 @@ func TestVerifyRequest(t *testing.T) {
 					if err != nil {
 						t.Errorf("cannot parse public key: %v", err)
 					}
-					verifier, _ := NewRSAPSSVerifier("bad-key-id", *pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+					verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("bad-key-id"), *NewFields())
 					return *verifier
 				})(),
 				req: readRequest(httpreq1pssSelective),
@@ -1152,7 +1155,7 @@ func TestVerifyRequest(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "bad keyID but not verified", // this is NOT a failure
+			name: "keyID not verified", // this is NOT a failure
 			args: args{
 				signatureName: "sig-b22",
 				verifier: (func() Verifier {
@@ -1160,8 +1163,8 @@ func TestVerifyRequest(t *testing.T) {
 					if err != nil {
 						t.Errorf("cannot parse public key: %v", err)
 					}
-					verifier, _ := NewRSAPSSVerifier("bad-key-id", *pubKey, NewVerifyConfig().
-						SetVerifyCreated(false).SetVerifyKeyID(false), *NewFields())
+					verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().
+						SetVerifyCreated(false), *NewFields())
 					return *verifier
 				})(),
 				req: readRequest(httpreq1pssSelective),
@@ -1191,7 +1194,7 @@ func makeRSAVerifier(f failer, keyID string, fields Fields) Verifier {
 		if err != nil {
 			f.Errorf("cannot parse public key: %v", err)
 		}
-		verifier, _ := NewRSAPSSVerifier(keyID, *pubKey, NewVerifyConfig().SetVerifyCreated(false), fields)
+		verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID(keyID), fields)
 		return *verifier
 	})()
 }
@@ -1318,7 +1321,7 @@ func TestDictionary(t *testing.T) {
 	}
 	res := readResponse(httpres2)
 	res.Header.Set("X-Dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
-	signer2, err := NewP256Signer("key10", *priv, NewSignConfig(),
+	signer2, err := NewP256Signer(*priv, NewSignConfig().SetKeyID("key10"),
 		*NewFields().AddHeader("@status").AddDictHeader("x-dictionary", "a"))
 	if err != nil {
 		t.Errorf("Could not create signer")
@@ -1331,7 +1334,7 @@ func TestDictionary(t *testing.T) {
 	res.Header.Add("Signature", sig2)
 
 	// Client verifies response
-	verifier2, err := NewP256Verifier("key10", *pub, NewVerifyConfig().SetVerifyCreated(false),
+	verifier2, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key10"),
 		*NewFields().AddHeader("@status").AddDictHeader("x-dictionary", "a"))
 	if err != nil {
 		t.Errorf("Could not create verifier: %v", err)
@@ -1348,7 +1351,7 @@ func TestMultipleSignaturesOld(t *testing.T) {
 		t.Errorf("Could not create keypair")
 	}
 	res := readResponse(httpres2)
-	signer1, err := NewP256Signer("key10", *priv1, NewSignConfig().SignCreated(false), Headers("Content-Type", "Digest"))
+	signer1, err := NewP256Signer(*priv1, NewSignConfig().SignCreated(false).SetKeyID("key10"), Headers("Content-Type", "Digest"))
 	if err != nil {
 		t.Errorf("Could not create signer")
 	}
@@ -1363,7 +1366,7 @@ func TestMultipleSignaturesOld(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not create keypair")
 	}
-	signer2, err := NewP256Signer("key20", *priv2, NewSignConfig().SignCreated(false), *NewFields().AddDictHeader("Signature", "sig2"))
+	signer2, err := NewP256Signer(*priv2, NewSignConfig().SignCreated(false).SetKeyID("key20"), *NewFields().AddDictHeader("Signature", "sig2"))
 	if err != nil {
 		t.Errorf("Could not create signer")
 	}
@@ -1399,8 +1402,8 @@ func TestMultipleSignatures(t *testing.T) {
 	req := readRequest(httpreq9)
 	pubKey1, err := parseECPublicKeyFromPemStr(p256PubKey2)
 	assert.NoError(t, err, "cannot parse ECC public key")
-	verifier1, err := NewP256Verifier("test-key-ecc-p256", *pubKey1, NewVerifyConfig().
-		SetVerifyCreated(false), Headers("@method", "@authority", "@path", "content-digest",
+	verifier1, err := NewP256Verifier(*pubKey1, NewVerifyConfig().
+		SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), Headers("@method", "@authority", "@path", "content-digest",
 		"content-type", "content-length"))
 	assert.NoError(t, err, "cannot create verifier1")
 	_, err = verifyRequestDebug("sig1", *verifier1, req)
@@ -1408,8 +1411,8 @@ func TestMultipleSignatures(t *testing.T) {
 
 	pubKey2, err := parseRsaPublicKey(rsaPubKey)
 	assert.NoError(t, err, "cannot parse RSA public key")
-	verifier2, err := NewRSAVerifier("test-key-rsa", *pubKey2, NewVerifyConfig().
-		SetVerifyCreated(false).SetRejectExpired(false), *NewFields().AddDictHeader("Signature", "sig1").AddHeaders("@authority", "forwarded"))
+	verifier2, err := NewRSAVerifier(*pubKey2, NewVerifyConfig().
+		SetVerifyCreated(false).SetRejectExpired(false).SetKeyID("test-key-rsa"), *NewFields().AddDictHeader("Signature", "sig1").AddHeaders("@authority", "forwarded"))
 	assert.NoError(t, err, "cannot create verifier2")
 	_, err = verifyRequestDebug("proxy_sig", *verifier2, req)
 	assert.NoError(t, err, "proxy signature not verified")
@@ -1611,7 +1614,7 @@ func TestVerifyResponse(t *testing.T) {
 					if err != nil {
 						t.Errorf("cannot parse public key: %v", err)
 					}
-					verifier, _ := NewP256Verifier("test-key-ecc-p256", *pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+					verifier, _ := NewP256Verifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), *NewFields())
 					return *verifier
 				})(),
 				res: readResponse(httpres4),
@@ -1632,7 +1635,7 @@ func TestOptionalSign(t *testing.T) {
 	req := readRequest(httpreq2)
 	f1 := NewFields().AddHeader("date").AddHeaderExt("x-optional", true, false, false, false)
 	key1 := bytes.Repeat([]byte{0x55}, 64)
-	signer1, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f1)
+	signer1, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(9999).SetKeyID("key1"), *f1)
 	assert.NoError(t, err, "Could not create signer")
 	signatureInput, _, signatureBase, err := signRequestDebug("sig1", *signer1, req)
 	assert.NoError(t, err, "Should not fail with optional header absent")
@@ -1646,7 +1649,7 @@ func TestOptionalSign(t *testing.T) {
 	assert.Equal(t, "\"date\": Tue, 20 Apr 2021 02:07:55 GMT\n\"x-optional\": value\n\"@signature-params\": (\"date\" \"x-optional\");created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
 
 	f2 := f1.AddQueryParamExt("bla", true, false, false).AddQueryParamExt("bar", true, false, false)
-	signer2, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f2)
+	signer2, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(9999).SetKeyID("key1"), *f2)
 	assert.NoError(t, err, "Could not create signer")
 	signatureInput, _, signatureBase, err = signRequestDebug("sig1", *signer2, req)
 	assert.NoError(t, err, "Should not fail with query params")
@@ -1656,7 +1659,7 @@ func TestOptionalSign(t *testing.T) {
 	res1 := readResponse(httpres2)
 	res1.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a b c)")
 	f3 := NewFields().AddDictHeaderExt("x-dictionary", "a", true, false, false).AddDictHeaderExt("x-dictionary", "zz", true, false, false)
-	signer3, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f3)
+	signer3, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(9999).SetKeyID("key1"), *f3)
 	assert.NoError(t, err, "Could not create signer")
 	signatureInput, _, signatureBase, err = signResponseDebug("sig1", *signer3, res1, nil)
 	assert.NoError(t, err, "Should not fail with dict headers")
@@ -1666,7 +1669,7 @@ func TestOptionalSign(t *testing.T) {
 	res2 := readResponse(httpres2)
 	res2.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a  b  c)")
 	f4 := NewFields().AddStructuredFieldExt("x-dictionary", true, false, false).AddStructuredFieldExt("x-not-a-dictionary", true, false, false)
-	signer4, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f4)
+	signer4, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(9999).SetKeyID("key1"), *f4)
 	assert.NoError(t, err, "Could not create signer")
 	signatureInput, _, signatureBase, err = signResponseDebug("sig1", *signer4, res2, nil)
 	assert.NoError(t, err, "Should not fail with structured fields")
@@ -1681,7 +1684,7 @@ func TestAssocMessage(t *testing.T) {
 	res1.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a b c)")
 	f3 := NewFields().AddDictHeaderExt("x-dictionary", "a", true, false, false).AddDictHeaderExt("x-dictionary", "zz", true, false, false).
 		AddQueryParamExt("pet", false, true, false)
-	signer3, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(9999), *f3)
+	signer3, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(9999).SetKeyID("key1"), *f3)
 	assert.NoError(t, err, "Could not create signer")
 	signatureInput, signature, signatureBase, err := signResponseDebug("sig1", *signer3, res1, assocReq)
 	assert.NoError(t, err, "Should not fail with dict headers")
@@ -1690,7 +1693,7 @@ func TestAssocMessage(t *testing.T) {
 	res1.Header.Add("Signature-Input", signatureInput)
 	res1.Header.Add("Signature", signature)
 
-	verifier, err := NewHMACSHA256Verifier("key1", key1, NewVerifyConfig().SetVerifyCreated(false), *f3)
+	verifier, err := NewHMACSHA256Verifier(key1, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), *f3)
 	assert.NoError(t, err, "Should create verifier")
 	err = VerifyResponse("sig1", *verifier, res1, assocReq)
 	assert.NoError(t, err, "Verification should succeed")
@@ -1765,7 +1768,7 @@ func TestRequestBinding(t *testing.T) {
 	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
 	assert.NoError(t, err, "read pub key")
 	fields2 := *NewFields()
-	verifier2, err := NewP256Verifier("test-key-ecc-p256", *pubKey2, NewVerifyConfig().SetVerifyCreated(false), fields2)
+	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
 	assert.NoError(t, err, "create verifier")
 	err = VerifyResponse("reqres", *verifier2, res, req)
 	assert.NoError(t, err, "verify response")
@@ -1776,14 +1779,14 @@ func TestOptionalVerify(t *testing.T) {
 	req.Header.Add("X-Opt1", "val1")
 	f1 := NewFields().AddHeader("date").AddHeaderExt("x-opt1", true, false, false, false)
 	key1 := bytes.Repeat([]byte{0x66}, 64)
-	signer, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(8888), *f1)
+	signer, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(8888).SetKeyID("key1"), *f1)
 	assert.NoError(t, err, "Could not create signer")
 	sigInput, signature, err := SignRequest("sig1", *signer, req)
 	assert.NoError(t, err, "Should not fail with optional header present")
 	req.Header.Add("Signature-Input", sigInput)
 	req.Header.Add("Signature", signature)
 
-	verifier, err := NewHMACSHA256Verifier("key1", key1, NewVerifyConfig().SetVerifyCreated(false), *f1)
+	verifier, err := NewHMACSHA256Verifier(key1, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), *f1)
 	assert.NoError(t, err, "Could not create verifier")
 	err = VerifyRequest("sig1", *verifier, req)
 	assert.NoError(t, err, "Should not fail: present and signed")
@@ -1795,7 +1798,7 @@ func TestOptionalVerify(t *testing.T) {
 	req = readRequest(httpreq2) // header present but not signed
 	req.Header.Add("X-Opt1", "val1")
 	f2 := NewFields().AddHeader("date") // without the optional header
-	signer, err = NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(2222), *f2)
+	signer, err = NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(2222).SetKeyID("key1"), *f2)
 	assert.NoError(t, err, "Should not fail to create Signer")
 	sigInput, signature, err = SignRequest("sig1", *signer, req)
 	assert.NoError(t, err, "Should not fail with redundant header present")
@@ -1818,13 +1821,13 @@ func TestBinarySequence(t *testing.T) {
 	res.Header.Add("Set-Cookie", "d=5, eee")
 
 	// First signature try fails
-	signer1, err := NewP256Signer("key20", *priv, NewSignConfig(),
+	signer1, err := NewP256Signer(*priv, NewSignConfig().SetKeyID("key20"),
 		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, false, false, false))
 	assert.NoError(t, err, "could not create signer")
 	_, _, err = SignResponse("sig2", *signer1, res, nil)
 	assert.Error(t, err, "signature should have failed")
 
-	signer2, err := NewP256Signer("key20", *priv, NewSignConfig().setFakeCreated(1659563420),
+	signer2, err := NewP256Signer(*priv, NewSignConfig().setFakeCreated(1659563420).SetKeyID("key20"),
 		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, true, false, false))
 	assert.NoError(t, err, "could not create signer")
 	sigInput, sig, sigBase, err := signResponseDebug("sig2", *signer2, res, nil)
@@ -1834,14 +1837,14 @@ func TestBinarySequence(t *testing.T) {
 	res.Header.Add("Signature", sig)
 
 	// Client verifies response - should fail
-	verifier1, err := NewP256Verifier("key20", *pub, NewVerifyConfig().SetVerifyCreated(false),
+	verifier1, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key20"),
 		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, false, false, false))
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier1, res, nil)
 	assert.Error(t, err, "binary sequence verified as non-bs")
 
 	// Client verifies response - should succeed
-	verifier2, err := NewP256Verifier("key20", *pub, NewVerifyConfig().SetVerifyCreated(false),
+	verifier2, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key20"),
 		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, true, false, false))
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier2, res, nil)
@@ -1853,7 +1856,7 @@ func TestSignatureTag(t *testing.T) {
 	assert.NoError(t, err, "failed to generate key")
 	res := readResponse(httpres2)
 
-	signer1, err := NewP256Signer("key21", *priv, NewSignConfig().SetTag("ctx1").setFakeCreated(1660755826),
+	signer1, err := NewP256Signer(*priv, NewSignConfig().SetTag("ctx1").setFakeCreated(1660755826).SetKeyID("key21"),
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create signer")
 	sigInput, sig, sigBase, err := signResponseDebug("sig2", *signer1, res, nil)
@@ -1863,28 +1866,35 @@ func TestSignatureTag(t *testing.T) {
 	res.Header.Add("Signature", sig)
 
 	// Signature should fail with malformed tag
-	signer2, err := NewP256Signer("key21", *priv, NewSignConfig().SetTag("ctx1\x00"),
+	signer2, err := NewP256Signer(*priv, NewSignConfig().SetTag("ctx1\x00").SetKeyID("key21"),
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create signer")
 	_, _, _, err = signResponseDebug("sig2", *signer2, res, nil)
 	assert.Error(t, err, "signature should fail")
 
+	// Signature should fail when the key ID is an empty string
+	signer3, err := NewP256Signer(*priv, NewSignConfig().SetKeyID(""),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create signer")
+	_, _, _, err = signResponseDebug("sig2", *signer3, res, nil)
+	assert.Error(t, err, "signature should fail")
+
 	// Client verifies response - should succeed, no tag constraint
-	verifier1, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false),
+	verifier1, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key21"),
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier1, res, nil)
 	assert.NoError(t, err, "failed to verify response")
 
 	// Client verifies response - should succeed, correct tag
-	verifier2, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedTags([]string{"ctx3", "ctx2", "ctx1"}),
+	verifier2, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedTags([]string{"ctx3", "ctx2", "ctx1"}).SetKeyID("key21"),
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier2, res, nil)
 	assert.NoError(t, err, "failed to verify response")
 
 	// Client verifies response - should fail, incorrect tags
-	verifier3, err := NewP256Verifier("key21", *pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedTags([]string{"ctx5", "ctx6", "ctx7"}),
+	verifier3, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedTags([]string{"ctx5", "ctx6", "ctx7"}).SetKeyID("key21"),
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier3, res, nil)
@@ -1958,7 +1968,7 @@ func testOneTransformation(t *testing.T, msg string, verifies bool) {
 		t.Errorf("cannot parse public key: %v", err)
 	}
 	pubKey := prvKey.Public().(ed25519.PublicKey)
-	verifier, err := NewEd25519Verifier("test-key-ed25519", pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+	verifier, err := NewEd25519Verifier(pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
 	assert.NoError(t, err, "could not create verifier")
 	req := readRequest(msg)
 	err = VerifyRequest("transform", *verifier, req)
@@ -1988,7 +1998,7 @@ func TestQPEncoding(t *testing.T) {
 	req := readRequest(httpreq10)
 	f1 := NewFields().AddQueryParam("var").AddQueryParam("bar").AddQueryParam("façade\": ")
 	key1 := bytes.Repeat([]byte{0x67}, 64)
-	signer, err := NewHMACSHA256Signer("key1", key1, NewSignConfig().setFakeCreated(8888), *f1)
+	signer, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(8888).SetKeyID("key1"), *f1)
 	assert.NoError(t, err, "Could not create signer")
 	_, _, sigBase, err := signRequestDebug("sig1", *signer, req)
 	assert.NoError(t, err, "Should not fail while signing weird QPs")
@@ -2035,7 +2045,7 @@ func TestRequestBinding17(t *testing.T) {
 		AddHeaderExt("@method", false, false, true, false).
 		AddHeaderExt("@path", false, false, true, false).
 		AddHeaderExt("content-digest", false, false, true, false)
-	verifier2, err := NewP256Verifier("test-key-ecc-p256", *pubKey2, NewVerifyConfig().SetVerifyCreated(false), fields2)
+	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
 	assert.NoError(t, err, "create verifier")
 	sigBase, err := verifyResponseDebug("reqres", *verifier2, res, req)
 	expected := `"@status": 503
@@ -2084,8 +2094,8 @@ func TestMultipleSignatures17(t *testing.T) {
 	req := readRequest(httpreq12)
 	pubKey1, err := parseECPublicKeyFromPemStr(p256PubKey2)
 	assert.NoError(t, err, "cannot parse ECC public key")
-	verifier1, err := NewP256Verifier("test-key-ecc-p256", *pubKey1, NewVerifyConfig().
-		SetVerifyCreated(false), Headers("@method", "@authority", "@path", "content-digest",
+	verifier1, err := NewP256Verifier(*pubKey1, NewVerifyConfig().
+		SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), Headers("@method", "@authority", "@path", "content-digest",
 		"content-type", "content-length"))
 	assert.NoError(t, err, "cannot create verifier1")
 	_, err = verifyRequestDebug("sig1", *verifier1, req)
@@ -2093,7 +2103,7 @@ func TestMultipleSignatures17(t *testing.T) {
 
 	pubKey2, err := parseRsaPublicKey(rsaPubKey)
 	assert.NoError(t, err, "cannot parse RSA public key")
-	verifier2, err := NewRSAVerifier("test-key-rsa", *pubKey2, NewVerifyConfig().
+	verifier2, err := NewRSAVerifier(*pubKey2, NewVerifyConfig().
 		SetVerifyCreated(false).SetRejectExpired(false), *NewFields().AddHeaders("@authority", "forwarded"))
 	assert.NoError(t, err, "cannot create verifier2")
 	_, err = verifyRequestDebug("proxy_sig", *verifier2, req)
@@ -2144,7 +2154,7 @@ func TestRequestBindingSignedResponse17(t *testing.T) {
 		AddHeaderExt("@path", false, false, true, false).
 		AddHeaderExt("@query", false, false, true, false).
 		AddHeaderExt("content-digest", false, false, true, false)
-	verifier2, err := NewP256Verifier("test-key-ecc-p256", *pubKey2, NewVerifyConfig().SetVerifyCreated(false), fields2)
+	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
 	assert.NoError(t, err, "create verifier")
 	sigBase, err := verifyResponseDebug("reqres", *verifier2, res, req)
 	expected := `"@status": 503
