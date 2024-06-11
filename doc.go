@@ -1,5 +1,4 @@
-// Package httpsign signs HTTP requests and responses as defined in draft-ietf-httpbis-message-signatures.
-// See https://datatracker.ietf.org/doc/draft-ietf-httpbis-message-signatures/ for the latest draft version.
+// Package httpsign signs HTTP requests and responses as defined in RFC 9421, formerly draft-ietf-httpbis-message-signatures.
 //
 // For client-side message signing and verification, use the Client wrapper.
 // Alternatively you can use SignRequest, VerifyResponse etc. directly, but this is more complicated.
