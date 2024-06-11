@@ -114,10 +114,7 @@ func TestClientUsage(t *testing.T) {
 
 	// Send an HTTP POST, get response -- signing happens behind the scenes
 	body := `{"hello": "world"}`
-	res, err := client.Post(ts.URL, "application/json", bufio.NewReader(strings.NewReader(body)))
-	if err != nil {
-		_ = err // handle error
-	}
+	res, _ := client.Post(ts.URL, "application/json", bufio.NewReader(strings.NewReader(body)))
 
 	// Read the response
 	serverText, _ := io.ReadAll(res.Body)
