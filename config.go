@@ -16,6 +16,7 @@ type SignConfig struct {
 	expires     int64
 	nonce       string
 	tag         string
+	keyID       *string
 }
 
 // NewSignConfig generates a default configuration.
@@ -27,6 +28,7 @@ func NewSignConfig() *SignConfig {
 		expires:     0,
 		nonce:       "",
 		tag:         "", // we disallow an empty tag
+		keyID:       nil,
 	}
 }
 
@@ -70,6 +72,12 @@ func (c *SignConfig) SetTag(tag string) *SignConfig {
 	return c
 }
 
+// SetKeyID configures a keyid value that will be included as a signature parameter.
+func (c *SignConfig) SetKeyID(keyID string) *SignConfig {
+	c.keyID = &keyID
+	return c
+}
+
 // VerifyConfig contains additional configuration for the verifier.
 type VerifyConfig struct {
 	verifyCreated bool
@@ -77,7 +85,7 @@ type VerifyConfig struct {
 	notOlderThan  time.Duration
 	allowedAlgs   []string
 	rejectExpired bool
-	verifyKeyID   bool
+	keyID         *string
 	dateWithin    time.Duration
 	allowedTags   []string
 }
@@ -118,11 +126,11 @@ func (v *VerifyConfig) SetAllowedAlgs(allowedAlgs []string) *VerifyConfig {
 	return v
 }
 
-// SetVerifyKeyID defines how to verify the keyid parameter, if one exists. If this value is set,
-// the signature verifies only if the value is the same as was specified in the Verifier structure.
-// Default: true.
-func (v *VerifyConfig) SetVerifyKeyID(verify bool) *VerifyConfig {
-	v.verifyKeyID = verify
+// SetKeyID defines how to verify the keyid parameter, if one exists. If this value is a non-nil string,
+// the signature verifies only if the value is the same as was specified here.
+// Default: nil.
+func (v *VerifyConfig) SetKeyID(keyID string) *VerifyConfig {
+	v.keyID = &keyID
 	return v
 }
 
@@ -150,7 +158,7 @@ func NewVerifyConfig() *VerifyConfig {
 		notOlderThan:  10 * time.Second,
 		rejectExpired: true,
 		allowedAlgs:   []string{},
-		verifyKeyID:   true,
+		keyID:         nil,
 		dateWithin:    0,   // meaning no constraint
 		allowedTags:   nil, // no constraint
 	}

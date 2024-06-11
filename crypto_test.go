@@ -13,10 +13,9 @@ import (
 
 func TestNewHMACSHA256Signer(t *testing.T) {
 	type args struct {
-		keyID string
-		key   []byte
-		c     *SignConfig
-		f     Fields
+		key []byte
+		c   *SignConfig
+		f   Fields
 	}
 	tests := []struct {
 		name    string
@@ -27,13 +26,11 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 		{
 			name: "happy path",
 			args: args{
-				keyID: "key1",
-				key:   []byte(strings.Repeat("c", 64)),
-				c:     nil,
-				f:     Fields{},
+				key: []byte(strings.Repeat("c", 64)),
+				c:   nil,
+				f:   Fields{},
 			},
 			want: &Signer{
-				keyID:  "key1",
 				key:    []byte(strings.Repeat("c", 64)),
 				alg:    "hmac-sha256",
 				config: NewSignConfig(),
@@ -44,8 +41,7 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 		{
 			name: "key too short",
 			args: args{
-				keyID: "key2",
-				key:   []byte("abc"),
+				key: []byte("abc"),
 			},
 			want:    nil,
 			wantErr: true,
@@ -53,7 +49,7 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewHMACSHA256Signer(tt.args.keyID, tt.args.key, tt.args.c, tt.args.f)
+			got, err := NewHMACSHA256Signer(tt.args.key, tt.args.c, tt.args.f)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHMACSHA256Signer() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -67,9 +63,8 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 
 func TestSigner_sign(t *testing.T) {
 	type fields struct {
-		keyID string
-		key   interface{}
-		alg   string
+		key interface{}
+		alg string
 	}
 	type args struct {
 		buff []byte
@@ -84,9 +79,8 @@ func TestSigner_sign(t *testing.T) {
 		{
 			name: "happy path",
 			fields: fields{
-				keyID: "key1",
-				key:   []byte(strings.Repeat("a", 64)),
-				alg:   "hmac-sha256",
+				key: []byte(strings.Repeat("a", 64)),
+				alg: "hmac-sha256",
 			},
 			args: args{
 				buff: []byte("abc"),
@@ -97,9 +91,8 @@ func TestSigner_sign(t *testing.T) {
 		{
 			name: "bad alg",
 			fields: fields{
-				keyID: "key1",
-				key:   []byte(strings.Repeat("a", 64)),
-				alg:   "hmac-sha999",
+				key: []byte(strings.Repeat("a", 64)),
+				alg: "hmac-sha999",
 			},
 			args: args{
 				buff: []byte("abc"),
@@ -111,9 +104,8 @@ func TestSigner_sign(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Signer{
-				keyID: tt.fields.keyID,
-				key:   tt.fields.key,
-				alg:   tt.fields.alg,
+				key: tt.fields.key,
+				alg: tt.fields.alg,
 			}
 			got, err := s.sign(tt.args.buff)
 			if (err != nil) != tt.wantErr {
@@ -122,51 +114,6 @@ func TestSigner_sign(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("sign() got = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestNewRSASigner(t *testing.T) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Errorf("failed to gen private key")
-	}
-	_ = privateKey.Public()
-
-	type args struct {
-		keyID  string
-		key    rsa.PrivateKey
-		config *SignConfig
-		fields Fields
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *Signer
-		wantErr bool
-	}{
-		{
-			name: "empty key ID",
-			args: args{
-				keyID:  "",
-				key:    *privateKey,
-				config: nil,
-				fields: *NewFields(),
-			},
-			want:    nil,
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewRSASigner(tt.args.keyID, tt.args.key, tt.args.config, tt.args.fields)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewRSASigner() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewRSASigner() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -181,7 +128,7 @@ func TestForeignSigner(t *testing.T) {
 	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
 	signatureName := "sig1"
 	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
-	signer, err := NewJWSSigner(jwa.ES256, "key1", priv, config, fields)
+	signer, err := NewJWSSigner(jwa.ES256, priv, config.SetKeyID("key1"), fields)
 	if err != nil {
 		t.Errorf("Failed to create JWS signer")
 	}
@@ -192,7 +139,7 @@ func TestForeignSigner(t *testing.T) {
 	}
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewJWSVerifier(jwa.ES256, pub, "key1", NewVerifyConfig().SetVerifyCreated(false), fields)
+	verifier, err := NewJWSVerifier(jwa.ES256, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -223,13 +170,11 @@ func TestNewRSASigner1(t *testing.T) {
 		{
 			name: "happy path",
 			args: args{
-				keyID:  "key100",
 				key:    key,
 				config: nil,
 				fields: *NewFields(),
 			},
 			want: &Signer{
-				keyID:         "key100",
 				key:           *key,
 				alg:           "rsa-v1_5-sha256",
 				config:        NewSignConfig(),
@@ -241,7 +186,7 @@ func TestNewRSASigner1(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewRSASigner(tt.args.keyID, *tt.args.key, tt.args.config, tt.args.fields)
+			got, err := NewRSASigner(*tt.args.key, tt.args.config, tt.args.fields)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewRSASigner() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -278,7 +223,6 @@ func TestNewJWSVerifier(t *testing.T) {
 				fields: *NewFields(),
 			},
 			want: &Verifier{
-				keyID:           "key200",
 				key:             "1234",
 				alg:             "",
 				config:          NewVerifyConfig(),
@@ -314,7 +258,7 @@ func TestNewJWSVerifier(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewJWSVerifier(tt.args.alg, tt.args.key, tt.args.keyID, tt.args.config, tt.args.fields)
+			got, err := NewJWSVerifier(tt.args.alg, tt.args.key, tt.args.config, tt.args.fields)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewJWSVerifier() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -334,7 +278,6 @@ func TestNewJWSVerifier(t *testing.T) {
 
 func TestVerify(t *testing.T) {
 	v := Verifier{
-		keyID:           "",
 		key:             nil,
 		alg:             "bad-alg",
 		config:          NewVerifyConfig(),

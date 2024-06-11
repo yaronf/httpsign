@@ -15,14 +15,14 @@ import (
 func Test_WrapHandler(t *testing.T) {
 	fetchVerifier := func(r *http.Request) (string, *Verifier) {
 		sigName := "sig1"
-		verifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{1}, 64), nil,
+		verifier, _ := NewHMACSHA256Verifier(bytes.Repeat([]byte{1}, 64), nil,
 			Headers("@method"))
 		return sigName, verifier
 	}
 
 	fetchSigner := func(res http.Response, r *http.Request) (string, *Signer) {
 		sigName := "sig1"
-		signer, _ := NewHMACSHA256Signer("key", bytes.Repeat([]byte{0}, 64), nil,
+		signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{0}, 64), NewSignConfig().SetKeyID("key"),
 			Headers("@status", "bar", "date", "Content-Digest"))
 		return sigName, signer
 	}
@@ -38,11 +38,11 @@ func Test_WrapHandler(t *testing.T) {
 	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), *config))
 	defer ts.Close()
 
-	signer, err := NewHMACSHA256Signer("key", bytes.Repeat([]byte{1}, 64), nil,
+	signer, err := NewHMACSHA256Signer(bytes.Repeat([]byte{1}, 64), NewSignConfig().SetKeyID("key"),
 		Headers("@method", "content-digest", "@request-target"))
 	assert.NoError(t, err)
 
-	verifier, err := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), NewVerifyConfig(), *NewFields())
+	verifier, err := NewHMACSHA256Verifier(bytes.Repeat([]byte{0}, 64), NewVerifyConfig().SetKeyID("key"), *NewFields())
 	assert.NoError(t, err)
 	client := NewDefaultClient(NewClientConfig().SetSignatureName("sig1").SetSigner(signer).SetVerifier(verifier).SetDigestSchemesSend([]string{DigestSha256}))
 	res, err := client.Post(ts.URL+"?foo", "text/plain", strings.NewReader("Message body here"))
@@ -68,7 +68,7 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 		}
 		fetchSigner := func(res http.Response, r *http.Request) (string, *Signer) {
 			sigName := "sig1"
-			signer, _ := NewHMACSHA256Signer("key", bytes.Repeat([]byte{0}, 64), signConfig,
+			signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{0}, 64), signConfig.SetKeyID("key1"),
 				Headers("@status", "bar", "date"))
 			return sigName, signer
 		}
@@ -99,7 +99,7 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 			config = config.SetFetchSigner(nil)
 		}
 		if verifyRequest {
-			serverVerifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{9}, 64), NewVerifyConfig(), *NewFields())
+			serverVerifier, _ := NewHMACSHA256Verifier(bytes.Repeat([]byte{9}, 64), NewVerifyConfig().SetKeyID("key"), *NewFields())
 			config = config.SetFetchVerifier(func(r *http.Request) (sigName string, verifier *Verifier) {
 				return "sig333", serverVerifier
 			})
@@ -114,11 +114,11 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 		} else {
 			key = bytes.Repeat([]byte{3}, 64)
 		}
-		verifyConfig := NewVerifyConfig()
+		verifyConfig := NewVerifyConfig().SetKeyID("key")
 		if badAlgs {
 			verifyConfig = verifyConfig.SetAllowedAlgs([]string{"zuzu"})
 		}
-		verifier, _ := NewHMACSHA256Verifier("key", key, verifyConfig, *NewFields())
+		verifier, _ := NewHMACSHA256Verifier(key, verifyConfig, *NewFields())
 
 		client := NewDefaultClient(NewClientConfig().SetSignatureName("sig1").SetVerifier(verifier))
 		res, err := client.Get(ts.URL)
@@ -176,7 +176,7 @@ func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler
 	}
 	fetchVerifier := func(r *http.Request) (string, *Verifier) {
 		sigName := "sig1"
-		verifier, _ := NewHMACSHA256Verifier("key", bytes.Repeat([]byte{0}, 64), nil,
+		verifier, _ := NewHMACSHA256Verifier(bytes.Repeat([]byte{0}, 64), NewVerifyConfig().SetKeyID("key"),
 			Headers("@method"))
 		return sigName, verifier
 	}
@@ -187,8 +187,8 @@ func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler
 	// Client code starts here
 	// Create a signer and a wrapped HTTP client (we set SignCreated to false to make the response deterministic,
 	// don't do that in production.)
-	signer, _ := NewHMACSHA256Signer("key1", bytes.Repeat([]byte{1}, 64),
-		NewSignConfig().SignCreated(false), Headers("@method"))
+	signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{1}, 64),
+		NewSignConfig().SetKeyID("key1").SignCreated(false), Headers("@method"))
 	client := NewDefaultClient(NewClientConfig().SetSignatureName("sig22").SetSigner(signer)) // sign, don't verify
 
 	// Send an HTTP GET, get response -- signing and verification happen behind the scenes

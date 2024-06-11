@@ -17,7 +17,7 @@ func signMessage(config SignConfig, signatureName string, signer Signer, parsedM
 	if err != nil {
 		return "", "", "", err
 	}
-	sigParams, err := generateSigParams(&config, signer.keyID, signer.alg, signer.foreignSigner, filtered)
+	sigParams, err := generateSigParams(&config, signer.alg, signer.foreignSigner, filtered)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -257,7 +257,7 @@ func quotedString(s string) (string, error) {
 	return result.String(), nil
 }
 
-func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner interface{}, fields Fields) (string, error) {
+func generateSigParams(config *SignConfig, alg string, foreignSigner interface{}, fields Fields) (string, error) {
 	p := httpsfv.NewParams()
 	var createdTime int64
 	if config.fakeCreated != 0 {
@@ -291,7 +291,12 @@ func generateSigParams(config *SignConfig, keyID, alg string, foreignSigner inte
 		}
 		p.Add("tag", qContext)
 	}
-	p.Add("keyid", keyID)
+	if config.keyID != nil {
+		if *config.keyID == "" {
+			return "", fmt.Errorf("key ID must not be an empty string")
+		}
+		p.Add("keyid", *config.keyID)
+	}
 	return fields.asSignatureInput(p)
 }
 
@@ -548,7 +553,7 @@ func verifyMessage(config VerifyConfig, verifier Verifier, message, assocMessage
 	if !(psiSig.fields.contains(&filtered)) {
 		return "", fmt.Errorf("actual signature does not cover all required fields")
 	}
-	err := applyVerificationPolicy(verifier, *message, psiSig, config)
+	err := applyVerificationPolicy(*message, psiSig, config)
 	if err != nil {
 		return "", err
 	}
@@ -587,7 +592,7 @@ func signatureFieldsFromHeaders(header http.Header, name string) ([]byte, *psiSi
 	return wantSigRaw, psiSig, nil
 }
 
-func applyVerificationPolicy(verifier Verifier, message parsedMessage, psi *psiSignature, config VerifyConfig) error {
+func applyVerificationPolicy(message parsedMessage, psi *psiSignature, config VerifyConfig) error {
 	err := applyPolicyCreated(psi, message, config)
 	if err != nil {
 		return err
@@ -604,22 +609,22 @@ func applyVerificationPolicy(verifier Verifier, message parsedMessage, psi *psiS
 	if err4 != nil {
 		return err4
 	}
-	err5 := applyPolicyOthers(verifier, psi, config)
+	err5 := applyPolicyOthers(psi, config)
 	if err5 != nil {
 		return err5
 	}
 	return nil
 }
 
-func applyPolicyOthers(verifier Verifier, psi *psiSignature, config VerifyConfig) error {
-	if config.verifyKeyID {
+func applyPolicyOthers(psi *psiSignature, config VerifyConfig) error {
+	if config.keyID != nil {
 		keyidParam, ok := psi.params["keyid"]
 		if ok {
 			keyID, ok := keyidParam.(string)
 			if !ok {
 				return fmt.Errorf("malformed \"keyid\" parameter")
 			}
-			if keyID != verifier.keyID {
+			if keyID != *config.keyID {
 				return fmt.Errorf("wrong keyid \"%s\"", keyID)
 			}
 		}
