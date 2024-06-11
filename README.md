@@ -14,18 +14,14 @@ in the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign).
 
 ```cgo
 	// Create a signer and a wrapped HTTP client
-	signer, _ := httpsign.NewRSAPSSSigner("key1", *prvKey,
-		httpsign.NewSignConfig(),
+	signer, _ := httpsign.NewRSAPSSSigner(*prvKey, httpsign.NewSignConfig(),
 		httpsign.Headers("@request-target", "content-digest")) // The Content-Digest header will be auto-generated
 	client := httpsign.NewDefaultClient(httpsign.NewClientConfig().SetSignatureName("sig1").SetSigner(signer)) // sign requests, don't verify responses
 
 	// Send an HTTP POST, get response -- signing happens behind the scenes
 	body := `{"hello": "world"}`
-	res, err := client.Post(ts.URL, "application/json", bufio.NewReader(strings.NewReader(body)))
-	if err != nil {
-		// handle error
-	}
-
+	res, _ := client.Post(ts.URL, "application/json", bufio.NewReader(strings.NewReader(body)))
+	
 	// Read the response
 	serverText, _ := io.ReadAll(res.Body)
 	_ = res.Body.Close()
