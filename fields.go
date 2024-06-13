@@ -123,6 +123,12 @@ func (fs *Fields) AddHeaderExt(hdr string, optional bool, binarySequence bool, a
 	return fs
 }
 
+// AddHeaderOptional appends a bare header name, e.g. "cache-control". However, the header is not required to exist
+// in the message. This is a convenience function and AddHeaderExt is more general.
+func (fs *Fields) AddHeaderOptional(hdr string) *Fields {
+	return fs.AddHeaderExt(hdr, true, false, false, false)
+}
+
 func fromQueryParam(qp string) *field {
 	i := httpsfv.NewItem("@query-param")
 	i.Params.Add("name", QueryEscapeForSignature(qp))

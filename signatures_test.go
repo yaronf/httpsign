@@ -1633,7 +1633,7 @@ func TestVerifyResponse(t *testing.T) {
 
 func TestOptionalSign(t *testing.T) {
 	req := readRequest(httpreq2)
-	f1 := NewFields().AddHeader("date").AddHeaderExt("x-optional", true, false, false, false)
+	f1 := NewFields().AddHeader("date").AddHeaderOptional("x-optional")
 	key1 := bytes.Repeat([]byte{0x55}, 64)
 	signer1, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(9999).SetKeyID("key1"), *f1)
 	assert.NoError(t, err, "Could not create signer")
@@ -1777,7 +1777,7 @@ func TestRequestBinding(t *testing.T) {
 func TestOptionalVerify(t *testing.T) {
 	req := readRequest(httpreq2)
 	req.Header.Add("X-Opt1", "val1")
-	f1 := NewFields().AddHeader("date").AddHeaderExt("x-opt1", true, false, false, false)
+	f1 := NewFields().AddHeader("date").AddHeaderOptional("x-opt1")
 	key1 := bytes.Repeat([]byte{0x66}, 64)
 	signer, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(8888).SetKeyID("key1"), *f1)
 	assert.NoError(t, err, "Could not create signer")
