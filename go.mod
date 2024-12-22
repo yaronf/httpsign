@@ -1,11 +1,11 @@
 module github.com/yaronf/httpsign
 
-go 1.22
+go 1.20
 
 require (
 	github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
 	github.com/dunglas/httpsfv v1.0.2
-	github.com/lestrrat-go/jwx/v2 v2.1.3
+	github.com/lestrrat-go/jwx/v2 v2.1.2
 	github.com/stretchr/testify v1.10.0
 )
 
