@@ -22,15 +22,13 @@ func ecdsaSignRaw(rd io.Reader, priv *ecdsa.PrivateKey, hash []byte) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
-	rb := make([]byte, lr)
-	sb := make([]byte, ls)
+	rb, sb := make([]byte, lr), make([]byte, ls)
 	if r.BitLen() > 8*lr || s.BitLen() > 8*ls {
 		return nil, fmt.Errorf("signature values too long")
 	}
 	r.FillBytes(rb)
 	s.FillBytes(sb)
-	rb = append(rb, sb...)
-	return rb, nil
+	return append(rb, sb...), nil
 }
 
 func ecdsaVerifyRaw(pub *ecdsa.PublicKey, hash []byte, sig []byte) (bool, error) {

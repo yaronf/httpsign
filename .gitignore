@@ -2,3 +2,5 @@
 /fuzz/go.sum
 /.idea/inspectionProfiles/Project_Default.xml
 /testdata/fuzz/FuzzSignAndVerifyHMAC/
+
+.qodo
