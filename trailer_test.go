@@ -52,7 +52,7 @@ Trailer: Expires, Hdr
 
 `
 
-var longReq1 = rawHeaders1 + "5000\r\n" + strings.Repeat("x", 0x5000) + "\r\n\r\n" + "Hdr: zoomba\r\n\r\n"
+var longReq1 = rawHeaders1 + "5000\r\n" + strings.Repeat("x", 0x5000) + "\r\n0\r\n" + "Hdr: zoomba\r\n\r\n"
 
 func TestTrailer_Get(t *testing.T) {
 	fetchVerifier := func(r *http.Request) (string, *Verifier) {
