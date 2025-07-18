@@ -118,10 +118,6 @@ func TestTrailer_Get(t *testing.T) {
 	}
 
 	req2 := readRequest(longReq1)
-	if err != nil {
-		t.Errorf("createBody: %s", err)
-	}
-
 	req2.RequestURI = "" // otherwise Do will complain
 	req2.URL = u
 
