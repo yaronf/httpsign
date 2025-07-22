@@ -14,11 +14,12 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var httpreq1 = `POST /foo?param=value&pet=dog HTTP/1.1
@@ -685,6 +686,25 @@ func TestSignAndVerifyHMAC(t *testing.T) {
 	assert.NoError(t, err, "verification error")
 }
 
+// Same as TestSignAndVerifyHMAC but using Message
+func TestMessageSignAndVerifyHMAC(t *testing.T) {
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
+	fields := Headers("@authority", "date", "content-type")
+	signatureName := "sig1"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
+	req := readRequest(httpreq1)
+	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
+	assert.NoError(t, err, "could not generate Verifier")
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
+	assert.NoError(t, err, "verification error")
+}
+
 func TestSignAndVerifyHMACNoHeader(t *testing.T) {
 	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
 	fields := Headers("@authority", "content-type")
@@ -710,6 +730,34 @@ func TestSignAndVerifyHMACNoHeader(t *testing.T) {
 	assert.Error(t, err, "verification should fail, header not found")
 }
 
+// Same as TestSignAndVerifyHMACNoHeader but using Message
+func TestMessageSignAndVerifyHMACNoHeader(t *testing.T) {
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
+	fields := Headers("@authority", "content-type")
+	signatureName := "sig1"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
+	req := readRequest(longReq1)
+	_, sig, err := SignRequest(signatureName, *signer, req)
+	assert.NoError(t, err, "failed to sign")
+	req.Header.Add("Signature", sig)
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
+	assert.NoError(t, err, "could not generate Verifier")
+	err = VerifyRequest(signatureName, *verifier, req)
+	assert.Error(t, err, "verification should fail, header not found")
+
+	req = readRequest(longReq1)
+	sigInput, _, err := SignRequest(signatureName, *signer, req)
+	assert.NoError(t, err, "failed to sign")
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err = NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
+	assert.NoError(t, err, "could not generate Verifier")
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
+	assert.Error(t, err, "verification should fail, header not found")
+}
+
 func TestSignAndVerifyHMACBad(t *testing.T) {
 	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
 	fields := Headers("@authority", "date", "content-type")
@@ -724,6 +772,26 @@ func TestSignAndVerifyHMACBad(t *testing.T) {
 	verifier, err := NewHMACSHA256Verifier(badkey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
 	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req)
+	assert.Error(t, err, "verification should have failed")
+}
+
+// Same as TestSignAndVerifyHMACBad but using Message
+func TestMessageSignAndVerifyHMACBad(t *testing.T) {
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
+	fields := Headers("@authority", "date", "content-type")
+	signatureName := "sig1"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
+	req := readRequest(httpreq1)
+	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	badkey := append(key, byte(0x77))
+	verifier, err := NewHMACSHA256Verifier(badkey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
+	assert.NoError(t, err, "could not generate Verifier")
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
 	assert.Error(t, err, "verification should have failed")
 }
 
@@ -792,6 +860,76 @@ func TestCreated(t *testing.T) {
 	t.Run("verify logic requires to verify Created", testDateFail)
 }
 
+// Same as TestCreated but using Message
+func TestMessageCreated(t *testing.T) {
+	testOnceWithConfig := func(t *testing.T, createdTime int64, verifyConfig *VerifyConfig, wantSuccess bool) {
+		fields := Headers("@status", "date", "content-type")
+		signatureName := "sigres"
+		key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+		signConfig := NewSignConfig().SignCreated(true).setFakeCreated(createdTime).SetKeyID("test-shared-secret")
+		signer, _ := NewHMACSHA256Signer(key, signConfig, fields)
+		res := readResponse(httpres2)
+		nowStr := time.Now().UTC().Format(http.TimeFormat)
+		res.Header.Set("Date", nowStr)
+		sigInput, sig, _ := SignResponse(signatureName, *signer, res, nil)
+
+		res2 := readResponse(httpres2)
+		res2.Header.Set("Date", nowStr)
+		res2.Header.Add("Signature", sig)
+		res2.Header.Add("Signature-Input", sigInput)
+		verifier, err := NewHMACSHA256Verifier(key, verifyConfig, fields)
+		if err != nil {
+			t.Errorf("could not generate Verifier: %s", err)
+		}
+		msg, err := NewMessage(NewMessageConfig().WithResponse(res2, nil))
+		if err != nil {
+			t.Errorf("could not create Message: %s", err)
+		}
+		_, err = msg.Verify(signatureName, *verifier)
+
+		if wantSuccess && err != nil {
+			t.Errorf("verification error: %s", err)
+		}
+		if !wantSuccess && err == nil {
+			t.Errorf("expected verification to fail")
+		}
+	}
+	testOnce := func(t *testing.T, createdTime int64, wantSuccess bool) {
+		testOnceWithConfig(t, createdTime, nil, wantSuccess)
+	}
+	now := time.Now().Unix() // the window is in ms, but "created" granularity is in sec!
+	testInWindow := func(t *testing.T) { testOnce(t, now, true) }
+	testOlder := func(t *testing.T) { testOnce(t, now-20_000, false) }
+	testNewer := func(t *testing.T) { testOnce(t, now+3_000, false) }
+	testOldWindow1 := func(t *testing.T) {
+		testOnceWithConfig(t, now-20_000, NewVerifyConfig().SetNotOlderThan(19_000*time.Second), false)
+	}
+	testOldWindow2 := func(t *testing.T) {
+		testOnceWithConfig(t, now-20_000, NewVerifyConfig().SetNotOlderThan(21_000*time.Second), true)
+	}
+	testNewWindow1 := func(t *testing.T) {
+		testOnceWithConfig(t, now+15_000, NewVerifyConfig().SetNotNewerThan(16_000*time.Second), true)
+	}
+	testNewWindow2 := func(t *testing.T) {
+		testOnceWithConfig(t, now+15_000, NewVerifyConfig().SetNotNewerThan(14_000*time.Second), false)
+	}
+	testDate := func(t *testing.T) {
+		testOnceWithConfig(t, now, NewVerifyConfig().SetVerifyDateWithin(100*time.Millisecond), true)
+	}
+	testDateFail := func(t *testing.T) {
+		testOnceWithConfig(t, now, NewVerifyConfig().SetVerifyCreated(false).SetVerifyDateWithin(100*time.Millisecond), false)
+	}
+	t.Run("in window", testInWindow)
+	t.Run("older", testOlder)
+	t.Run("newer", testNewer)
+	t.Run("older, smaller than window", testOldWindow1)
+	t.Run("older, larger than window", testOldWindow2)
+	t.Run("newer, smaller than window", testNewWindow1)
+	t.Run("newer, larger than window", testNewWindow2)
+	t.Run("verify Date header within window", testDate)
+	t.Run("verify logic requires to verify Created", testDateFail)
+}
+
 func TestSignAndVerifyResponseHMAC(t *testing.T) {
 	fields := Headers("@status", "date", "content-type")
 	signatureName := "sigres"
@@ -809,6 +947,33 @@ func TestSignAndVerifyResponseHMAC(t *testing.T) {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
 	err = VerifyResponse(signatureName, *verifier, res2, nil)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
+// Same as TestSignAndVerifyResponseHMAC but using Message
+func TestMessageSignAndVerifyResponseHMAC(t *testing.T) {
+	fields := Headers("@status", "date", "content-type")
+	signatureName := "sigres"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	config := NewSignConfig().SetExpires(999).SetKeyID("test-shared-secret") // should have expired long ago (but will be ignored by verifier)
+	signer, _ := NewHMACSHA256Signer(key, config, fields)                    // default config
+	res := readResponse(httpres2)
+	sigInput, sig, _ := SignResponse(signatureName, *signer, res, nil)
+
+	res2 := readResponse(httpres2)
+	res2.Header.Add("Signature", sig)
+	res2.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetRejectExpired(false).SetKeyID("test-shared-secret"), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	msg, err := NewMessage(NewMessageConfig().WithResponse(res2, nil))
+	if err != nil {
+		t.Errorf("could not create Message: %s", err)
+	}
+	_, err = msg.Verify(signatureName, *verifier)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
 	}
@@ -841,6 +1006,36 @@ func TestSignAndVerifyRSAPSS(t *testing.T) {
 	}
 }
 
+// Same as TestSignAndVerifyRSAPSS but using Message
+func TestMessageSignAndVerifyRSAPSS(t *testing.T) {
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-key-rsa-pss")
+	fields := Headers("@authority", "date", "content-type")
+	signatureName := "sig1"
+	prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
+	if err != nil {
+		t.Errorf("cannot read private key")
+	}
+	signer, _ := NewRSAPSSSigner(*prvKey, config, fields)
+	req := readRequest(httpreq1)
+	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+	if err != nil {
+		t.Errorf("cannot read public key: %v", err)
+	}
+	verifier, err := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss"), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
 func TestSignAndVerifyRSA(t *testing.T) {
 	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-key-rsa")
 	fields := Headers("@authority", "date", "content-type")
@@ -863,6 +1058,36 @@ func TestSignAndVerifyRSA(t *testing.T) {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
 	err = VerifyRequest(signatureName, *verifier, req)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
+// Same as TestSignAndVerifyRSA but using Message
+func TestMessageSignAndVerifyRSA(t *testing.T) {
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-key-rsa")
+	fields := Headers("@authority", "date", "content-type")
+	signatureName := "sig1"
+	prvKey, err := parseRsaPrivateKeyFromPemStr(rsaPrvKey2)
+	if err != nil {
+		t.Errorf("cannot read private key")
+	}
+	signer, _ := NewRSASigner(*prvKey, config, fields)
+	req := readRequest(httpreq1)
+	sigInput, sig, _ := SignRequest(signatureName, *signer, req)
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPubKey2)
+	if err != nil {
+		t.Errorf("cannot read public key: %v", err)
+	}
+	verifier, err := NewRSAVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa"), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
 	}
@@ -894,6 +1119,35 @@ func TestSignAndVerifyP256(t *testing.T) {
 	}
 }
 
+// Same as TestMessageSignAndVerifyP256 but using Message
+func TestMessageSignAndVerifyP256(t *testing.T) {
+	config := NewSignConfig().setFakeCreated(1618884475).SetKeyID("test-key-p256")
+	signatureName := "sig1"
+	prvKey, pubKey, err := genP256KeyPair()
+	if err != nil {
+		t.Errorf("cannot generate P-256 keypair")
+	}
+	fields := *NewFields().AddHeader("@method").AddHeader("Date").AddHeader("Content-Type").AddQueryParam("pet")
+	signer, _ := NewP256Signer(*prvKey, config, fields)
+	req := readRequest(httpreq2)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	if err != nil {
+		t.Errorf("signature failed: %v", err)
+	}
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewP256Verifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-p256"), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
 func TestSignAndVerifyP384(t *testing.T) {
 	config := NewSignConfig().setFakeCreated(1618884475).SetKeyID("test-key-p384")
 	signatureName := "sig1"
@@ -915,6 +1169,35 @@ func TestSignAndVerifyP384(t *testing.T) {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
 	err = VerifyRequest(signatureName, *verifier, req)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
+// Same as TestSignAndVerifyP384 but using Message
+func TestMessageSignAndVerifyP384(t *testing.T) {
+	config := NewSignConfig().setFakeCreated(1618884475).SetKeyID("test-key-p384")
+	signatureName := "sig1"
+	prvKey, pubKey, err := genP384KeyPair()
+	if err != nil {
+		t.Errorf("cannot generate P-384 keypair")
+	}
+	fields := *NewFields().AddHeader("@method").AddHeader("Date").AddHeader("Content-Type").AddQueryParam("pet")
+	signer, _ := NewP384Signer(*prvKey, config, fields)
+	req := readRequest(httpreq2)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	if err != nil {
+		t.Errorf("signature failed: %v", err)
+	}
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewP384Verifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-p384"), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
 	}
@@ -959,6 +1242,53 @@ func signAndVerifyEdDSA(t *testing.T, signer *Signer, pubKey ed25519.PublicKey, 
 		t.Errorf("could not generate Verifier: %s", err)
 	}
 	err = VerifyRequest(signatureName, *verifier, req)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
+// Same as TestSignAndVerifyEdDSA but using Message
+func TestMessageSignAndVerifyEdDSA(t *testing.T) {
+	pubKey1, prvKey1, err := ed25519.GenerateKey(nil) // Need some tweaking for RFC 8032 keys, see package doc
+	if err != nil {
+		t.Errorf("cannot generate keypair: %s", err)
+	}
+	config := NewSignConfig().setFakeCreated(1618884475).SetKeyID("test-key-ed25519")
+	fields := *NewFields().AddHeader("@method").AddHeader("Date").AddHeader("Content-Type").AddQueryParam("pet")
+	signer1, _ := NewEd25519Signer(prvKey1, config, fields)
+
+	messageSignAndVerifyEdDSA(t, signer1, pubKey1, fields)
+
+	seed2 := make([]byte, ed25519.SeedSize)
+	_, err = rand.Read(seed2)
+	if err != nil {
+		t.Errorf("rand failed?")
+	}
+	config.SetKeyID("test-key-ed25519")
+	prvKey2 := ed25519.NewKeyFromSeed(seed2)
+	pubKey2 := prvKey2.Public().(ed25519.PublicKey)
+
+	signer2, _ := NewEd25519SignerFromSeed(seed2, config, fields)
+
+	messageSignAndVerifyEdDSA(t, signer2, pubKey2, fields)
+}
+
+func messageSignAndVerifyEdDSA(t *testing.T, signer *Signer, pubKey ed25519.PublicKey, fields Fields) {
+	signatureName := "sig1"
+	req := readRequest(httpreq2)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	if err != nil {
+		t.Errorf("signature failed: %v", err)
+	}
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewEd25519Verifier(pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ed25519"), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
 	}
@@ -1184,6 +1514,164 @@ func TestVerifyRequest(t *testing.T) {
 	}
 }
 
+// Same as TestVerifyRequest but using Message
+func TestMessageVerifyRequest(t *testing.T) {
+	type args struct {
+		signatureName string
+		verifier      Verifier
+		req           *http.Request
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "test case B.2.1",
+			args: args{
+				signatureName: "sig-b21",
+				verifier:      makeRSAVerifier(t, "test-key-rsa-pss", *NewFields()),
+				req:           readRequest(httpreq1pssMinimal),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "test case B.2.2",
+			args: args{
+				signatureName: "sig-b22",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss"), *NewFields())
+					return *verifier
+				})(),
+				req: readRequest(httpreq1pssSelective),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "test case B.2.3",
+			args: args{
+				signatureName: "sig-b23",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss"), *NewFields())
+					return *verifier
+				})(),
+				req: readRequest(httpreq1pssFull),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "test case B.2.6",
+			args: args{
+				signatureName: "sig-b26",
+				verifier: (func() Verifier {
+					prvKey, err := parseEdDSAPrivateKeyFromPemStr(ed25519PrvKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					pubKey := prvKey.Public().(ed25519.PublicKey)
+					verifier, _ := NewEd25519Verifier(pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ed25519"), *NewFields())
+					return *verifier
+				})(),
+				req: readRequest(httpreq1ed25519),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "test case B.3", // TLS-terminating proxy
+			args: args{
+				signatureName: "ttrp",
+				verifier: (func() Verifier {
+					pubKey, _ := parseECPublicKeyFromPemStr(p256PubKey2)
+					verifier, _ := NewP256Verifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), *NewFields())
+					return *verifier
+				})(),
+				req: readRequest(httpreqtlsproxy),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "verify bad sig (not base64)",
+			args: args{
+				signatureName: "sig1",
+				verifier:      makeRSAVerifier(t, "test-key-rsa-pss", *NewFields()),
+				req:           readRequest(httpreq1pssSelectiveBad),
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "missing fields",
+			args: args{
+				signatureName: "sig1",
+				verifier:      makeRSAVerifier(t, "test-key-rsa-pss", *NewFields().AddQueryParam("missing")),
+				req:           readRequest(httpreq1pssMinimal),
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "bad keyID",
+			args: args{
+				signatureName: "sig-b22",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("bad-key-id"), *NewFields())
+					return *verifier
+				})(),
+				req: readRequest(httpreq1pssSelective),
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
+			name: "keyID not verified", // this is NOT a failure
+			args: args{
+				signatureName: "sig-b22",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().
+						SetVerifyCreated(false), *NewFields())
+					return *verifier
+				})(),
+				req: readRequest(httpreq1pssSelective),
+			},
+			want:    true,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg, err := NewMessage(NewMessageConfig().WithRequest(tt.args.req))
+			assert.NoError(t, err, "could not create Message")
+			_, err = msg.Verify(tt.args.signatureName, tt.args.verifier)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("VerifyRequest() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+		})
+	}
+}
+
 type failer interface {
 	Errorf(format string, args ...any)
 }
@@ -1345,6 +1833,42 @@ func TestDictionary(t *testing.T) {
 	}
 }
 
+// Same as TestDictionary but using Message
+func TestMessageDictionary(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	if err != nil {
+		t.Errorf("failed to generate key")
+	}
+	res := readResponse(httpres2)
+	res.Header.Set("X-Dictionary", "a=1, b=2;x=1;y=2, c=(a b c)")
+	signer2, err := NewP256Signer(*priv, NewSignConfig().SetKeyID("key10"),
+		*NewFields().AddHeader("@status").AddDictHeader("x-dictionary", "a"))
+	if err != nil {
+		t.Errorf("Could not create signer")
+	}
+	sigInput2, sig2, err := SignResponse("sig2", *signer2, res, nil)
+	if err != nil {
+		t.Errorf("Could not sign response: %v", err)
+	}
+	res.Header.Add("Signature-Input", sigInput2)
+	res.Header.Add("Signature", sig2)
+
+	// Client verifies response
+	verifier2, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key10"),
+		*NewFields().AddHeader("@status").AddDictHeader("x-dictionary", "a"))
+	if err != nil {
+		t.Errorf("Could not create verifier: %v", err)
+	}
+	msg, err := NewMessage(NewMessageConfig().WithResponse(res, nil))
+	if err != nil {
+		t.Errorf("could not create Message: %s", err)
+	}
+	_, err = msg.Verify("sig2", *verifier2)
+	if err != nil {
+		t.Errorf("Could not verify response: %v", err)
+	}
+}
+
 func TestMultipleSignaturesOld(t *testing.T) {
 	priv1, _, err := genP256KeyPair() // no pub, no verify
 	if err != nil {
@@ -1415,6 +1939,28 @@ func TestMultipleSignatures(t *testing.T) {
 		SetVerifyCreated(false).SetRejectExpired(false).SetKeyID("test-key-rsa"), *NewFields().AddDictHeader("Signature", "sig1").AddHeaders("@authority", "forwarded"))
 	assert.NoError(t, err, "cannot create verifier2")
 	_, err = verifyRequestDebug("proxy_sig", *verifier2, req)
+	assert.NoError(t, err, "proxy signature not verified")
+}
+
+// Same as TestMultipleSignatures but using Message
+func TestMessageMultipleSignatures(t *testing.T) {
+	msg, err := NewMessage(NewMessageConfig().WithRequest(readRequest(httpreq9)))
+	assert.NoError(t, err, "cannot create message")
+	pubKey1, err := parseECPublicKeyFromPemStr(p256PubKey2)
+	assert.NoError(t, err, "cannot parse ECC public key")
+	verifier1, err := NewP256Verifier(*pubKey1, NewVerifyConfig().
+		SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), Headers("@method", "@authority", "@path", "content-digest",
+		"content-type", "content-length"))
+	assert.NoError(t, err, "cannot create verifier1")
+	_, _, err = verifyDebug("sig1", *verifier1, msg)
+	assert.Error(t, err, "sig1 cannot be verified, because the proxy modified the authority field")
+
+	pubKey2, err := parseRsaPublicKey(rsaPubKey)
+	assert.NoError(t, err, "cannot parse RSA public key")
+	verifier2, err := NewRSAVerifier(*pubKey2, NewVerifyConfig().
+		SetVerifyCreated(false).SetRejectExpired(false).SetKeyID("test-key-rsa"), *NewFields().AddDictHeader("Signature", "sig1").AddHeaders("@authority", "forwarded"))
+	assert.NoError(t, err, "cannot create verifier2")
+	_, _, err = verifyDebug("proxy_sig", *verifier2, msg)
 	assert.NoError(t, err, "proxy signature not verified")
 }
 
@@ -1631,6 +2177,48 @@ func TestVerifyResponse(t *testing.T) {
 	}
 }
 
+// Same as TestVerifyResponse but using Message
+func TestMessageVerifyResponse(t *testing.T) {
+	type args struct {
+		signatureName string
+		verifier      Verifier
+		res           *http.Response
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "test case B.2.4",
+			args: args{
+				signatureName: "sig-b24",
+				verifier: (func() Verifier {
+					pubKey, err := parseECPublicKeyFromPemStr(p256PubKey2)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewP256Verifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), *NewFields())
+					return *verifier
+				})(),
+				res: readResponse(httpres4),
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg, err := NewMessage(NewMessageConfig().WithResponse(tt.args.res, nil))
+			if err != nil {
+				t.Errorf("could not create Message: %s", err)
+			}
+			if _, err = msg.Verify(tt.args.signatureName, tt.args.verifier); (err != nil) != tt.wantErr {
+				t.Errorf("VerifyResponse() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestOptionalSign(t *testing.T) {
 	req := readRequest(httpreq2)
 	f1 := NewFields().AddHeader("date").AddHeaderOptional("x-optional")
@@ -1696,6 +2284,31 @@ func TestAssocMessage(t *testing.T) {
 	verifier, err := NewHMACSHA256Verifier(key1, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), *f3)
 	assert.NoError(t, err, "Should create verifier")
 	err = VerifyResponse("sig1", *verifier, res1, assocReq)
+	assert.NoError(t, err, "Verification should succeed")
+}
+
+// Same as TestAssocMessage but using Message
+func TestMessageAssocRequest(t *testing.T) {
+	key1 := bytes.Repeat([]byte{0x66}, 64)
+	assocReq := readRequest(httpreq2)
+	res1 := readResponse(httpres2)
+	res1.Header.Set("X-Dictionary", "a=1,    b=2;x=1;y=2,    c=(a b c)")
+	f3 := NewFields().AddDictHeaderExt("x-dictionary", "a", true, false, false).AddDictHeaderExt("x-dictionary", "zz", true, false, false).
+		AddQueryParamExt("pet", false, true, false)
+	signer3, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(9999).SetKeyID("key1"), *f3)
+	assert.NoError(t, err, "Could not create signer")
+	signatureInput, signature, signatureBase, err := signResponseDebug("sig1", *signer3, res1, assocReq)
+	assert.NoError(t, err, "Should not fail with dict headers")
+	assert.Equal(t, "sig1=(\"x-dictionary\";key=\"a\" \"@query-param\";name=\"pet\";req);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureInput)
+	assert.Equal(t, "\"x-dictionary\";key=\"a\": 1\n\"@query-param\";name=\"pet\";req: dog\n\"@query-param\";name=\"pet\";req: snake\n\"@signature-params\": (\"x-dictionary\";key=\"a\" \"@query-param\";name=\"pet\";req);created=9999;alg=\"hmac-sha256\";keyid=\"key1\"", signatureBase)
+	res1.Header.Add("Signature-Input", signatureInput)
+	res1.Header.Add("Signature", signature)
+
+	verifier, err := NewHMACSHA256Verifier(key1, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), *f3)
+	assert.NoError(t, err, "Should create verifier")
+	msg, err := NewMessage(NewMessageConfig().WithResponse(res1, assocReq))
+	assert.NoError(t, err, "Should create message")
+	_, err = msg.Verify("sig1", *verifier)
 	assert.NoError(t, err, "Verification should succeed")
 }
 
@@ -1774,6 +2387,27 @@ func TestRequestBinding(t *testing.T) {
 	assert.NoError(t, err, "verify response")
 }
 
+// Same as TestRequestBinding but using Message
+func TestMessageRequestBinding(t *testing.T) {
+	req := readRequest(httpreq6)
+	contentDigest := req.Header.Values("Content-Digest")
+	err := ValidateContentDigestHeader(contentDigest, &req.Body, []string{DigestSha512})
+	assert.NoError(t, err, "validate digest")
+
+	res := readResponse(httpres6)
+	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
+	assert.NoError(t, err, "read pub key")
+	fields2 := *NewFields()
+	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
+	assert.NoError(t, err, "create verifier")
+	msg, err := NewMessage(NewMessageConfig().WithResponse(res, req))
+	if err != nil {
+		t.Errorf("could not create Message: %s", err)
+	}
+	_, err = msg.Verify("reqres", *verifier2)
+	assert.NoError(t, err, "verify response")
+}
+
 func TestOptionalVerify(t *testing.T) {
 	req := readRequest(httpreq2)
 	req.Header.Add("X-Opt1", "val1")
@@ -1813,6 +2447,54 @@ func TestOptionalVerify(t *testing.T) {
 	assert.NoError(t, err, "Should not fail: absent and not signed")
 }
 
+// Same as TestOptionalVerify but using Message
+func TestMessageOptionalVerify(t *testing.T) {
+	req := readRequest(httpreq2)
+	req.Header.Add("X-Opt1", "val1")
+	f1 := NewFields().AddHeader("date").AddHeaderOptional("x-opt1")
+	key1 := bytes.Repeat([]byte{0x66}, 64)
+	signer, err := NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(8888).SetKeyID("key1"), *f1)
+	assert.NoError(t, err, "Could not create signer")
+	sigInput, signature, err := SignRequest("sig1", *signer, req)
+	assert.NoError(t, err, "Should not fail with optional header present")
+	req.Header.Add("Signature-Input", sigInput)
+	req.Header.Add("Signature", signature)
+
+	verifier, err := NewHMACSHA256Verifier(key1, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), *f1)
+	assert.NoError(t, err, "Could not create verifier")
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify("sig1", *verifier)
+	assert.NoError(t, err, "Should not fail: present and signed")
+
+	req.Header.Del("X-Opt1") // header absent but included in covered components
+	msg, err = NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify("sig1", *verifier)
+	assert.Error(t, err, "Should fail: absent and signed")
+
+	req = readRequest(httpreq2) // header present but not signed
+	req.Header.Add("X-Opt1", "val1")
+	f2 := NewFields().AddHeader("date") // without the optional header
+	signer, err = NewHMACSHA256Signer(key1, NewSignConfig().setFakeCreated(2222).SetKeyID("key1"), *f2)
+	assert.NoError(t, err, "Should not fail to create Signer")
+	sigInput, signature, err = SignRequest("sig1", *signer, req)
+	assert.NoError(t, err, "Should not fail with redundant header present")
+	req.Header.Add("Signature-Input", sigInput)
+	req.Header.Add("Signature", signature)
+
+	msg, err = NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify("sig1", *verifier)
+	assert.Error(t, err, "Should fail: present and not signed")
+
+	req.Header.Del("X-Opt1")
+	msg, err = NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify("sig1", *verifier)
+	assert.NoError(t, err, "Should not fail: absent and not signed")
+}
+
 func TestBinarySequence(t *testing.T) {
 	priv, pub, err := genP256KeyPair()
 	assert.NoError(t, err, "failed to generate key")
@@ -1848,6 +2530,49 @@ func TestBinarySequence(t *testing.T) {
 		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, true, false, false))
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier2, res, nil)
+	assert.NoError(t, err, "could not verify response")
+}
+
+// Same as TestBinarySequence but using Message
+func TestMessageBinarySequence(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	assert.NoError(t, err, "failed to generate key")
+	res := readResponse(httpres2)
+	res.Header.Add("Set-Cookie", "a=1, b=2;x=1;y=2, c=(a b c)")
+	res.Header.Add("Set-Cookie", "d=5, eee")
+
+	// First signature try fails
+	signer1, err := NewP256Signer(*priv, NewSignConfig().SetKeyID("key20"),
+		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, false, false, false))
+	assert.NoError(t, err, "could not create signer")
+	_, _, err = SignResponse("sig2", *signer1, res, nil)
+	assert.Error(t, err, "signature should have failed")
+
+	signer2, err := NewP256Signer(*priv, NewSignConfig().setFakeCreated(1659563420).SetKeyID("key20"),
+		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, true, false, false))
+	assert.NoError(t, err, "could not create signer")
+	sigInput, sig, sigBase, err := signResponseDebug("sig2", *signer2, res, nil)
+	assert.NoError(t, err, "could not sign response")
+	assert.Equal(t, "\"@status\": 200\n\"set-cookie\";bs: :YT0xLCBiPTI7eD0xO3k9MiwgYz0oYSBiIGMp:, :ZD01LCBlZWU=:\n\"@signature-params\": (\"@status\" \"set-cookie\";bs);created=1659563420;alg=\"ecdsa-p256-sha256\";keyid=\"key20\"", sigBase, "unexpected signature base")
+	res.Header.Add("Signature-Input", sigInput)
+	res.Header.Add("Signature", sig)
+
+	// Client verifies response - should fail
+	verifier1, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key20"),
+		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, false, false, false))
+	assert.NoError(t, err, "could not create verifier")
+	msg, err := NewMessage(NewMessageConfig().WithResponse(res, nil))
+	assert.NoError(t, err, "could not create message")
+	_, err = msg.Verify("sig2", *verifier1)
+	assert.Error(t, err, "binary sequence verified as non-bs")
+
+	// Client verifies response - should succeed
+	verifier2, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key20"),
+		*NewFields().AddHeader("@status").AddHeaderExt("set-cookie", false, true, false, false))
+	assert.NoError(t, err, "could not create verifier")
+	msg, err = NewMessage(NewMessageConfig().WithResponse(res, nil))
+	assert.NoError(t, err, "could not create message")
+	_, err = msg.Verify("sig2", *verifier2)
 	assert.NoError(t, err, "could not verify response")
 }
 
@@ -1898,6 +2623,63 @@ func TestSignatureTag(t *testing.T) {
 		*NewFields().AddHeader("@status"))
 	assert.NoError(t, err, "could not create verifier")
 	err = VerifyResponse("sig2", *verifier3, res, nil)
+	assert.Error(t, err, "should have failed to verify response")
+}
+
+// Same as TestSignatureTag but using Message
+func TestMessageSignatureTag(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	assert.NoError(t, err, "failed to generate key")
+	res := readResponse(httpres2)
+
+	signer1, err := NewP256Signer(*priv, NewSignConfig().SetTag("ctx1").setFakeCreated(1660755826).SetKeyID("key21"),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create signer")
+	sigInput, sig, sigBase, err := signResponseDebug("sig2", *signer1, res, nil)
+	assert.NoError(t, err, "signature failed")
+	assert.Equal(t, "\"@status\": 200\n\"@signature-params\": (\"@status\");created=1660755826;alg=\"ecdsa-p256-sha256\";tag=\"ctx1\";keyid=\"key21\"", sigBase, "unexpected signature base")
+	res.Header.Add("Signature-Input", sigInput)
+	res.Header.Add("Signature", sig)
+
+	// Signature should fail with malformed tag
+	signer2, err := NewP256Signer(*priv, NewSignConfig().SetTag("ctx1\x00").SetKeyID("key21"),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create signer")
+	_, _, _, err = signResponseDebug("sig2", *signer2, res, nil)
+	assert.Error(t, err, "signature should fail")
+
+	// Signature should fail when the key ID is an empty string
+	signer3, err := NewP256Signer(*priv, NewSignConfig().SetKeyID(""),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create signer")
+	_, _, _, err = signResponseDebug("sig2", *signer3, res, nil)
+	assert.Error(t, err, "signature should fail")
+
+	// Client verifies response - should succeed, no tag constraint
+	verifier1, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key21"),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create verifier")
+	msg, err := NewMessage(NewMessageConfig().WithResponse(res, nil))
+	assert.NoError(t, err, "could not create message")
+	_, err = msg.Verify("sig2", *verifier1)
+	assert.NoError(t, err, "failed to verify response")
+
+	// Client verifies response - should succeed, correct tag
+	verifier2, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedTags([]string{"ctx3", "ctx2", "ctx1"}).SetKeyID("key21"),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create verifier")
+	msg, err = NewMessage(NewMessageConfig().WithResponse(res, nil))
+	assert.NoError(t, err, "could not create message")
+	_, err = msg.Verify("sig2", *verifier2)
+	assert.NoError(t, err, "failed to verify response")
+
+	// Client verifies response - should fail, incorrect tags
+	verifier3, err := NewP256Verifier(*pub, NewVerifyConfig().SetVerifyCreated(false).SetAllowedTags([]string{"ctx5", "ctx6", "ctx7"}).SetKeyID("key21"),
+		*NewFields().AddHeader("@status"))
+	assert.NoError(t, err, "could not create verifier")
+	msg, err = NewMessage(NewMessageConfig().WithResponse(res, nil))
+	assert.NoError(t, err, "could not create message")
+	_, err = msg.Verify("sig2", *verifier3)
 	assert.Error(t, err, "should have failed to verify response")
 }
 
@@ -1988,6 +2770,36 @@ func TestTransformations(t *testing.T) {
 	testOneTransformation(t, httpTransform6, false)
 }
 
+func testMessageOneTransformation(t *testing.T, reqStr string, verifies bool) {
+	// Initial verification successful
+	prvKey, err := parseEdDSAPrivateKeyFromPemStr(ed25519PrvKey)
+	if err != nil {
+		t.Errorf("cannot parse public key: %v", err)
+	}
+	pubKey := prvKey.Public().(ed25519.PublicKey)
+	verifier, err := NewEd25519Verifier(pubKey, NewVerifyConfig().SetVerifyCreated(false), *NewFields())
+	assert.NoError(t, err, "could not create verifier")
+	req := readRequest(reqStr)
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify("transform", *verifier)
+	if verifies {
+		assert.NoError(t, err, "failed to verify request")
+	} else {
+		assert.Error(t, err, "should fail to verify request")
+	}
+}
+
+// Same as TestTransformations but using Message
+func TestMessageTransformations(t *testing.T) {
+	testMessageOneTransformation(t, httpTransform1, true)
+	testMessageOneTransformation(t, httpTransform2, true)
+	testMessageOneTransformation(t, httpTransform3, true)
+	testMessageOneTransformation(t, httpTransform4, true)
+	testMessageOneTransformation(t, httpTransform5, false)
+	testMessageOneTransformation(t, httpTransform6, false)
+}
+
 var httpreq10 = `GET /parameters?var=this%20is%20a%20big%0Amultiline%20value&bar=with+plus+whitespace&fa%C3%A7ade%22%3A%20=something HTTP/1.1
 Host: www.example.com	
 Date: Tue, 20 Apr 2021 02:07:56 GMT	
@@ -2064,6 +2876,42 @@ func TestRequestBinding17(t *testing.T) {
 	assert.NoError(t, err, "validate response digest")
 }
 
+// Same as TestRequestBinding17 but using Message
+func TestMessageRequestBinding17(t *testing.T) {
+	req := readRequest(httpreq11)
+	reqContentDigest := req.Header.Values("Content-Digest")
+	err := ValidateContentDigestHeader(reqContentDigest, &req.Body, []string{DigestSha512})
+	assert.NoError(t, err, "validate request digest")
+
+	res := readResponse(httpres9)
+	msg, err := NewMessage(NewMessageConfig().WithResponse(res, req))
+	assert.NoError(t, err, "cannot create message")
+	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
+	assert.NoError(t, err, "read pub key")
+	fields2 := *NewFields().AddHeaders("@status", "content-digest", "content-type").
+		AddHeaderExt("@authority", false, false, true, false).
+		AddHeaderExt("@method", false, false, true, false).
+		AddHeaderExt("@path", false, false, true, false).
+		AddHeaderExt("content-digest", false, false, true, false)
+	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
+	assert.NoError(t, err, "create verifier")
+	sigBase, _, err := verifyDebug("reqres", *verifier2, msg)
+	expected := `"@status": 503
+"content-digest": sha-512=:0Y6iCBzGg5rZtoXS95Ijz03mslf6KAMCloESHObfwnHJDbkkWWQz6PhhU9kxsTbARtY2PTBOzq24uJFpHsMuAg==:
+"content-type": application/json
+"@authority";req: example.com
+"@method";req: POST
+"@path";req: /foo
+"content-digest";req: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+"@signature-params": ("@status" "content-digest" "content-type" "@authority";req "@method";req "@path";req "content-digest";req);created=1618884479;keyid="test-key-ecc-p256"`
+	assert.NoError(t, err, "verify response")
+	assert.Equal(t, expected, sigBase, "Incorrect signature base for response")
+
+	responseContentDigest := res.Header.Values("Content-Digest")
+	err = ValidateContentDigestHeader(responseContentDigest, &res.Body, []string{DigestSha512})
+	assert.NoError(t, err, "validate response digest")
+}
+
 var httpreq12 = `POST /foo?param=Value&Pet=dog HTTP/1.1
 Host: origin.host.internal.example
 Date: Tue, 20 Apr 2021 02:07:56 GMT
@@ -2115,6 +2963,34 @@ func TestMultipleSignatures17(t *testing.T) {
 	assert.NoError(t, err, "sig1 should verify for the original message that the proxy received")
 }
 
+// Same as TestMultipleSignatures17 but using Message
+func TestMessageMultipleSignatures17(t *testing.T) {
+	msg, err := NewMessage(NewMessageConfig().WithRequest(readRequest(httpreq12)))
+	assert.NoError(t, err, "cannot create message")
+	pubKey1, err := parseECPublicKeyFromPemStr(p256PubKey2)
+	assert.NoError(t, err, "cannot parse ECC public key")
+	verifier1, err := NewP256Verifier(*pubKey1, NewVerifyConfig().
+		SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), Headers("@method", "@authority", "@path", "content-digest",
+		"content-type", "content-length"))
+	assert.NoError(t, err, "cannot create verifier1")
+	_, _, err = verifyDebug("sig1", *verifier1, msg)
+	assert.Error(t, err, "sig1 cannot be verified, because the proxy modified the authority field")
+
+	pubKey2, err := parseRsaPublicKey(rsaPubKey)
+	assert.NoError(t, err, "cannot parse RSA public key")
+	verifier2, err := NewRSAVerifier(*pubKey2, NewVerifyConfig().
+		SetVerifyCreated(false).SetRejectExpired(false), *NewFields().AddHeaders("@authority", "forwarded"))
+	assert.NoError(t, err, "cannot create verifier2")
+	_, _, err = verifyDebug("proxy_sig", *verifier2, msg)
+	assert.NoError(t, err, "proxy signature not verified")
+
+	msg, err = NewMessage(NewMessageConfig().WithRequest(readRequest(httpreq13)))
+	assert.NoError(t, err, "cannot create message")
+	sigBase, _, err := verifyDebug("sig1", *verifier1, msg)
+	assert.NotEmpty(t, sigBase)
+	assert.NoError(t, err, "sig1 should verify for the original message that the proxy received")
+}
+
 var httpreq14 = `POST /foo?param=Value&Pet=dog HTTP/1.1
 Host: example.com
 Date: Tue, 20 Apr 2021 02:07:55 GMT
@@ -2157,6 +3033,46 @@ func TestRequestBindingSignedResponse17(t *testing.T) {
 	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
 	assert.NoError(t, err, "create verifier")
 	sigBase, err := verifyResponseDebug("reqres", *verifier2, res, req)
+	expected := `"@status": 503
+"content-digest": sha-512=:0Y6iCBzGg5rZtoXS95Ijz03mslf6KAMCloESHObfwnHJDbkkWWQz6PhhU9kxsTbARtY2PTBOzq24uJFpHsMuAg==:
+"content-type": application/json
+"@authority";req: example.com
+"@method";req: POST
+"@path";req: /foo
+"@query";req: ?param=Value&Pet=dog
+"content-digest";req: sha-512=:WZDPaVn/7XgHaAy8pmojAkGWoRx2UFChF41A2svX+TaPm+AbwAgBWnrIiYllu7BNNyealdVLvRwEmTHWXvJwew==:
+"content-type";req: application/json
+"content-length";req: 18
+"@signature-params": ("@status" "content-digest" "content-type" "@authority";req "@method";req "@path";req "@query";req "content-digest";req "content-type";req "content-length";req);created=1618884479;keyid="test-key-ecc-p256"`
+
+	assert.NoError(t, err, "verify response")
+	assert.Equal(t, expected, sigBase, "Incorrect signature base for response")
+
+	responseContentDigest := res.Header.Values("Content-Digest")
+	err = ValidateContentDigestHeader(responseContentDigest, &res.Body, []string{DigestSha512})
+	assert.NoError(t, err, "validate response digest")
+}
+
+// Same as TestRequestBindingSignedResponse17 but using Message
+func TestMessageRequestBindingSignedResponse17(t *testing.T) {
+	req := readRequest(httpreq14)
+	reqContentDigest := req.Header.Values("Content-Digest")
+	err := ValidateContentDigestHeader(reqContentDigest, &req.Body, []string{DigestSha512})
+	assert.NoError(t, err, "validate request digest")
+
+	res := readResponse(httpres10)
+	msg, err := NewMessage(NewMessageConfig().WithResponse(res, req))
+	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
+	assert.NoError(t, err, "read pub key")
+	fields2 := *NewFields().AddHeaders("@status", "content-digest", "content-type").
+		AddHeaderExt("@authority", false, false, true, false).
+		AddHeaderExt("@method", false, false, true, false).
+		AddHeaderExt("@path", false, false, true, false).
+		AddHeaderExt("@query", false, false, true, false).
+		AddHeaderExt("content-digest", false, false, true, false)
+	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
+	assert.NoError(t, err, "create verifier")
+	sigBase, _, err := verifyDebug("reqres", *verifier2, msg)
 	expected := `"@status": 503
 "content-digest": sha-512=:0Y6iCBzGg5rZtoXS95Ijz03mslf6KAMCloESHObfwnHJDbkkWWQz6PhhU9kxsTbARtY2PTBOzq24uJFpHsMuAg==:
 "content-type": application/json

@@ -3,11 +3,12 @@ package httpsign
 import (
 	"errors"
 	"fmt"
-	"github.com/dunglas/httpsfv"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/dunglas/httpsfv"
 )
 
 func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage, parsedAssocMessage *parsedMessage,
@@ -358,28 +359,12 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) e
 }
 
 func verifyRequestDebug(signatureName string, verifier Verifier, req *http.Request) (signatureBase string, err error) {
-	if req == nil {
-		return "", fmt.Errorf("nil request")
-	}
-	if signatureName == "" {
-		return "", fmt.Errorf("empty signature name")
-	}
-	withTrailers, wantSigRaw, psiSig, err := extractSignatureFields(signatureName, &verifier, req.Header, req.Trailer, &req.Body)
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
 	if err != nil {
 		return "", err
 	}
-	parsedMessage, err := parseRequest(req, withTrailers)
-	if err != nil {
-		return "", err
-	}
-	return verifyMessage(*verifier.config, verifier, parsedMessage, nil, verifier.fields,
-		wantSigRaw, psiSig)
-}
-
-// MessageDetails aggregates the details of a signed message, for a given signature
-type MessageDetails struct {
-	KeyID, Alg string
-	Fields     Fields
+	signatureBase, _, err = verifyDebug(signatureName, verifier, msg)
+	return
 }
 
 // RequestDetails parses a signed request and returns the key ID and optionally the algorithm used in the given signature.
@@ -395,6 +380,46 @@ func RequestDetails(signatureName string, req *http.Request) (details *MessageDe
 		return nil, fmt.Errorf("could not extract signature: %w", err)
 	}
 	return signatureDetails(psiSig)
+}
+
+func verifyDebug(signatureName string, verifier Verifier, message *Message) (string, *psiSignature, error) {
+	if message == nil {
+		return "", nil, fmt.Errorf("nil message")
+	}
+	if signatureName == "" {
+		return "", nil, fmt.Errorf("empty signature name")
+	}
+
+	withTrailers, wantSigRaw, psiSig, err := extractSignatureFields(
+		signatureName, &verifier, message.headers, message.trailers, message.body)
+	if err != nil {
+		return "", nil, err
+	}
+
+	var parsedMsg *parsedMessage
+	var parsedAssoc *parsedMessage
+
+	// Parse the main message
+	parsedMsg, err = parseMessage(message, withTrailers)
+	if err != nil {
+		return "", nil, err
+	}
+
+	// If there's an associated request, parse that too
+	if assocMsg := message.assocReq; assocMsg != nil {
+		parsedAssoc, err = parseMessage(assocMsg, false)
+		if err != nil {
+			return "", nil, err
+		}
+	}
+
+	signatureBase, err := verifyMessage(*verifier.config, verifier, parsedMsg, parsedAssoc,
+		verifier.fields, wantSigRaw, psiSig)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return signatureBase, psiSig, nil
 }
 
 // ResponseDetails parses a signed response and returns the key ID and optionally the algorithm used in the given signature.
@@ -475,11 +500,28 @@ func signatureDetails(signature *psiSignature) (details *MessageDetails, err err
 			return nil, fmt.Errorf("malformed \"alg\" parameter")
 		}
 	}
-	return &MessageDetails{
+	details = &MessageDetails{
 		KeyID:  keyID,
 		Alg:    alg,
 		Fields: signature.fields,
-	}, nil
+	}
+
+	if created, ok := signature.params["created"].(int64); ok {
+		t := time.Unix(created, 0)
+		details.Created = &t
+	}
+	if expires, ok := signature.params["expires"].(int64); ok {
+		t := time.Unix(expires, 0)
+		details.Expires = &t
+	}
+	if nonce, ok := signature.params["nonce"].(string); ok {
+		details.Nonce = &nonce
+	}
+	if tag, ok := signature.params["tag"].(string); ok {
+		details.Tag = &tag
+	}
+
+	return details, nil
 }
 
 // VerifyResponse verifies a signed HTTP response. Returns an error if verification failed for any reason, otherwise nil.
@@ -489,30 +531,12 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response,
 }
 
 func verifyResponseDebug(signatureName string, verifier Verifier, res *http.Response, req *http.Request) (signatureBase string, err error) {
-	if res == nil {
-		return "", fmt.Errorf("nil response")
-	}
-	if signatureName == "" {
-		return "", fmt.Errorf("empty signature name")
-	}
-	resWithTrailers, wantSigRaw, psiSig, err := extractSignatureFields(signatureName, &verifier, res.Header, res.Trailer, &res.Body)
+	msg, err := NewMessage(NewMessageConfig().WithResponse(res, req))
 	if err != nil {
 		return "", err
 	}
-	parsedMessage, err := parseResponse(res, resWithTrailers)
-	if err != nil {
-		return "", err
-	}
-	// Read the associated request with trailers if the verifier requests its trailers, or there are signed trailer
-	// covered in the signature
-	reqWithTrailers := verifier.fields.hasTrailerFields(true) || psiSig.fields.hasTrailerFields(true)
-	parsedAssocMessage, err := parseRequest(req, reqWithTrailers)
-	if err != nil {
-		return "", err
-	}
-	signatureBase, err = verifyMessage(*verifier.config, verifier, parsedMessage, parsedAssocMessage,
-		verifier.fields, wantSigRaw, psiSig)
-	return signatureBase, err
+	signatureBase, _, err = verifyDebug(signatureName, verifier, msg)
+	return
 }
 
 func extractSignatureFields(signatureName string, verifier *Verifier,
