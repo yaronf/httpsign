@@ -190,6 +190,9 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		return ecdsaSignRaw(rand.Reader, &key, hashed[:])
 	case "ed25519":
 		key := s.key.(ed25519.PrivateKey)
+		if len(key) != ed25519.PrivateKeySize {
+			return nil, fmt.Errorf("key must be %d bytes long", ed25519.PrivateKeySize)
+		}
 		return ed25519.Sign(key, buff), nil
 	default:
 		return nil, fmt.Errorf("sign: unknown algorithm \"%s\"", s.alg)
