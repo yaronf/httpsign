@@ -1,6 +1,7 @@
 package httpsign
 
 import (
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"github.com/lestrrat-go/jwx/v2/jwa"
@@ -93,6 +94,18 @@ func TestSigner_sign(t *testing.T) {
 			fields: fields{
 				key: []byte(strings.Repeat("a", 64)),
 				alg: "hmac-sha999",
+			},
+			args: args{
+				buff: []byte("abc"),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "ed25519 key not 64 bytes",
+			fields: fields{
+				key: ed25519.PrivateKey(strings.Repeat("a", 63)),
+				alg: "ed25519",
 			},
 			args: args{
 				buff: []byte("abc"),
