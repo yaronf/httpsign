@@ -4,12 +4,13 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jws"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jws"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewHMACSHA256Signer(t *testing.T) {
@@ -157,6 +158,41 @@ func TestForeignSigner(t *testing.T) {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
 	err = VerifyRequest(signatureName, *verifier, req)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
+// Same as TestForeignSigner but using Message
+func TestMessageForeignSigner(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	if err != nil {
+		t.Errorf("Failed to generate keypair: %v", err)
+	}
+
+	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
+	signatureName := "sig1"
+	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
+	signer, err := NewJWSSigner(jwa.ES256, priv, config.SetKeyID("key1"), fields)
+	if err != nil {
+		t.Errorf("Failed to create JWS signer")
+	}
+	req := readRequest(httpreq2)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	if err != nil {
+		t.Errorf("signature failed: %v", err)
+	}
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewJWSVerifier(jwa.ES256, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
+	if err != nil {
+		t.Errorf("could not generate Verifier: %s", err)
+	}
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	if err != nil {
+		t.Errorf("Failed to create Message")
+	}
+	_, err = msg.Verify(signatureName, *verifier)
 	if err != nil {
 		t.Errorf("verification error: %s", err)
 	}

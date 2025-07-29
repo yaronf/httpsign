@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
-	"github.com/andreyvit/diff"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+
+	"github.com/andreyvit/diff"
 )
 
 var wantFields = `"kuku": my awesome header
@@ -96,6 +97,61 @@ func testHTTP(t *testing.T, proto string) {
 	simpleClient(t, proto, simpleHandler)
 }
 
+func testMessageHTTP(t *testing.T, proto string) {
+	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
+		reqProto := r.Proto
+		if reqProto != proto {
+			t.Errorf("expected %s, got %s", proto, reqProto)
+		}
+		var scheme string
+		if ts.TLS == nil {
+			scheme = "http"
+		} else {
+			scheme = "https"
+		}
+		sp := bytes.Split([]byte(ts.URL), []byte(":"))
+		portval, err := strconv.Atoi(string(sp[2]))
+		if err != nil {
+			t.Errorf("cannot parse server port number")
+		}
+		tpl, err := template.New("fields").Parse(wantFields)
+		if err != nil {
+			t.Errorf("could not parse template")
+		}
+		type inputs struct {
+			Port   int
+			Scheme string
+		}
+		// Use the Template facility to create the list of expected signed fields
+		wf, err := execTemplate(*tpl, "fields", inputs{Port: portval, Scheme: scheme})
+		if err != nil {
+			t.Errorf("execTemplate failed")
+		}
+		verifier, err := NewHMACSHA256Verifier(bytes.Repeat([]byte{0x03}, 64),
+			NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"),
+			Headers("@query"))
+		if err != nil {
+			t.Errorf("could not create verifier")
+		}
+		msg, err := NewMessage(NewMessageConfig().WithRequest(r))
+		if err != nil {
+			t.Errorf("could not create message")
+		}
+		sigInput, _, err := verifyDebug("sig1", *verifier, msg)
+		if err != nil {
+			t.Errorf("failed to verify request: sig input: %s\nerr: %v", sigInput, err)
+		}
+
+		if sigInput != wf {
+			t.Errorf("unexpected fields: %s\n", diff.CharacterDiff(sigInput, wantFields))
+		}
+		w.WriteHeader(200)
+	}
+
+	// And run the client code...
+	simpleClient(t, proto, simpleHandler)
+}
+
 func simpleClient(t *testing.T, proto string, simpleHandler func(w http.ResponseWriter, r *http.Request)) {
 	// Client code
 	switch proto {
@@ -153,8 +209,10 @@ func simpleClient(t *testing.T, proto string, simpleHandler func(w http.Response
 
 func TestHTTP11(t *testing.T) {
 	testHTTP(t, "HTTP/1.1")
+	testMessageHTTP(t, "HTTP/1.1")
 }
 
 func TestHTTP20(t *testing.T) {
 	testHTTP(t, "HTTP/2.0")
+	testMessageHTTP(t, "HTTP/2.0")
 }

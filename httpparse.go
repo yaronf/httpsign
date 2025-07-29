@@ -22,40 +22,23 @@ func parseRequest(req *http.Request, withTrailers bool) (*parsedMessage, error) 
 	if req == nil {
 		return nil, nil
 	}
-	err := validateMessageHeaders(req.Header)
-	if err != nil {
-		return nil, err
+
+	scheme := "http"
+	if req.TLS != nil {
+		scheme = "https"
 	}
-	if withTrailers {
-		_, err = duplicateBody(&req.Body) // read the entire body to populate the trailers
-		if err != nil {
-			return nil, fmt.Errorf("cannot duplicate request body: %w", err)
-		}
-		err = validateMessageHeaders(req.Trailer)
-		if err != nil {
-			return nil, fmt.Errorf("could not validate trailers: %w", err)
-		}
+
+	msg := &Message{
+		method:    req.Method,
+		url:       req.URL,
+		headers:   req.Header,
+		trailers:  req.Trailer,
+		body:      &req.Body,
+		authority: req.Host,
+		scheme:    scheme,
 	}
-	// Query params are only obtained from the URL (i.e. not from the message body, when using application/x-www-form-urlencoded)
-	// So we are not vulnerable to the issue described in Sec. "Ambiguous Handling of Query Elements" of the draft.
-	values, err := url.ParseQuery(req.URL.RawQuery)
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse query: %s", req.URL.RawQuery)
-	}
-	escaped := reEncodeQPs(values)
-	u := req.URL
-	if u.Host == "" {
-		u.Host = req.Host
-	}
-	if u.Scheme == "" {
-		if req.TLS == nil {
-			u.Scheme = "http"
-		} else {
-			u.Scheme = "https"
-		}
-	}
-	return &parsedMessage{derived: generateReqDerivedComponents(req), url: u, headers: normalizeHeaderNames(req.Header),
-		trailers: normalizeHeaderNames(req.Trailer), qParams: escaped}, nil
+
+	return parseMessage(msg, withTrailers)
 }
 
 func reEncodeQPs(values url.Values) url.Values {
@@ -82,23 +65,14 @@ func normalizeHeaderNames(header http.Header) http.Header {
 }
 
 func parseResponse(res *http.Response, withTrailers bool) (*parsedMessage, error) {
-	err := validateMessageHeaders(res.Header)
-	if err != nil {
-		return nil, err
-	}
-	if withTrailers {
-		_, err = duplicateBody(&res.Body) // read the entire body to populate the trailers
-		if err != nil {
-			return nil, fmt.Errorf("cannot duplicate request body: %w", err)
-		}
-		err = validateMessageHeaders(res.Trailer)
-		if err != nil {
-			return nil, fmt.Errorf("could not validate trailers: %w", err)
-		}
+	msg := &Message{
+		statusCode: &res.StatusCode,
+		headers:    res.Header,
+		trailers:   res.Trailer,
+		body:       &res.Body,
 	}
 
-	return &parsedMessage{derived: generateResDerivedComponents(res), url: nil,
-		headers: normalizeHeaderNames(res.Header)}, nil
+	return parseMessage(msg, withTrailers)
 }
 
 func validateMessageHeaders(header http.Header) error {
@@ -112,6 +86,9 @@ func validateMessageHeaders(header http.Header) error {
 }
 
 func foldFields(fields []string) string {
+	if len(fields) == 0 {
+		return ""
+	}
 	ff := strings.TrimSpace(fields[0])
 	for i := 1; i < len(fields); i++ {
 		ff += ", " + strings.TrimSpace(fields[i])
@@ -123,17 +100,14 @@ func derivedComponent(name, v string, components components) {
 	components[name] = v
 }
 
-func generateReqDerivedComponents(req *http.Request) components {
-	components := components{}
-	derivedComponent("@method", scMethod(req), components)
-	theURL := req.URL
-	derivedComponent("@target-uri", scTargetURI(theURL), components)
-	derivedComponent("@path", scPath(theURL), components)
-	derivedComponent("@authority", scAuthority(req), components)
-	derivedComponent("@scheme", scScheme(theURL), components)
-	derivedComponent("@request-target", scRequestTarget(theURL), components)
-	derivedComponent("@query", scQuery(theURL), components)
-	return components
+func generateReqDerivedComponents(method string, u *url.URL, authority string, components components) {
+	derivedComponent("@method", method, components)
+	derivedComponent("@target-uri", scTargetURI(u), components)
+	derivedComponent("@path", scPath(u), components)
+	derivedComponent("@authority", authority, components)
+	derivedComponent("@scheme", scScheme(u), components)
+	derivedComponent("@request-target", scRequestTarget(u), components)
+	derivedComponent("@query", scQuery(u), components)
 }
 
 func scPath(theURL *url.URL) string {
@@ -162,24 +136,81 @@ func scScheme(url *url.URL) string {
 	return url.Scheme
 }
 
-func scAuthority(req *http.Request) string {
-	return req.Host
-}
-
 func scTargetURI(url *url.URL) string {
 	return url.String()
 }
 
-func scMethod(req *http.Request) string {
-	return req.Method
+func scStatus(statusCode int) string {
+	return strconv.Itoa(statusCode)
 }
 
-func generateResDerivedComponents(res *http.Response) components {
-	components := components{}
-	derivedComponent("@status", scStatus(res), components)
-	return components
-}
+func parseMessage(msg *Message, withTrailers bool) (*parsedMessage, error) {
+	if msg == nil {
+		return nil, nil
+	}
 
-func scStatus(res *http.Response) string {
-	return strconv.Itoa(res.StatusCode)
+	err := validateMessageHeaders(msg.headers)
+	if err != nil {
+		return nil, err
+	}
+
+	if withTrailers {
+		if msg.body != nil {
+			_, err = duplicateBody(msg.body)
+			if err != nil {
+				return nil, fmt.Errorf("cannot duplicate message body: %w", err)
+			}
+		}
+		err = validateMessageHeaders(msg.trailers)
+		if err != nil {
+			return nil, fmt.Errorf("could not validate trailers: %w", err)
+		}
+	}
+
+	derived := components{}
+	var u *url.URL
+	var qParams url.Values
+
+	if msg.method != "" || msg.url != nil {
+		if msg.method == "" || msg.url == nil {
+			return nil, fmt.Errorf("invalid state: method or url without the other")
+		}
+
+		u = msg.url
+		if u == nil {
+			u = &url.URL{Path: "/"}
+		}
+		if u.Host == "" && msg.authority != "" {
+			u.Host = msg.authority
+		}
+		if u.Scheme == "" {
+			if msg.scheme != "" {
+				u.Scheme = msg.scheme
+			} else {
+				u.Scheme = "http"
+			}
+		}
+
+		if u.RawQuery != "" {
+			values, err := url.ParseQuery(u.RawQuery)
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse query: %s", u.RawQuery)
+			}
+			qParams = reEncodeQPs(values)
+		}
+
+		generateReqDerivedComponents(msg.method, u, msg.authority, derived)
+	} else if msg.statusCode != nil {
+		derivedComponent("@status", scStatus(*msg.statusCode), derived)
+	} else {
+		return nil, fmt.Errorf("invalid state: method and url, or status required")
+	}
+
+	return &parsedMessage{
+		derived:  derived,
+		url:      u,
+		headers:  normalizeHeaderNames(msg.headers),
+		trailers: normalizeHeaderNames(msg.trailers),
+		qParams:  qParams,
+	}, nil
 }

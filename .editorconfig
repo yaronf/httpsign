@@ -1,0 +1,9 @@
+# See https://editorconfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Go files
+[*._test.go]
+# Preserve trailing whitespace in tests since some depend on it
+trim_trailing_whitespace = false

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var rawPost1 = `POST /foo HTTP/1.1
@@ -171,5 +172,52 @@ func TestTrailer_SigFields(t *testing.T) {
 	verifier, err = NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
 	assert.NoError(t, err, "could not generate Verifier")
 	err = VerifyRequest(signatureName, *verifier, req2)
+	assert.Error(t, err, "verification error")
+}
+
+// Same as TestTrailer_SigFields but using Message
+func TestMessageTrailer_SigFields(t *testing.T) {
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
+	fields := Headers("@authority", "@method", "content-type")
+	signatureName := "sig1"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
+	req := readRequest(rawPost2)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	assert.NoError(t, err, "signature failed")
+	// Add signature correctly
+	signedMessage := rawPost2 + "Signature: " + sig + "\n" + "Signature-Input: " + sigInput + "\n\n"
+	signedMessage = strings.Replace(signedMessage, "Trailer: Expires, Hdr", "Trailer: Expires, Hdr, Signature, Signature-Input",
+		1)
+	req2 := readRequestChunked(signedMessage)
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
+	assert.NoError(t, err, "could not generate Verifier")
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req2))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
+	assert.NoError(t, err, "verification error")
+
+	// Missing Signature-Input
+	signedMessage = rawPost2 + "Signature: " + sig + "\n\n"
+	signedMessage = strings.Replace(signedMessage, "Trailer: Expires, Hdr", "Trailer: Expires, Hdr, Signature, Signature-Input",
+		1)
+	req2 = readRequestChunked(signedMessage)
+	verifier, err = NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
+	assert.NoError(t, err, "could not generate Verifier")
+	msg, err = NewMessage(NewMessageConfig().WithRequest(req2))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
+	assert.Error(t, err, "verification error")
+
+	// Missing Signature
+	signedMessage = rawPost2 + "Signature-Input: " + sigInput + "\n\n"
+	signedMessage = strings.Replace(signedMessage, "Trailer: Expires, Hdr", "Trailer: Expires, Hdr, Signature, Signature-Input",
+		1)
+	req2 = readRequestChunked(signedMessage)
+	verifier, err = NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
+	assert.NoError(t, err, "could not generate Verifier")
+	msg, err = NewMessage(NewMessageConfig().WithRequest(req2))
+	assert.NoError(t, err, "could not create Message")
+	_, err = msg.Verify(signatureName, *verifier)
 	assert.Error(t, err, "verification error")
 }
