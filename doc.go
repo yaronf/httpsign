@@ -6,4 +6,5 @@
 // WrapHandler installs a wrapper around a normal HTTP message handler.
 // Digest functionality (creation and validation of the Content-Digest header) is available automatically
 // through the Client and WrapHandler interfaces, otherwise it is available separately.
+// Use Message and its Verify method if you need more flexibility such as in a non-HTTP context.
 package httpsign
