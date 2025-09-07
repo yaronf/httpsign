@@ -30,6 +30,9 @@ in the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign).
 * The `Accept-Signature` header is unimplemented.
 * In responses, when using the "wrapped handler" feature, the `Content-Type` header is only signed if set explicitly by the server. This is different, but arguably more secure, than the normal `net.http` behavior.
 
+### Contributing
+Contributions to this project are welcome, both as issues and pull requests.
+
 [![Go Reference](https://pkg.go.dev/badge/github.com/yaronf/httpsign.svg)](https://pkg.go.dev/github.com/yaronf/httpsign)
 [![Test](https://github.com/yaronf/httpsign/actions/workflows/test.yml/badge.svg)](https://github.com/yaronf/httpsign/actions/workflows/test.yml)
 [![GoReportCard example](https://goreportcard.com/badge/github.com/yaronf/httpsign)](https://goreportcard.com/report/github.com/yaronf/httpsign)
