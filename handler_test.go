@@ -3,13 +3,14 @@ package httpsign
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_WrapHandler(t *testing.T) {
@@ -62,7 +63,7 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 		// Callback to let the server locate its signing key and configuration
 		var signConfig *SignConfig
 		if !earlyExpires {
-			signConfig = nil
+			signConfig = NewSignConfig()
 		} else {
 			signConfig = NewSignConfig().SetExpires(2000)
 		}
