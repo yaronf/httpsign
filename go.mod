@@ -1,6 +1,8 @@
 module github.com/yaronf/httpsign
 
-go 1.21
+go 1.24.0
+
+toolchain go1.24.1
 
 require (
 	github.com/andreyvit/diff v0.0.0-20170406064948-c7f18ee00883
