@@ -3062,6 +3062,7 @@ func TestMessageRequestBindingSignedResponse17(t *testing.T) {
 
 	res := readResponse(httpres10)
 	msg, err := NewMessage(NewMessageConfig().WithResponse(res, req))
+	assert.NoError(t, err, "cannot create message")
 	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
 	assert.NoError(t, err, "read pub key")
 	fields2 := *NewFields().AddHeaders("@status", "content-digest", "content-type").

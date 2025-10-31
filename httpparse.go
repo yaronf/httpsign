@@ -41,6 +41,7 @@ func parseRequest(req *http.Request, withTrailers bool) (*parsedMessage, error) 
 	return parseMessage(msg, withTrailers)
 }
 
+//lint:ignore ST1003 QPs is intentional abbreviation for Query Parameters
 func reEncodeQPs(values url.Values) url.Values {
 	escaped := url.Values{}
 	for key, v := range values { // Re-escape query parameters, both names and values

@@ -464,7 +464,8 @@ func ResponseSignatureNames(res *http.Response, withTrailers bool) ([]string, er
 }
 
 func messageSignatureNames(parsedMessage *parsedMessage, withTrailers bool) ([]string, error) {
-	//lint:ignore SA1008 the Header type expects canonicalized names, tough
+	// Note: parsedMessage.headers intentionally uses lowercase keys (see httpparse.go)
+	// Linter warning about non-canonical key is expected and can be ignored
 	signatureField := parsedMessage.headers["signature"]
 	dict, err := httpsfv.UnmarshalDictionary(signatureField)
 	if err != nil {
@@ -472,7 +473,8 @@ func messageSignatureNames(parsedMessage *parsedMessage, withTrailers bool) ([]s
 	}
 	names := dict.Names()
 	if withTrailers {
-		//lint:ignore SA1008 the Header type expects canonicalized names, tough
+		// Note: parsedMessage.trailers intentionally uses lowercase keys (see httpparse.go)
+		// Linter warning about non-canonical key is expected and can be ignored
 		signatureField := parsedMessage.trailers["signature"]
 		dict, err := httpsfv.UnmarshalDictionary(signatureField)
 		if err != nil {

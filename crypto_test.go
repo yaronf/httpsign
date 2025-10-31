@@ -71,7 +71,7 @@ func TestNewHMACSHA256Signer(t *testing.T) {
 
 func TestSigner_sign(t *testing.T) {
 	type fields struct {
-		key interface{}
+		key any
 		alg string
 	}
 	type args struct {
@@ -210,7 +210,6 @@ func makeRSAPrivateKey() *rsa.PrivateKey {
 }
 func TestNewRSASigner1(t *testing.T) {
 	type args struct {
-		keyID  string
 		key    *rsa.PrivateKey
 		config *SignConfig
 		fields Fields
@@ -256,7 +255,7 @@ func TestNewRSASigner1(t *testing.T) {
 func TestNewJWSVerifier(t *testing.T) {
 	type args struct {
 		alg    jwa.SignatureAlgorithm
-		key    interface{}
+		key    any
 		keyID  string
 		config *VerifyConfig
 		fields Fields
@@ -418,7 +417,7 @@ func TestMessageForeignSignerV3(t *testing.T) {
 func TestNewJWSVerifierV3(t *testing.T) {
 	type args struct {
 		alg    jwav3.SignatureAlgorithm
-		key    interface{}
+		key    any
 		config *VerifyConfig
 		fields Fields
 	}
