@@ -8,8 +8,14 @@ import (
 	"strings"
 	"testing"
 
+	// JWX v2 - for existing tests
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jws"
+
+	// JWX v3 - for new V3 tests
+	jwav3 "github.com/lestrrat-go/jwx/v3/jwa"
+	jwsv3 "github.com/lestrrat-go/jwx/v3/jws"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -340,4 +346,211 @@ func TestVerify(t *testing.T) {
 	v.foreignVerifier = struct{ xx int }{7}
 	_, err = v.verify([]byte{1, 2, 3}, []byte{4, 5, 6})
 	assert.ErrorContains(t, err, "expected", "bad algorithm")
+}
+
+// V3 Tests - Testing jwx v3 functionality
+
+func TestForeignSignerV3(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	if err != nil {
+		t.Errorf("Failed to generate keypair: %v", err)
+	}
+
+	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
+	signatureName := "sig1"
+	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
+	signer, err := NewJWSSignerV3(jwav3.ES256(), priv, config.SetKeyID("key1"), fields)
+	if err != nil {
+		t.Errorf("Failed to create JWS V3 signer: %v", err)
+	}
+	req := readRequest(httpreq2)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	if err != nil {
+		t.Errorf("signature failed: %v", err)
+	}
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewJWSVerifierV3(jwav3.ES256(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
+	if err != nil {
+		t.Errorf("could not generate V3 Verifier: %s", err)
+	}
+	err = VerifyRequest(signatureName, *verifier, req)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
+// Same as TestForeignSignerV3 but using Message
+func TestMessageForeignSignerV3(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	if err != nil {
+		t.Errorf("Failed to generate keypair: %v", err)
+	}
+
+	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
+	signatureName := "sig1"
+	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
+	signer, err := NewJWSSignerV3(jwav3.ES256(), priv, config.SetKeyID("key1"), fields)
+	if err != nil {
+		t.Errorf("Failed to create JWS V3 signer: %v", err)
+	}
+	req := readRequest(httpreq2)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	if err != nil {
+		t.Errorf("signature failed: %v", err)
+	}
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+	verifier, err := NewJWSVerifierV3(jwav3.ES256(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
+	if err != nil {
+		t.Errorf("could not generate V3 Verifier: %s", err)
+	}
+	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	if err != nil {
+		t.Errorf("Failed to create Message")
+	}
+	_, err = msg.Verify(signatureName, *verifier)
+	if err != nil {
+		t.Errorf("verification error: %s", err)
+	}
+}
+
+func TestNewJWSVerifierV3(t *testing.T) {
+	type args struct {
+		alg    jwav3.SignatureAlgorithm
+		key    interface{}
+		config *VerifyConfig
+		fields Fields
+	}
+	verifier, _ := jwsv3.NewVerifier(jwav3.HS256())
+	tests := []struct {
+		name    string
+		args    args
+		want    *Verifier
+		wantErr bool
+	}{
+		{
+			name: "happy path",
+			args: args{
+				alg:    jwav3.HS256(),
+				key:    "1234",
+				config: nil,
+				fields: *NewFields(),
+			},
+			want: &Verifier{
+				key:             "1234",
+				alg:             "",
+				config:          NewVerifyConfig(),
+				fields:          *NewFields(),
+				foreignVerifier: verifier,
+			},
+			wantErr: false,
+		},
+		{
+			name: "none",
+			args: args{
+				alg:    jwav3.NoSignature(),
+				key:    "1234",
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "nil key",
+			args: args{
+				alg:    jwav3.HS256(),
+				key:    nil,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewJWSVerifierV3(tt.args.alg, tt.args.key, tt.args.config, tt.args.fields)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewJWSVerifierV3() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != nil {
+				got.foreignVerifier = nil
+			}
+			if tt.want != nil {
+				tt.want.foreignVerifier = nil
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewJWSVerifierV3() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// Test cross-compatibility between v2 and v3
+func TestCrossVersionCompatibility(t *testing.T) {
+	priv, pub, err := genP256KeyPair()
+	if err != nil {
+		t.Fatalf("Failed to generate keypair: %v", err)
+	}
+
+	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
+	signatureName := "sig1"
+	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
+
+	// Test 1: Sign with v2, verify with v3
+	t.Run("v2_sign_v3_verify", func(t *testing.T) {
+		signerV2, err := NewJWSSigner(jwa.ES256, priv, config.SetKeyID("key1"), fields)
+		if err != nil {
+			t.Fatalf("Failed to create v2 signer: %v", err)
+		}
+
+		req := readRequest(httpreq2)
+		sigInput, sig, err := SignRequest(signatureName, *signerV2, req)
+		if err != nil {
+			t.Fatalf("v2 signature failed: %v", err)
+		}
+
+		req.Header.Add("Signature", sig)
+		req.Header.Add("Signature-Input", sigInput)
+
+		verifierV3, err := NewJWSVerifierV3(jwav3.ES256(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
+		if err != nil {
+			t.Fatalf("Failed to create v3 verifier: %v", err)
+		}
+
+		err = VerifyRequest(signatureName, *verifierV3, req)
+		if err != nil {
+			t.Errorf("v3 verification of v2 signature failed: %v", err)
+		}
+	})
+
+	// Test 2: Sign with v3, verify with v2
+	t.Run("v3_sign_v2_verify", func(t *testing.T) {
+		signerV3, err := NewJWSSignerV3(jwav3.ES256(), priv, config.SetKeyID("key1"), fields)
+		if err != nil {
+			t.Fatalf("Failed to create v3 signer: %v", err)
+		}
+
+		req := readRequest(httpreq2)
+		sigInput, sig, err := SignRequest(signatureName, *signerV3, req)
+		if err != nil {
+			t.Fatalf("v3 signature failed: %v", err)
+		}
+
+		req.Header.Add("Signature", sig)
+		req.Header.Add("Signature-Input", sigInput)
+
+		verifierV2, err := NewJWSVerifier(jwa.ES256, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
+		if err != nil {
+			t.Fatalf("Failed to create v2 verifier: %v", err)
+		}
+
+		err = VerifyRequest(signatureName, *verifierV2, req)
+		if err != nil {
+			t.Errorf("v2 verification of v3 signature failed: %v", err)
+		}
+	})
 }
