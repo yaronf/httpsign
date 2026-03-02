@@ -222,7 +222,10 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 	case "rsa-pss-sha512":
 		hashed := sha512.Sum512(buff)
 		key := s.key.(rsa.PrivateKey)
-		sig, err := rsa.SignPSS(rand.Reader, &key, crypto.SHA512, hashed[:], nil)
+		// RFC 9421 Section 3.3.1 requires salt length = hash output length (64 bytes for SHA-512)
+		// to match TLS 1.3 and ensure interoperability with WebCrypto and other implementations
+		opts := &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash}
+		sig, err := rsa.SignPSS(rand.Reader, &key, crypto.SHA512, hashed[:], opts)
 		if err != nil {
 			return nil, fmt.Errorf("RSA-PSS signature failed")
 		}

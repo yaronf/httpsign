@@ -3,11 +3,13 @@ package httpsign
 import (
 	"bufio"
 	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha512"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -1034,6 +1036,85 @@ func TestMessageSignAndVerifyRSAPSS(t *testing.T) {
 	if err != nil {
 		t.Errorf("verification error: %s", err)
 	}
+}
+
+// TestRSAPSSSaltLength verifies that RSA-PSS signatures use the correct salt length
+// (64 bytes for SHA-512) as required by RFC 9421 Section 3.3.1
+func TestRSAPSSSaltLength(t *testing.T) {
+	prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
+	if err != nil {
+		t.Fatalf("cannot read private key: %v", err)
+	}
+	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+	if err != nil {
+		t.Fatalf("cannot read public key: %v", err)
+	}
+
+	config := NewSignConfig().SetKeyID("test-key-rsa-pss")
+	fields := Headers("@authority", "date")
+	signer, err := NewRSAPSSSigner(*prvKey, config, fields)
+	assert.NoError(t, err, "failed to create signer")
+
+	// Use the internal sign method directly on test data
+	testData := []byte("test signature base for salt length verification")
+	sigBytes, err := signer.sign(testData)
+	assert.NoError(t, err, "signing failed")
+
+	// Hash the test data
+	hashed := sha512.Sum512(testData)
+
+	// Verify with explicit PSSSaltLengthEqualsHash (64 bytes for SHA-512)
+	// If this succeeds, it proves our signer uses the correct salt length per RFC 9421
+	opts := &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash}
+	err = rsa.VerifyPSS(pubKey, crypto.SHA512, hashed[:], sigBytes, opts)
+	assert.NoError(t, err, "signature should verify with 64-byte salt (PSSSaltLengthEqualsHash)")
+
+	// Also verify that it would fail with wrong salt length expectation (e.g., 32 bytes)
+	optsWrong := &rsa.PSSOptions{SaltLength: 32}
+	err = rsa.VerifyPSS(pubKey, crypto.SHA512, hashed[:], sigBytes, optsWrong)
+	assert.Error(t, err, "signature should NOT verify with wrong salt length (32 bytes)")
+
+	// Verify with PSSSaltLengthAuto should also work (it auto-detects)
+	err = rsa.VerifyPSS(pubKey, crypto.SHA512, hashed[:], sigBytes, nil)
+	assert.NoError(t, err, "signature should verify with auto-detect (nil options)")
+}
+
+// TestRSAPSSBackwardsCompatibility verifies that old signatures (created with PSSSaltLengthAuto,
+// ~190 bytes of salt) can still be verified by the current verifier
+func TestRSAPSSBackwardsCompatibility(t *testing.T) {
+	prvKey, err := loadRSAPSSPrivateKey(rsaPSSPrvKey)
+	if err != nil {
+		t.Fatalf("cannot read private key: %v", err)
+	}
+	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+	if err != nil {
+		t.Fatalf("cannot read public key: %v", err)
+	}
+
+	// Simulate an "old" signature created with PSSSaltLengthAuto (maximum salt, ~190 bytes)
+	testData := []byte("test signature base for backwards compatibility")
+	hashed := sha512.Sum512(testData)
+	
+	// Create a signature with PSSSaltLengthAuto (old behavior)
+	optsOld := &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthAuto}
+	oldSig, err := rsa.SignPSS(rand.Reader, prvKey, crypto.SHA512, hashed[:], optsOld)
+	assert.NoError(t, err, "old-style signing should work")
+
+	// Create a verifier using the current implementation
+	config := NewVerifyConfig().SetKeyID("test-key-rsa-pss")
+	fields := Headers("@authority", "date")
+	verifier, err := NewRSAPSSVerifier(*pubKey, config, fields)
+	assert.NoError(t, err, "failed to create verifier")
+
+	// Verify the old signature using the verifier's internal method
+	// The verifier should accept it because it uses nil options (auto-detect)
+	success, err := verifier.verify(testData, oldSig)
+	assert.NoError(t, err, "old signature (with max salt ~190 bytes) should still verify")
+	assert.True(t, success, "verification should succeed")
+
+	// Also test with direct VerifyPSS using nil (auto-detect) - this is what the verifier uses
+	err = rsa.VerifyPSS(pubKey, crypto.SHA512, hashed[:], oldSig, nil)
+	assert.NoError(t, err, "old signature should verify with auto-detect (nil options)")
 }
 
 func TestSignAndVerifyRSA(t *testing.T) {
