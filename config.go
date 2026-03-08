@@ -10,27 +10,29 @@ import (
 
 // SignConfig contains additional configuration for the signer.
 type SignConfig struct {
-	signAlg         bool
-	signCreated     bool
-	fakeCreated     int64
-	expires         int64
-	nonce           string
-	tag             string
-	keyID           *string
-	maxBodySize     int64
+	signAlg           bool
+	signCreated       bool
+	fakeCreated       int64
+	expires           int64
+	expiresAfter      int64
+	nonce             string
+	tag               string
+	keyID             *string
+	maxBodySize       int64
 	schemeFromRequest func(*http.Request) string
 }
 
 // NewSignConfig generates a default configuration.
 func NewSignConfig() *SignConfig {
 	return &SignConfig{
-		signAlg:     true,
-		signCreated: true,
-		fakeCreated: 0,
-		expires:     0,
-		nonce:       "",
-		tag:         "", // we disallow an empty tag
-		keyID:       nil,
+		signAlg:      true,
+		signCreated:  true,
+		fakeCreated:  0,
+		expires:      0,
+		expiresAfter: 0,
+		nonce:        "",
+		tag:          "", // we disallow an empty tag
+		keyID:        nil,
 	}
 }
 
@@ -99,17 +101,17 @@ func (c *SignConfig) SetSchemeFromRequest(f func(*http.Request) string) *SignCon
 
 // VerifyConfig contains additional configuration for the verifier.
 type VerifyConfig struct {
-	verifyCreated    bool
-	notNewerThan     time.Duration
-	notOlderThan     time.Duration
-	allowedAlgs      []string
-	rejectExpired    bool
-	keyID            *string
-	dateWithin       time.Duration
-	allowedTags      []string
-	maxBodySize      int64
+	verifyCreated     bool
+	notNewerThan      time.Duration
+	notOlderThan      time.Duration
+	allowedAlgs       []string
+	rejectExpired     bool
+	keyID             *string
+	dateWithin        time.Duration
+	allowedTags       []string
+	maxBodySize       int64
 	schemeFromRequest func(*http.Request) string
-	nonceValidator   func(string) error
+	nonceValidator    func(string) error
 }
 
 // SetNonceValidator sets a callback to validate the nonce parameter during verification.

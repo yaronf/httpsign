@@ -279,6 +279,12 @@ func generateSigParams(config *SignConfig, alg string, foreignSigner interface{}
 	if config.expires != 0 {
 		p.Add("expires", config.expires)
 	}
+	if config.expiresAfter != 0 {
+		if config.expires != 0 {
+			return "", fmt.Errorf("cannot use both expires and expiresAfter")
+		}
+		p.Add("expires", config.expiresAfter+createdTime)
+	}
 	if config.nonce != "" {
 		qNonce, err := quotedString(config.nonce)
 		if err != nil {
