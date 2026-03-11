@@ -357,6 +357,15 @@ func (fs *Fields) hasHeader(name string) bool {
 	return false
 }
 
+func (fs *Fields) hasAssociatedRequestFields() bool {
+	for _, f := range fs.f {
+		if f.associatedRequest() {
+			return true
+		}
+	}
+	return false
+}
+
 func (fs *Fields) hasTrailerFields(forAssocRequest bool) bool {
 	for _, f := range fs.f {
 		_, tr := f.Params.Get("tr")

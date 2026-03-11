@@ -20,7 +20,7 @@ type parsedMessage struct {
 
 func parseRequest(req *http.Request, withTrailers bool, maxBodySize int64, schemeOverride string) (*parsedMessage, error) {
 	if req == nil {
-		return nil, nil
+		return nil, fmt.Errorf("nil request")
 	}
 
 	scheme := "http"

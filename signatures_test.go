@@ -1917,6 +1917,33 @@ func TestRequestSignatureNames(t *testing.T) {
 	names, err := RequestSignatureNames(req, false)
 	assert.NoError(t, err, "failed to fetch signature names")
 	assert.ElementsMatch(t, names, []string{"sig3", "sig2", "sig1"}, "did not find all signature names")
+
+	// parseRequest(nil) should return error, not (nil, nil)
+	_, err = RequestSignatureNames(nil, false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "nil request")
+}
+
+func TestSignResponseNilRequestWhenAssocFieldsRequired(t *testing.T) {
+	// Signer has fields from associated request; req=nil should fail with clear error
+	priv, pub, err := genP256KeyPair()
+	assert.NoError(t, err)
+	fields := *NewFields().AddHeaders("@status", "date").
+		AddHeaderExt("@authority", false, false, true, false) // requires associated request
+	signer, err := NewP256Signer(*priv, NewSignConfig().SetKeyID("key"), fields)
+	assert.NoError(t, err)
+	res := readResponse(httpres2)
+	_, _, err = SignResponse("sig1", *signer, res, nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "nil request")
+	_ = pub
+
+	// Signer without assoc fields; req=nil should succeed
+	signerNoAssoc, err := NewP256Signer(*priv, NewSignConfig().SetKeyID("key"),
+		*NewFields().AddHeaders("@status", "date"))
+	assert.NoError(t, err)
+	_, _, err = SignResponse("sig1", *signerNoAssoc, res, nil)
+	assert.NoError(t, err)
 }
 
 func TestResponseSignatureNames(t *testing.T) {

@@ -351,10 +351,15 @@ func signResponseDebug(signatureName string, signer Signer, res *http.Response, 
 	if err != nil {
 		return "", "", "", err
 	}
-	reqWithTrailers := signer.fields.hasTrailerFields(true)
-	parsedReq, err := parseRequest(req, reqWithTrailers, signer.config.maxBodySize, resolvedScheme(signer.config.schemeFromRequest, req))
-	if err != nil {
-		return "", "", "", err
+	var parsedReq *parsedMessage
+	if req != nil {
+		reqWithTrailers := signer.fields.hasTrailerFields(true)
+		parsedReq, err = parseRequest(req, reqWithTrailers, signer.config.maxBodySize, resolvedScheme(signer.config.schemeFromRequest, req))
+		if err != nil {
+			return "", "", "", err
+		}
+	} else if signer.fields.hasAssociatedRequestFields() {
+		return "", "", "", fmt.Errorf("nil request")
 	}
 	return signMessage(*signer.config, signatureName, signer, parsedRes, parsedReq, signer.fields)
 }
