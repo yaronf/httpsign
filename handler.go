@@ -96,7 +96,7 @@ func signServerResponse(wrapped *wrappedResponseWriter, r *http.Request, config 
 	if signer.fields.hasHeader("Content-Digest") &&
 		wrapped.body != nil && config.computeDigest && wrapped.Header().Get("Content-Digest") == "" {
 		closer := io.NopCloser(bytes.NewReader(wrapped.body.Bytes()))
-		digest, err := GenerateContentDigestHeader(&closer, config.digestSchemesSend)
+		digest, err := GenerateContentDigestHeader(&closer, config.digestSchemesSend, NewDigestOptions().SetMaxBodySize(config.maxBodySize))
 		if err != nil {
 			return err
 		}
@@ -158,7 +158,7 @@ func verifyServerRequest(r *http.Request, config HandlerConfig) error {
 		if r.Body == nil && len(receivedContentDigest) > 0 {
 			return fmt.Errorf("found Content-Digest but no message body")
 		}
-		err := ValidateContentDigestHeader(receivedContentDigest, &r.Body, config.digestSchemesRecv)
+		err := ValidateContentDigestHeader(receivedContentDigest, &r.Body, config.digestSchemesRecv, NewDigestOptions().SetMaxBodySize(config.maxBodySize))
 		if err != nil {
 			return err
 		}

@@ -317,7 +317,7 @@ func signRequestDebug(signatureName string, signer Signer, req *http.Request) (s
 		return "", "", "", fmt.Errorf("empty signature name")
 	}
 	withTrailers := signer.fields.hasTrailerFields(false)
-	parsedMessage, err := parseRequest(req, withTrailers)
+	parsedMessage, err := parseRequest(req, withTrailers, signer.config.maxBodySize)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -340,12 +340,12 @@ func signResponseDebug(signatureName string, signer Signer, res *http.Response, 
 		return "", "", "", fmt.Errorf("empty signature name")
 	}
 	resWithTrailers := signer.fields.hasTrailerFields(false)
-	parsedRes, err := parseResponse(res, resWithTrailers)
+	parsedRes, err := parseResponse(res, resWithTrailers, signer.config.maxBodySize)
 	if err != nil {
 		return "", "", "", err
 	}
 	reqWithTrailers := signer.fields.hasTrailerFields(true)
-	parsedReq, err := parseRequest(req, reqWithTrailers)
+	parsedReq, err := parseRequest(req, reqWithTrailers, signer.config.maxBodySize)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -375,7 +375,7 @@ func RequestDetails(signatureName string, req *http.Request) (details *MessageDe
 	if signatureName == "" {
 		return nil, fmt.Errorf("empty signature name")
 	}
-	_, _, psiSig, err := extractSignatureFields(signatureName, nil, req.Header, req.Trailer, &req.Body)
+	_, _, psiSig, err := extractSignatureFields(signatureName, nil, req.Header, req.Trailer, &req.Body, 0)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract signature: %w", err)
 	}
@@ -391,7 +391,7 @@ func verifyDebug(signatureName string, verifier Verifier, message *Message) (str
 	}
 
 	withTrailers, wantSigRaw, psiSig, err := extractSignatureFields(
-		signatureName, &verifier, message.headers, message.trailers, message.body)
+		signatureName, &verifier, message.headers, message.trailers, message.body, verifier.config.maxBodySize)
 	if err != nil {
 		return "", nil, err
 	}
@@ -400,14 +400,14 @@ func verifyDebug(signatureName string, verifier Verifier, message *Message) (str
 	var parsedAssoc *parsedMessage
 
 	// Parse the main message
-	parsedMsg, err = parseMessage(message, withTrailers)
+	parsedMsg, err = parseMessage(message, withTrailers, verifier.config.maxBodySize)
 	if err != nil {
 		return "", nil, err
 	}
 
 	// If there's an associated request, parse that too
 	if assocMsg := message.assocReq; assocMsg != nil {
-		parsedAssoc, err = parseMessage(assocMsg, false)
+		parsedAssoc, err = parseMessage(assocMsg, false, verifier.config.maxBodySize)
 		if err != nil {
 			return "", nil, err
 		}
@@ -430,7 +430,7 @@ func ResponseDetails(signatureName string, res *http.Response) (details *Message
 	if signatureName == "" {
 		return nil, fmt.Errorf("empty signature name")
 	}
-	_, _, psiSig, err := extractSignatureFields(signatureName, nil, res.Header, res.Trailer, &res.Body)
+	_, _, psiSig, err := extractSignatureFields(signatureName, nil, res.Header, res.Trailer, &res.Body, 0)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract signature: %w", err)
 	}
@@ -443,7 +443,7 @@ func ResponseDetails(signatureName string, res *http.Response) (details *Message
 // needs to be read because signature headers appear in trailers. Trailers are very uncommon
 // and come at a performance cost.
 func RequestSignatureNames(req *http.Request, withTrailers bool) ([]string, error) {
-	parsedMessage, err := parseRequest(req, withTrailers)
+	parsedMessage, err := parseRequest(req, withTrailers, 0)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse request: %w", err)
 	}
@@ -456,7 +456,7 @@ func RequestSignatureNames(req *http.Request, withTrailers bool) ([]string, erro
 // needs to be read because signature headers appear in trailers. Trailers are very uncommon
 // and come at a performance cost.
 func ResponseSignatureNames(res *http.Response, withTrailers bool) ([]string, error) {
-	parsedMessage, err := parseResponse(res, withTrailers)
+	parsedMessage, err := parseResponse(res, withTrailers, 0)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse response: %w", err)
 	}
@@ -542,7 +542,7 @@ func verifyResponseDebug(signatureName string, verifier Verifier, res *http.Resp
 }
 
 func extractSignatureFields(signatureName string, verifier *Verifier,
-	headers http.Header, trailers http.Header, body *io.ReadCloser) (bool, []byte, *psiSignature, error) {
+	headers http.Header, trailers http.Header, body *io.ReadCloser, maxBodySize int64) (bool, []byte, *psiSignature, error) {
 	/*
 		Parse trailers if:
 		- A trailer field needs to be verified
@@ -556,7 +556,7 @@ func extractSignatureFields(signatureName string, verifier *Verifier,
 	sigRaw, parsedSigInput, err := signatureFieldsFromHeaders(headers, signatureName)
 	if err != nil {
 		if errors.Is(err, errHeaderNotFound) {
-			_, err := duplicateBody(body)
+			_, err := duplicateBody(body, maxBodySize)
 			if err != nil {
 				return false, nil, nil, err
 			}

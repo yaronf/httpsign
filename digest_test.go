@@ -1,8 +1,11 @@
 package httpsign
 
 import (
-	"github.com/stretchr/testify/assert"
+	"io"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // digest draft, B.1
@@ -101,4 +104,25 @@ func TestValidateContentDigestHeader(t *testing.T) {
 	hdr = res7.Header.Values("Content-Digest")
 	err = ValidateContentDigestHeader(hdr, &res7.Body, []string{DigestSha512})
 	assert.NoError(t, err, "digest mismatch?")
+}
+
+func TestGenerateContentDigestHeaderRespectsMaxBodySize(t *testing.T) {
+	body := io.NopCloser(strings.NewReader("hello world"))
+	_, err := GenerateContentDigestHeader(&body, []string{DigestSha256}, NewDigestOptions().SetMaxBodySize(5))
+	assert.Error(t, err, "body exceeds limit")
+}
+
+func TestGenerateContentDigestHeaderWithinMaxBodySize(t *testing.T) {
+	body := io.NopCloser(strings.NewReader("hello"))
+	d, err := GenerateContentDigestHeader(&body, []string{DigestSha256}, NewDigestOptions().SetMaxBodySize(20))
+	assert.NoError(t, err)
+	assert.NotEmpty(t, d)
+}
+
+func TestValidateContentDigestHeaderRespectsMaxBodySize(t *testing.T) {
+	res := readResponse(resdigest1)
+	hdr := res.Header.Values("Content-Digest")
+	body := io.NopCloser(strings.NewReader(`{"hello": "world"}`))
+	err := ValidateContentDigestHeader(hdr, &body, []string{DigestSha256}, NewDigestOptions().SetMaxBodySize(5))
+	assert.Error(t, err, "body exceeds limit")
 }

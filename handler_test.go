@@ -198,3 +198,31 @@ func TestWrapHandlerServerFails(t *testing.T) { // non-default verify handler
 
 	assert.Equal(t, res.StatusCode, 599, "Verification did not fail?")
 }
+
+func TestHandlerRejectsBodyExceedingMaxBodySize(t *testing.T) {
+	largeBody := bytes.Repeat([]byte("x"), 200)
+	fetchVerifier := func(r *http.Request) (string, *Verifier) {
+		verifier, _ := NewHMACSHA256Verifier(bytes.Repeat([]byte{0}, 64),
+			NewVerifyConfig().SetKeyID("key").SetVerifyCreated(false), Headers("@method", "content-digest"))
+		return "sig1", verifier
+	}
+	config := NewHandlerConfig().SetFetchVerifier(fetchVerifier).
+		SetMaxBodySize(100).
+		SetDigestSchemesRecv([]string{DigestSha256})
+	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	}
+	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), *config))
+	defer ts.Close()
+
+	signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{0}, 64),
+		NewSignConfig().SetKeyID("key").SignCreated(false), Headers("@method", "content-digest"))
+	client := NewDefaultClient(NewClientConfig().
+		SetSignatureName("sig1").
+		SetSigner(signer).
+		SetDigestSchemesSend([]string{DigestSha256}))
+
+	res, err := client.Post(ts.URL, "text/plain", bytes.NewReader(largeBody))
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "expected 401 when body exceeds MaxBodySize")
+}

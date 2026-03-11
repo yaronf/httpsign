@@ -18,7 +18,7 @@ type parsedMessage struct {
 	qParams           url.Values
 }
 
-func parseRequest(req *http.Request, withTrailers bool) (*parsedMessage, error) {
+func parseRequest(req *http.Request, withTrailers bool, maxBodySize int64) (*parsedMessage, error) {
 	if req == nil {
 		return nil, nil
 	}
@@ -38,7 +38,7 @@ func parseRequest(req *http.Request, withTrailers bool) (*parsedMessage, error) 
 		scheme:    scheme,
 	}
 
-	return parseMessage(msg, withTrailers)
+	return parseMessage(msg, withTrailers, maxBodySize)
 }
 
 //lint:ignore ST1003 QPs is intentional abbreviation for Query Parameters
@@ -65,7 +65,7 @@ func normalizeHeaderNames(header http.Header) http.Header {
 	return t
 }
 
-func parseResponse(res *http.Response, withTrailers bool) (*parsedMessage, error) {
+func parseResponse(res *http.Response, withTrailers bool, maxBodySize int64) (*parsedMessage, error) {
 	msg := &Message{
 		statusCode: &res.StatusCode,
 		headers:    res.Header,
@@ -73,7 +73,7 @@ func parseResponse(res *http.Response, withTrailers bool) (*parsedMessage, error
 		body:       &res.Body,
 	}
 
-	return parseMessage(msg, withTrailers)
+	return parseMessage(msg, withTrailers, maxBodySize)
 }
 
 func validateMessageHeaders(header http.Header) error {
@@ -145,7 +145,7 @@ func scStatus(statusCode int) string {
 	return strconv.Itoa(statusCode)
 }
 
-func parseMessage(msg *Message, withTrailers bool) (*parsedMessage, error) {
+func parseMessage(msg *Message, withTrailers bool, maxBodySize int64) (*parsedMessage, error) {
 	if msg == nil {
 		return nil, nil
 	}
@@ -157,7 +157,7 @@ func parseMessage(msg *Message, withTrailers bool) (*parsedMessage, error) {
 
 	if withTrailers {
 		if msg.body != nil {
-			_, err = duplicateBody(msg.body)
+			_, err = duplicateBody(msg.body, maxBodySize)
 			if err != nil {
 				return nil, fmt.Errorf("cannot duplicate message body: %w", err)
 			}

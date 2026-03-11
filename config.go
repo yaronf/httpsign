@@ -17,6 +17,7 @@ type SignConfig struct {
 	nonce       string
 	tag         string
 	keyID       *string
+	maxBodySize int64
 }
 
 // NewSignConfig generates a default configuration.
@@ -78,6 +79,13 @@ func (c *SignConfig) SetKeyID(keyID string) *SignConfig {
 	return c
 }
 
+// SetMaxBodySize sets the maximum message body size in bytes when reading for trailers.
+// Default: 0 (no limit).
+func (c *SignConfig) SetMaxBodySize(maxBytes int64) *SignConfig {
+	c.maxBodySize = maxBytes
+	return c
+}
+
 // VerifyConfig contains additional configuration for the verifier.
 type VerifyConfig struct {
 	verifyCreated bool
@@ -88,6 +96,7 @@ type VerifyConfig struct {
 	keyID         *string
 	dateWithin    time.Duration
 	allowedTags   []string
+	maxBodySize   int64
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,
@@ -150,6 +159,13 @@ func (v *VerifyConfig) SetAllowedTags(allowedTags []string) *VerifyConfig {
 	return v
 }
 
+// SetMaxBodySize sets the maximum message body size in bytes when reading for trailers.
+// Default: 0 (no limit).
+func (v *VerifyConfig) SetMaxBodySize(maxBytes int64) *VerifyConfig {
+	v.maxBodySize = maxBytes
+	return v
+}
+
 // NewVerifyConfig generates a default configuration.
 func NewVerifyConfig() *VerifyConfig {
 	return &VerifyConfig{
@@ -176,6 +192,7 @@ type HandlerConfig struct {
 	computeDigest     bool
 	digestSchemesSend []string
 	digestSchemesRecv []string
+	maxBodySize       int64
 }
 
 // NewHandlerConfig generates a default configuration. When verification or respectively,
@@ -265,6 +282,13 @@ func (h *HandlerConfig) SetDigestSchemesRecv(s []string) *HandlerConfig {
 	return h
 }
 
+// SetMaxBodySize sets the maximum message body size in bytes when computing or validating Content-Digest.
+// Default: 0 (no limit).
+func (h *HandlerConfig) SetMaxBodySize(maxBytes int64) *HandlerConfig {
+	h.maxBodySize = maxBytes
+	return h
+}
+
 // ClientConfig contains additional configuration for the HTTP client-side wrapper.
 // Signing and verification may either be skipped, independently.
 type ClientConfig struct {
@@ -275,6 +299,7 @@ type ClientConfig struct {
 	computeDigest     bool
 	digestSchemesSend []string
 	digestSchemesRecv []string
+	maxBodySize       int64
 }
 
 // NewClientConfig creates a new, default ClientConfig.
@@ -332,5 +357,12 @@ func (c *ClientConfig) SetDigestSchemesSend(s []string) *ClientConfig {
 // one accepted digest is included. Default: DigestSha256, DigestSha512.
 func (c *ClientConfig) SetDigestSchemesRecv(s []string) *ClientConfig {
 	c.digestSchemesRecv = s
+	return c
+}
+
+// SetMaxBodySize sets the maximum message body size in bytes when computing or validating Content-Digest.
+// Default: 0 (no limit).
+func (c *ClientConfig) SetMaxBodySize(maxBytes int64) *ClientConfig {
+	c.maxBodySize = maxBytes
 	return c
 }

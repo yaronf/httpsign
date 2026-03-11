@@ -88,7 +88,7 @@ func verifyClientResponse(req *http.Request, conf ClientConfig, res *http.Respon
 	if conf.computeDigest &&
 		res.Body != nil && len(receivedContentDigest) > 0 {
 		// verify the header even if not explicitly required by verifier field list
-		err := ValidateContentDigestHeader(receivedContentDigest, &res.Body, conf.digestSchemesRecv)
+		err := ValidateContentDigestHeader(receivedContentDigest, &res.Body, conf.digestSchemesRecv, NewDigestOptions().SetMaxBodySize(conf.maxBodySize))
 		if err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func verifyClientResponse(req *http.Request, conf ClientConfig, res *http.Respon
 func signClientRequest(req *http.Request, conf ClientConfig) error {
 	if conf.computeDigest && conf.signer.fields.hasHeader("Content-Digest") &&
 		req.Body != nil && req.Header.Get("Content-Digest") == "" {
-		header, err := GenerateContentDigestHeader(&req.Body, conf.digestSchemesSend)
+		header, err := GenerateContentDigestHeader(&req.Body, conf.digestSchemesSend, NewDigestOptions().SetMaxBodySize(conf.maxBodySize))
 		if err != nil {
 			return err
 		}
