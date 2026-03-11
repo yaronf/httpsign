@@ -655,7 +655,26 @@ func applyVerificationPolicy(message parsedMessage, psi *psiSignature, config Ve
 	if err5 != nil {
 		return err5
 	}
+	err6 := applyPolicyNonce(psi, config)
+	if err6 != nil {
+		return err6
+	}
 	return nil
+}
+
+func applyPolicyNonce(psi *psiSignature, config VerifyConfig) error {
+	if config.nonceValidator == nil {
+		return nil
+	}
+	nonceParam, ok := psi.params["nonce"]
+	if !ok {
+		return nil
+	}
+	nonce, ok := nonceParam.(string)
+	if !ok {
+		return fmt.Errorf("malformed \"nonce\" parameter")
+	}
+	return config.nonceValidator(nonce)
 }
 
 func applyPolicyOthers(psi *psiSignature, config VerifyConfig) error {

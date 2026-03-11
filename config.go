@@ -109,6 +109,17 @@ type VerifyConfig struct {
 	allowedTags      []string
 	maxBodySize      int64
 	schemeFromRequest func(*http.Request) string
+	nonceValidator   func(string) error
+}
+
+// SetNonceValidator sets a callback to validate the nonce parameter during verification.
+// When the signature includes a nonce, the callback is invoked; returning an error fails verification.
+// Use this for replay prevention: the callback should check that the nonce has not been seen before
+// (e.g. store in a cache or database) and return an error if it has. Nonce uniqueness requires
+// application-layer state—the library does not track seen nonces. Default: nil (no validation).
+func (v *VerifyConfig) SetNonceValidator(f func(string) error) *VerifyConfig {
+	v.nonceValidator = f
+	return v
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,

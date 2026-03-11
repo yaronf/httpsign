@@ -2124,6 +2124,58 @@ func TestSchemeFromRequest(t *testing.T) {
 	assert.Error(t, err, "verification without SetSchemeFromRequest should fail (scheme mismatch)")
 }
 
+// TestNonceValidator verifies SetNonceValidator callback for replay prevention.
+func TestNonceValidator(t *testing.T) {
+	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+	assert.NoError(t, err)
+	fields := *NewFields()
+
+	t.Run("rejects when validator returns error", func(t *testing.T) {
+		req := readRequest(httpreq1pssMinimal) // has nonce "b3k2pp5k7z-50gnwp.yemd"
+		verifier, _ := NewRSAPSSVerifier(*pubKey,
+			NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss").
+				SetNonceValidator(func(nonce string) error { return fmt.Errorf("nonce already seen") }),
+			fields)
+		err := VerifyRequest("sig-b21", *verifier, req)
+		assert.Error(t, err)
+	})
+
+	t.Run("accepts when validator returns nil", func(t *testing.T) {
+		req := readRequest(httpreq1pssMinimal)
+		verifier, _ := NewRSAPSSVerifier(*pubKey,
+			NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss").
+				SetNonceValidator(func(nonce string) error { return nil }),
+			fields)
+		err := VerifyRequest("sig-b21", *verifier, req)
+		assert.NoError(t, err)
+	})
+
+	t.Run("no nonce in signature skips validator", func(t *testing.T) {
+		req := readRequest(httpreq1pssSelective) // sig-b22 has no nonce
+		validatorCalled := false
+		sigB22Fields := *NewFields().AddHeaders("@authority", "content-digest").AddQueryParam("Pet")
+		verifier, _ := NewRSAPSSVerifier(*pubKey,
+			NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss").
+				SetNonceValidator(func(nonce string) error {
+					validatorCalled = true
+					return fmt.Errorf("should not be called")
+				}),
+			sigB22Fields)
+		err := VerifyRequest("sig-b22", *verifier, req)
+		assert.NoError(t, err)
+		assert.False(t, validatorCalled, "validator should not be called when signature has no nonce")
+	})
+
+	t.Run("nil validator unchanged behavior", func(t *testing.T) {
+		req := readRequest(httpreq1pssMinimal)
+		verifier, _ := NewRSAPSSVerifier(*pubKey,
+			NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss"),
+			fields)
+		err := VerifyRequest("sig-b21", *verifier, req)
+		assert.NoError(t, err)
+	})
+}
+
 // Same as TestMultipleSignatures but using Message
 func TestMessageMultipleSignatures(t *testing.T) {
 	msg, err := NewMessage(NewMessageConfig().WithRequest(readRequest(httpreq9)))
