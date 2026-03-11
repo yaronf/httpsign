@@ -123,14 +123,18 @@ func (v *VerifyConfig) SetNonceValidator(f func(string) error) *VerifyConfig {
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,
-// which can only happen if clocks are out of sync. Default: 1,000 ms.
+// which can only happen if clocks are out of sync. Default: 2 seconds.
+// This is a security parameter; tune it for your deployment.
 func (v *VerifyConfig) SetNotNewerThan(notNewerThan time.Duration) *VerifyConfig {
 	v.notNewerThan = notNewerThan
 	return v
 }
 
 // SetNotOlderThan sets the window for messages that are older than the current time,
-// because of network latency. Default: 10,000 ms.
+// because of network latency. Default: 10 seconds.
+// Without nonce validation, this is the only replay defense—signatures can be replayed
+// within the window. For sensitive operations (financial, privileged), reduce this value
+// or use SetNonceValidator. This is a security parameter; tune it for your deployment.
 func (v *VerifyConfig) SetNotOlderThan(notOlderThan time.Duration) *VerifyConfig {
 	v.notOlderThan = notOlderThan
 	return v
