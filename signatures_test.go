@@ -2083,6 +2083,47 @@ func TestMultipleSignatures(t *testing.T) {
 	assert.NoError(t, err, "proxy signature not verified")
 }
 
+// TestSchemeFromRequest verifies that SetSchemeFromRequest correctly overrides @scheme
+// when behind a TLS-terminating reverse proxy (req.TLS is nil, X-Forwarded-Proto: https).
+func TestSchemeFromRequest(t *testing.T) {
+	// Request parsed from raw HTTP has req.TLS == nil; simulate proxy with X-Forwarded-Proto
+	req := readRequest(httpreq1)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	// req.URL may not have Scheme set when parsed from request line; ensure authority matches
+	req.URL.Scheme = "" // force use of msg.scheme / schemeOverride
+
+	schemeFromRequest := func(r *http.Request) string {
+		return r.Header.Get("X-Forwarded-Proto")
+	}
+
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	fields := Headers("@method", "@authority", "@scheme", "content-type")
+	signConfig := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret").SetSchemeFromRequest(schemeFromRequest)
+	signer, err := NewHMACSHA256Signer(key, signConfig, fields)
+	assert.NoError(t, err)
+
+	sigInput, sig, err := SignRequest("sig1", *signer, req)
+	assert.NoError(t, err)
+	req.Header.Set("Signature-Input", sigInput)
+	req.Header.Set("Signature", sig)
+
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret").SetSchemeFromRequest(schemeFromRequest), fields)
+	assert.NoError(t, err)
+	err = VerifyRequest("sig1", *verifier, req)
+	assert.NoError(t, err, "verification with SetSchemeFromRequest should succeed")
+
+	// Without SetSchemeFromRequest, req.TLS is nil so scheme would be "http" -> verification fails.
+	// Use a fresh request: parseMessage mutates req.URL.Scheme in place, so reuse would give wrong result.
+	req2 := readRequest(httpreq1)
+	req2.Header.Set("X-Forwarded-Proto", "https")
+	req2.URL.Scheme = ""
+	req2.Header.Set("Signature-Input", sigInput)
+	req2.Header.Set("Signature", sig)
+	verifierNoOverride, _ := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
+	err = VerifyRequest("sig1", *verifierNoOverride, req2)
+	assert.Error(t, err, "verification without SetSchemeFromRequest should fail (scheme mismatch)")
+}
+
 // Same as TestMultipleSignatures but using Message
 func TestMessageMultipleSignatures(t *testing.T) {
 	msg, err := NewMessage(NewMessageConfig().WithRequest(readRequest(httpreq9)))

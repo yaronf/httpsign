@@ -18,7 +18,7 @@ type parsedMessage struct {
 	qParams           url.Values
 }
 
-func parseRequest(req *http.Request, withTrailers bool, maxBodySize int64) (*parsedMessage, error) {
+func parseRequest(req *http.Request, withTrailers bool, maxBodySize int64, schemeOverride string) (*parsedMessage, error) {
 	if req == nil {
 		return nil, nil
 	}
@@ -26,6 +26,9 @@ func parseRequest(req *http.Request, withTrailers bool, maxBodySize int64) (*par
 	scheme := "http"
 	if req.TLS != nil {
 		scheme = "https"
+	}
+	if schemeOverride != "" {
+		scheme = schemeOverride
 	}
 
 	msg := &Message{

@@ -29,6 +29,7 @@ in the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign).
 ### Notes and Missing Features
 * The `Accept-Signature` header is unimplemented.
 * In responses, when using the "wrapped handler" feature, the `Content-Type` header is only signed if set explicitly by the server. This is different, but arguably more secure, than the normal `net.http` behavior.
+* **Behind a TLS-terminating reverse proxy:** The `@scheme` derived component defaults to `req.TLS != nil`. Behind nginx, Envoy, AWS ALB, etc., `req.TLS` is nil, so `@scheme` becomes `"http"` even for HTTPS traffic. Use `SetSchemeFromRequest` on `SignConfig` and `VerifyConfig` to derive the scheme from `X-Forwarded-Proto` or similar headers.
 
 ### Contributing
 Contributions to this project are welcome, both as issues and pull requests.

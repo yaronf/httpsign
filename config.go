@@ -10,14 +10,15 @@ import (
 
 // SignConfig contains additional configuration for the signer.
 type SignConfig struct {
-	signAlg     bool
-	signCreated bool
-	fakeCreated int64
-	expires     int64
-	nonce       string
-	tag         string
-	keyID       *string
-	maxBodySize int64
+	signAlg         bool
+	signCreated     bool
+	fakeCreated     int64
+	expires         int64
+	nonce           string
+	tag             string
+	keyID           *string
+	maxBodySize     int64
+	schemeFromRequest func(*http.Request) string
 }
 
 // NewSignConfig generates a default configuration.
@@ -86,17 +87,28 @@ func (c *SignConfig) SetMaxBodySize(maxBytes int64) *SignConfig {
 	return c
 }
 
+// SetSchemeFromRequest sets a function to derive the @scheme value from the request.
+// The callback should return a string, typically "http" or "https".
+// Use this when behind a TLS-terminating reverse proxy where req.TLS is nil;
+// the callback can read X-Forwarded-Proto or similar headers.
+// Default: nil (use req.TLS to determine scheme).
+func (c *SignConfig) SetSchemeFromRequest(f func(*http.Request) string) *SignConfig {
+	c.schemeFromRequest = f
+	return c
+}
+
 // VerifyConfig contains additional configuration for the verifier.
 type VerifyConfig struct {
-	verifyCreated bool
-	notNewerThan  time.Duration
-	notOlderThan  time.Duration
-	allowedAlgs   []string
-	rejectExpired bool
-	keyID         *string
-	dateWithin    time.Duration
-	allowedTags   []string
-	maxBodySize   int64
+	verifyCreated    bool
+	notNewerThan     time.Duration
+	notOlderThan     time.Duration
+	allowedAlgs      []string
+	rejectExpired    bool
+	keyID            *string
+	dateWithin       time.Duration
+	allowedTags      []string
+	maxBodySize      int64
+	schemeFromRequest func(*http.Request) string
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,
@@ -163,6 +175,17 @@ func (v *VerifyConfig) SetAllowedTags(allowedTags []string) *VerifyConfig {
 // Default: 0 (no limit).
 func (v *VerifyConfig) SetMaxBodySize(maxBytes int64) *VerifyConfig {
 	v.maxBodySize = maxBytes
+	return v
+}
+
+// SetSchemeFromRequest sets a function to derive the @scheme value from the request.
+// The callback should return a string, typically "http" or "https".
+// Use this when behind a TLS-terminating reverse proxy where req.TLS is nil;
+// the callback can read X-Forwarded-Proto or similar headers.
+// When the function returns a non-empty string, it overrides the default (req.TLS).
+// Default: nil (use req.TLS to determine scheme).
+func (v *VerifyConfig) SetSchemeFromRequest(f func(*http.Request) string) *VerifyConfig {
+	v.schemeFromRequest = f
 	return v
 }
 

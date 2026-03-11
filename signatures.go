@@ -34,6 +34,13 @@ func signMessage(config SignConfig, signatureName string, signer Signer, parsedM
 	return signatureInput, signature, signatureBase, nil
 }
 
+func resolvedScheme(schemeFromRequest func(*http.Request) string, req *http.Request) string {
+	if req == nil || schemeFromRequest == nil {
+		return ""
+	}
+	return schemeFromRequest(req)
+}
+
 func applyFieldConstraints(fields Fields) error {
 	binaryFields := map[string]bool{"set-cookie": true}
 	for _, f := range fields.f {
@@ -317,7 +324,7 @@ func signRequestDebug(signatureName string, signer Signer, req *http.Request) (s
 		return "", "", "", fmt.Errorf("empty signature name")
 	}
 	withTrailers := signer.fields.hasTrailerFields(false)
-	parsedMessage, err := parseRequest(req, withTrailers, signer.config.maxBodySize)
+	parsedMessage, err := parseRequest(req, withTrailers, signer.config.maxBodySize, resolvedScheme(signer.config.schemeFromRequest, req))
 	if err != nil {
 		return "", "", "", err
 	}
@@ -345,7 +352,7 @@ func signResponseDebug(signatureName string, signer Signer, res *http.Response, 
 		return "", "", "", err
 	}
 	reqWithTrailers := signer.fields.hasTrailerFields(true)
-	parsedReq, err := parseRequest(req, reqWithTrailers, signer.config.maxBodySize)
+	parsedReq, err := parseRequest(req, reqWithTrailers, signer.config.maxBodySize, resolvedScheme(signer.config.schemeFromRequest, req))
 	if err != nil {
 		return "", "", "", err
 	}
@@ -359,7 +366,11 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) e
 }
 
 func verifyRequestDebug(signatureName string, verifier Verifier, req *http.Request) (signatureBase string, err error) {
-	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
+	config := NewMessageConfig().WithRequest(req)
+	if s := resolvedScheme(verifier.config.schemeFromRequest, req); s != "" {
+		config = config.WithScheme(s)
+	}
+	msg, err := NewMessage(config)
 	if err != nil {
 		return "", err
 	}
@@ -443,7 +454,7 @@ func ResponseDetails(signatureName string, res *http.Response) (details *Message
 // needs to be read because signature headers appear in trailers. Trailers are very uncommon
 // and come at a performance cost.
 func RequestSignatureNames(req *http.Request, withTrailers bool) ([]string, error) {
-	parsedMessage, err := parseRequest(req, withTrailers, 0)
+	parsedMessage, err := parseRequest(req, withTrailers, 0, "")
 	if err != nil {
 		return nil, fmt.Errorf("could not parse request: %w", err)
 	}
@@ -533,7 +544,12 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response,
 }
 
 func verifyResponseDebug(signatureName string, verifier Verifier, res *http.Response, req *http.Request) (signatureBase string, err error) {
-	msg, err := NewMessage(NewMessageConfig().WithResponse(res, req))
+	config := NewMessageConfig()
+	if s := resolvedScheme(verifier.config.schemeFromRequest, req); s != "" {
+		config = config.WithScheme(s)
+	}
+	config = config.WithResponse(res, req)
+	msg, err := NewMessage(config)
 	if err != nil {
 		return "", err
 	}
