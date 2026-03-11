@@ -808,7 +808,7 @@ func applyPolicyCreated(psi *psiSignature, message parsedMessage, config VerifyC
 func verifySignature(verifier Verifier, input string, signature []byte) error {
 	verified, err := verifier.verify([]byte(input), signature)
 	if !verified && (err == nil) {
-		err = fmt.Errorf("bad signature, check key or signature value")
+		err = fmt.Errorf("signature verification failed")
 	}
 	return err
 }

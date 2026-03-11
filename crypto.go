@@ -413,7 +413,8 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		if verifierV2, ok := v.foreignVerifier.(jws.Verifier); ok {
 			err := verifierV2.Verify(buff, sig, v.key)
 			if err != nil {
-				return false, err
+				// Return opaque error; underlying err discarded for consistency
+				return false, fmt.Errorf("signature verification failed")
 			}
 			return true, nil
 		}
@@ -426,7 +427,8 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		if verifierV3, ok := v.foreignVerifier.(Verifier2); ok {
 			err := verifierV3.Verify(v.key, buff, sig) // Note: key first, then payload, then signature
 			if err != nil {
-				return false, err
+				// Return opaque error; underlying err discarded for consistency
+				return false, fmt.Errorf("signature verification failed")
 			}
 			return true, nil
 		}
@@ -444,7 +446,8 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		key := v.key.(rsa.PublicKey)
 		err := rsa.VerifyPKCS1v15(&key, crypto.SHA256, hashed[:], sig)
 		if err != nil {
-			return false, fmt.Errorf("RSA verification failed: %w", err)
+			// Return opaque error; underlying crypto err discarded to avoid leaking internals
+			return false, fmt.Errorf("signature verification failed")
 		}
 		return true, nil
 	case "rsa-pss-sha512":
@@ -452,7 +455,8 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		key := v.key.(rsa.PublicKey)
 		err := rsa.VerifyPSS(&key, crypto.SHA512, hashed[:], sig, nil)
 		if err != nil {
-			return false, fmt.Errorf("RSA-PSS verification failed: %w", err)
+			// Return opaque error; underlying crypto err discarded to avoid leaking internals
+			return false, fmt.Errorf("signature verification failed")
 		}
 		return true, nil
 	case "ecdsa-p256-sha256":
@@ -467,7 +471,7 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		key := v.key.(ed25519.PublicKey)
 		verified := ed25519.Verify(key, buff, sig)
 		if !verified {
-			return false, fmt.Errorf("failed Ed25519 verification")
+			return false, fmt.Errorf("signature verification failed")
 		}
 		return true, nil
 	default:
