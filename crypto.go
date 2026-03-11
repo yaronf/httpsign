@@ -453,6 +453,7 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 	case "rsa-pss-sha512":
 		hashed := sha512.Sum512(buff)
 		key := v.key.(rsa.PublicKey)
+		// nil opts: accept any valid salt length for backward compatibility with pre-RFC-9421 signers
 		err := rsa.VerifyPSS(&key, crypto.SHA512, hashed[:], sig, nil)
 		if err != nil {
 			// Return opaque error; underlying crypto err discarded to avoid leaking internals
