@@ -157,6 +157,10 @@ func parseMessage(msg *Message, withTrailers bool, maxBodySize int64) (*parsedMe
 	if err != nil {
 		return nil, err
 	}
+	err = validateMessageHeaders(msg.trailers)
+	if err != nil {
+		return nil, fmt.Errorf("could not validate trailers: %w", err)
+	}
 
 	if withTrailers {
 		if msg.body != nil {
@@ -164,10 +168,6 @@ func parseMessage(msg *Message, withTrailers bool, maxBodySize int64) (*parsedMe
 			if err != nil {
 				return nil, fmt.Errorf("cannot duplicate message body: %w", err)
 			}
-		}
-		err = validateMessageHeaders(msg.trailers)
-		if err != nil {
-			return nil, fmt.Errorf("could not validate trailers: %w", err)
 		}
 	}
 

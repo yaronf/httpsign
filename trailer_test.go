@@ -221,3 +221,32 @@ func TestMessageTrailer_SigFields(t *testing.T) {
 	_, err = msg.Verify(signatureName, *verifier)
 	assert.Error(t, err, "verification error")
 }
+
+// TestTrailer_AtPrefixValidationWithoutWithTrailers verifies that trailer headers with @-prefix
+// are rejected even when withTrailers is false (Fix #13: validation must run unconditionally).
+func TestTrailer_AtPrefixValidationWithoutWithTrailers(t *testing.T) {
+	// Create a signed request (no trailers). Verifier has no trailer fields, so withTrailers=false.
+	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret")
+	fields := Headers("@authority", "@method", "content-type")
+	signatureName := "sig1"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
+	req := readRequest(httpreq1)
+	sigInput, sig, err := SignRequest(signatureName, *signer, req)
+	assert.NoError(t, err, "signature failed")
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+
+	// Build Message from request but override trailers with @-prefixed header (cannot appear in real HTTP).
+	msgConfig := NewMessageConfig().WithRequest(req).WithTrailers(http.Header{"@bad": {"value"}})
+	msg, err := NewMessage(msgConfig)
+	assert.NoError(t, err, "could not create Message")
+
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
+	assert.NoError(t, err, "could not create Verifier")
+
+	_, err = msg.Verify(signatureName, *verifier)
+	assert.Error(t, err, "verification must fail when trailers contain @-prefixed header")
+	assert.Contains(t, err.Error(), "could not validate trailers", "error should mention trailer validation")
+	assert.Contains(t, err.Error(), "potentially malicious header", "error should mention malicious header")
+}
