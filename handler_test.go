@@ -226,3 +226,26 @@ func TestHandlerRejectsBodyExceedingMaxBodySize(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode, "expected 401 when body exceeds MaxBodySize")
 }
+
+func TestHandlerRejectsResponseBodyExceedingMaxBodySize(t *testing.T) {
+	largeResponse := bytes.Repeat([]byte("x"), 200)
+	fetchSigner := func(res http.Response, r *http.Request) (string, *Signer) {
+		signer, _ := NewHMACSHA256Signer(bytes.Repeat([]byte{0}, 64),
+			NewSignConfig().SetKeyID("key").SignCreated(false),
+			Headers("@status", "date", "Content-Digest"))
+		return "sig1", signer
+	}
+	config := NewHandlerConfig().SetFetchSigner(fetchSigner).
+		SetMaxBodySize(100).
+		SetDigestSchemesSend([]string{DigestSha256})
+	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write(largeResponse)
+	}
+	ts := httptest.NewServer(WrapHandler(http.HandlerFunc(simpleHandler), *config))
+	defer ts.Close()
+
+	res, err := http.Get(ts.URL)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusInternalServerError, res.StatusCode, "expected 500 when response body exceeds MaxBodySize")
+}

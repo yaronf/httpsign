@@ -320,7 +320,8 @@ func (h *HandlerConfig) SetDigestSchemesRecv(s []string) *HandlerConfig {
 	return h
 }
 
-// SetMaxBodySize sets the maximum message body size in bytes when computing or validating Content-Digest.
+// SetMaxBodySize sets the maximum message body size in bytes when computing or validating Content-Digest,
+// and when buffering the response body for signing in WrapHandler. When exceeded, WrapHandler returns HTTP 500.
 // Default: 0 (no limit).
 func (h *HandlerConfig) SetMaxBodySize(maxBytes int64) *HandlerConfig {
 	h.maxBodySize = maxBytes

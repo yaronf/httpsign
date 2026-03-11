@@ -13,6 +13,9 @@ import (
 
 // WrapHandler wraps a server's HTTP request handler so that the incoming request is verified
 // and the response is signed. Both operations are optional.
+// The full response body is buffered in memory for signing. Set MaxBodySize to limit buffering;
+// when exceeded, the response is aborted with HTTP 500. WrapHandler is unsuitable for large
+// responses (file downloads, streaming).
 // Side effects: when signing, the wrapped handler adds a Signature and a Signature-input header. If the
 // Content-Digest header is included in the list of signed components, it is generated and added to the response.
 // Note: unlike the standard net.http behavior, for the "Content-Type" header to be signed,
@@ -26,8 +29,12 @@ func WrapHandler(h http.Handler, config HandlerConfig) http.Handler {
 				return
 			}
 		}
-		wrapped := newWrappedResponseWriter(w, r, config) // and this includes response signature
+		wrapped := newWrappedResponseWriter(w, r, config)
 		h.ServeHTTP(wrapped, r)
+		if wrapped.bodyOverflow {
+			sigFailed(wrapped.ResponseWriter, r, config.logger, errResponseBodyExceedsMaxSize)
+			return
+		}
 		if config.fetchSigner != nil {
 			err := signServerResponse(wrapped, r, config)
 			if err != nil {
@@ -42,6 +49,8 @@ func WrapHandler(h http.Handler, config HandlerConfig) http.Handler {
 		}
 	})
 }
+
+var errResponseBodyExceedsMaxSize = fmt.Errorf("response body exceeds maximum size")
 
 // This error case is not optional, as it's always a server bug
 func sigFailed(w http.ResponseWriter, _ *http.Request, logger *log.Logger, err error) {
@@ -114,11 +123,12 @@ func signServerResponse(wrapped *wrappedResponseWriter, r *http.Request, config 
 
 type wrappedResponseWriter struct {
 	http.ResponseWriter
-	status      int
-	body        *bytes.Buffer
-	config      HandlerConfig
-	wroteHeader bool
-	r           *http.Request
+	status       int
+	body         *bytes.Buffer
+	config       HandlerConfig
+	wroteHeader  bool
+	r            *http.Request
+	bodyOverflow bool
 }
 
 func newWrappedResponseWriter(w http.ResponseWriter, r *http.Request, config HandlerConfig) *wrappedResponseWriter {
@@ -132,6 +142,10 @@ func (w *wrappedResponseWriter) Write(p []byte) (n int, err error) {
 	w.wroteHeader = true
 	if w.body == nil {
 		w.body = new(bytes.Buffer)
+	}
+	if w.config.maxBodySize > 0 && int64(w.body.Len())+int64(len(p)) > w.config.maxBodySize {
+		w.bodyOverflow = true
+		return 0, errResponseBodyExceedsMaxSize
 	}
 	return w.body.Write(p)
 }
