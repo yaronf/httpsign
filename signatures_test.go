@@ -1583,6 +1583,36 @@ func TestVerifyRequest(t *testing.T) {
 			want:    true,
 			wantErr: false,
 		},
+		{
+			name: "missing keyid rejected when SetKeyID configured",
+			args: args{
+				signatureName: "sig-b22",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss"), *NewFields())
+					return *verifier
+				})(),
+				req: (func() *http.Request {
+					req := readRequest(httpreq1pssSelective)
+					req.Header.Del("Signature-Input")
+					req.Header.Del("Signature")
+					prvKey, _ := loadRSAPSSPrivateKey(rsaPSSPrvKey)
+					signConfig := NewSignConfig().SignAlg(false).setFakeCreated(1618884473).SetTag("header-example")
+					// Intentionally omit SetKeyID so signature has no keyid parameter
+					fields := *NewFields().AddHeaders("@authority", "content-digest").AddQueryParam("Pet")
+					signer, _ := NewRSAPSSSigner(*prvKey, signConfig, fields)
+					sigInput, sig, _ := SignRequest("sig-b22", *signer, req)
+					req.Header.Set("Signature-Input", sigInput)
+					req.Header.Set("Signature", sig)
+					return req
+				})(),
+			},
+			want:    false,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

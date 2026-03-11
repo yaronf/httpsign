@@ -645,14 +645,15 @@ func applyVerificationPolicy(message parsedMessage, psi *psiSignature, config Ve
 func applyPolicyOthers(psi *psiSignature, config VerifyConfig) error {
 	if config.keyID != nil {
 		keyidParam, ok := psi.params["keyid"]
-		if ok {
-			keyID, ok := keyidParam.(string)
-			if !ok {
-				return fmt.Errorf("malformed \"keyid\" parameter")
-			}
-			if keyID != *config.keyID {
-				return fmt.Errorf("wrong keyid \"%s\"", keyID)
-			}
+		if !ok {
+			return fmt.Errorf("missing \"keyid\" parameter")
+		}
+		keyID, ok := keyidParam.(string)
+		if !ok {
+			return fmt.Errorf("malformed \"keyid\" parameter")
+		}
+		if keyID != *config.keyID {
+			return fmt.Errorf("wrong keyid \"%s\"", keyID)
 		}
 	}
 	return nil
