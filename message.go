@@ -10,7 +10,7 @@ import (
 
 // MessageDetails aggregates the details of a signed message, for a given signature
 type MessageDetails struct {
-	KeyID   string
+	KeyID   *string // nil when keyid parameter is absent (RFC 9421 does not require it)
 	Alg     string
 	Fields  Fields
 	Created *time.Time

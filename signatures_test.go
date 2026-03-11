@@ -1806,7 +1806,8 @@ func TestRequestDetails(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        args
-		wantDetails MessageDetails
+		wantKeyID   *string
+		wantAlg     string
 		wantErr     bool
 	}{
 		{
@@ -1815,12 +1816,31 @@ func TestRequestDetails(t *testing.T) {
 				signatureName: "sig1",
 				req:           readRequest(httpreq1p256),
 			},
-			wantDetails: MessageDetails{
-				KeyID:  "test-key-ecc-p256",
-				Alg:    "",
-				Fields: Fields{},
+			wantKeyID: strPtr("test-key-ecc-p256"),
+			wantAlg:   "",
+			wantErr:   false,
+		},
+		{
+			name: "keyid absent returns nil",
+			args: args{
+				signatureName: "sig-b22",
+				req: (func() *http.Request {
+					req := readRequest(httpreq1pssSelective)
+					req.Header.Del("Signature-Input")
+					req.Header.Del("Signature")
+					prvKey, _ := loadRSAPSSPrivateKey(rsaPSSPrvKey)
+					signConfig := NewSignConfig().SignAlg(false).setFakeCreated(1618884473).SetTag("header-example")
+					fields := *NewFields().AddHeaders("@authority", "content-digest").AddQueryParam("Pet")
+					signer, _ := NewRSAPSSSigner(*prvKey, signConfig, fields)
+					sigInput, sig, _ := SignRequest("sig-b22", *signer, req)
+					req.Header.Set("Signature-Input", sigInput)
+					req.Header.Set("Signature", sig)
+					return req
+				})(),
 			},
-			wantErr: false,
+			wantKeyID: nil,
+			wantAlg:   "",
+			wantErr:   false,
 		},
 	}
 	for _, tt := range tests {
@@ -1830,14 +1850,26 @@ func TestRequestDetails(t *testing.T) {
 				t.Errorf("RequestDetails() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if gotDetails.KeyID != tt.wantDetails.KeyID {
-				t.Errorf("RequestDetails() gotKeyID = %v, want %v", gotDetails.KeyID, tt.wantDetails.KeyID)
+			if !equalStringPtr(gotDetails.KeyID, tt.wantKeyID) {
+				t.Errorf("RequestDetails() gotKeyID = %v, want %v", gotDetails.KeyID, tt.wantKeyID)
 			}
-			if gotDetails.Alg != tt.wantDetails.Alg {
-				t.Errorf("RequestDetails() gotAlg = %v, want %v", gotDetails.Alg, tt.wantDetails.Alg)
+			if gotDetails.Alg != tt.wantAlg {
+				t.Errorf("RequestDetails() gotAlg = %v, want %v", gotDetails.Alg, tt.wantAlg)
 			}
 		})
 	}
+}
+
+func strPtr(s string) *string { return &s }
+
+func equalStringPtr(a, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 func TestResponseDetails(t *testing.T) {
@@ -1848,7 +1880,7 @@ func TestResponseDetails(t *testing.T) {
 	tests := []struct {
 		name      string
 		args      args
-		wantKeyID string
+		wantKeyID *string
 		wantAlg   string
 		wantErr   bool
 	}{
@@ -1858,7 +1890,7 @@ func TestResponseDetails(t *testing.T) {
 				signatureName: "sig7",
 				res:           readResponse(httpres3),
 			},
-			wantKeyID: "my-key",
+			wantKeyID: strPtr("my-key"),
 			wantAlg:   "",
 			wantErr:   false,
 		},
@@ -1870,13 +1902,11 @@ func TestResponseDetails(t *testing.T) {
 				t.Errorf("ResponseDetails() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			gotKeyID := gotDetails.KeyID
-			gotAlg := gotDetails.Alg
-			if gotKeyID != tt.wantKeyID {
-				t.Errorf("ResponseDetails() gotKeyID = %v, want %v", gotKeyID, tt.wantKeyID)
+			if !equalStringPtr(gotDetails.KeyID, tt.wantKeyID) {
+				t.Errorf("ResponseDetails() gotKeyID = %v, want %v", gotDetails.KeyID, tt.wantKeyID)
 			}
-			if gotAlg != tt.wantAlg {
-				t.Errorf("ResponseDetails() gotAlg = %v, want %v", gotAlg, tt.wantAlg)
+			if gotDetails.Alg != tt.wantAlg {
+				t.Errorf("ResponseDetails() gotAlg = %v, want %v", gotDetails.Alg, tt.wantAlg)
 			}
 		})
 	}

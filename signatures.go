@@ -486,13 +486,13 @@ func messageSignatureNames(parsedMessage *parsedMessage, withTrailers bool) ([]s
 }
 
 func signatureDetails(signature *psiSignature) (details *MessageDetails, err error) {
-	keyIDParam, ok := signature.params["keyid"]
-	if !ok {
-		return nil, fmt.Errorf("missing \"keyid\" parameter")
-	}
-	keyID, ok := keyIDParam.(string)
-	if !ok {
-		return nil, fmt.Errorf("malformed \"keyid\" parameter")
+	var keyID *string
+	if keyIDParam, ok := signature.params["keyid"]; ok {
+		k, ok := keyIDParam.(string)
+		if !ok {
+			return nil, fmt.Errorf("malformed \"keyid\" parameter")
+		}
+		keyID = &k
 	}
 	var alg string
 	algParam, ok := signature.params["alg"] // "alg" is optional
