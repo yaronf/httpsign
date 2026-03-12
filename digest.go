@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"github.com/dunglas/httpsfv"
@@ -175,7 +176,7 @@ found:
 		if !ok {
 			return fmt.Errorf("non-byte string in received Content-Digest header")
 		}
-		if !bytes.Equal(raw, b) {
+		if subtle.ConstantTimeCompare(raw, b) != 1 {
 			return fmt.Errorf("digest mismatch for scheme %s", scheme)
 		}
 	}

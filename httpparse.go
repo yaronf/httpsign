@@ -150,7 +150,7 @@ func scStatus(statusCode int) string {
 
 func parseMessage(msg *Message, withTrailers bool, maxBodySize int64) (*parsedMessage, error) {
 	if msg == nil {
-		return nil, nil
+		return nil, fmt.Errorf("message must not be nil")
 	}
 
 	err := validateMessageHeaders(msg.headers)
