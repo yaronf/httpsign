@@ -1583,6 +1583,36 @@ func TestVerifyRequest(t *testing.T) {
 			want:    true,
 			wantErr: false,
 		},
+		{
+			name: "missing keyid rejected when SetKeyID configured",
+			args: args{
+				signatureName: "sig-b22",
+				verifier: (func() Verifier {
+					pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+					if err != nil {
+						t.Errorf("cannot parse public key: %v", err)
+					}
+					verifier, _ := NewRSAPSSVerifier(*pubKey, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss"), *NewFields())
+					return *verifier
+				})(),
+				req: (func() *http.Request {
+					req := readRequest(httpreq1pssSelective)
+					req.Header.Del("Signature-Input")
+					req.Header.Del("Signature")
+					prvKey, _ := loadRSAPSSPrivateKey(rsaPSSPrvKey)
+					signConfig := NewSignConfig().SignAlg(false).setFakeCreated(1618884473).SetTag("header-example")
+					// Intentionally omit SetKeyID so signature has no keyid parameter
+					fields := *NewFields().AddHeaders("@authority", "content-digest").AddQueryParam("Pet")
+					signer, _ := NewRSAPSSSigner(*prvKey, signConfig, fields)
+					sigInput, sig, _ := SignRequest("sig-b22", *signer, req)
+					req.Header.Set("Signature-Input", sigInput)
+					req.Header.Set("Signature", sig)
+					return req
+				})(),
+			},
+			want:    false,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1776,7 +1806,8 @@ func TestRequestDetails(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        args
-		wantDetails MessageDetails
+		wantKeyID   *string
+		wantAlg     string
 		wantErr     bool
 	}{
 		{
@@ -1785,12 +1816,31 @@ func TestRequestDetails(t *testing.T) {
 				signatureName: "sig1",
 				req:           readRequest(httpreq1p256),
 			},
-			wantDetails: MessageDetails{
-				KeyID:  "test-key-ecc-p256",
-				Alg:    "",
-				Fields: Fields{},
+			wantKeyID: strPtr("test-key-ecc-p256"),
+			wantAlg:   "",
+			wantErr:   false,
+		},
+		{
+			name: "keyid absent returns nil",
+			args: args{
+				signatureName: "sig-b22",
+				req: (func() *http.Request {
+					req := readRequest(httpreq1pssSelective)
+					req.Header.Del("Signature-Input")
+					req.Header.Del("Signature")
+					prvKey, _ := loadRSAPSSPrivateKey(rsaPSSPrvKey)
+					signConfig := NewSignConfig().SignAlg(false).setFakeCreated(1618884473).SetTag("header-example")
+					fields := *NewFields().AddHeaders("@authority", "content-digest").AddQueryParam("Pet")
+					signer, _ := NewRSAPSSSigner(*prvKey, signConfig, fields)
+					sigInput, sig, _ := SignRequest("sig-b22", *signer, req)
+					req.Header.Set("Signature-Input", sigInput)
+					req.Header.Set("Signature", sig)
+					return req
+				})(),
 			},
-			wantErr: false,
+			wantKeyID: nil,
+			wantAlg:   "",
+			wantErr:   false,
 		},
 	}
 	for _, tt := range tests {
@@ -1800,14 +1850,26 @@ func TestRequestDetails(t *testing.T) {
 				t.Errorf("RequestDetails() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if gotDetails.KeyID != tt.wantDetails.KeyID {
-				t.Errorf("RequestDetails() gotKeyID = %v, want %v", gotDetails.KeyID, tt.wantDetails.KeyID)
+			if !equalStringPtr(gotDetails.KeyID, tt.wantKeyID) {
+				t.Errorf("RequestDetails() gotKeyID = %v, want %v", gotDetails.KeyID, tt.wantKeyID)
 			}
-			if gotDetails.Alg != tt.wantDetails.Alg {
-				t.Errorf("RequestDetails() gotAlg = %v, want %v", gotDetails.Alg, tt.wantDetails.Alg)
+			if gotDetails.Alg != tt.wantAlg {
+				t.Errorf("RequestDetails() gotAlg = %v, want %v", gotDetails.Alg, tt.wantAlg)
 			}
 		})
 	}
+}
+
+func strPtr(s string) *string { return &s }
+
+func equalStringPtr(a, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 func TestResponseDetails(t *testing.T) {
@@ -1818,7 +1880,7 @@ func TestResponseDetails(t *testing.T) {
 	tests := []struct {
 		name      string
 		args      args
-		wantKeyID string
+		wantKeyID *string
 		wantAlg   string
 		wantErr   bool
 	}{
@@ -1828,7 +1890,7 @@ func TestResponseDetails(t *testing.T) {
 				signatureName: "sig7",
 				res:           readResponse(httpres3),
 			},
-			wantKeyID: "my-key",
+			wantKeyID: strPtr("my-key"),
 			wantAlg:   "",
 			wantErr:   false,
 		},
@@ -1840,13 +1902,11 @@ func TestResponseDetails(t *testing.T) {
 				t.Errorf("ResponseDetails() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			gotKeyID := gotDetails.KeyID
-			gotAlg := gotDetails.Alg
-			if gotKeyID != tt.wantKeyID {
-				t.Errorf("ResponseDetails() gotKeyID = %v, want %v", gotKeyID, tt.wantKeyID)
+			if !equalStringPtr(gotDetails.KeyID, tt.wantKeyID) {
+				t.Errorf("ResponseDetails() gotKeyID = %v, want %v", gotDetails.KeyID, tt.wantKeyID)
 			}
-			if gotAlg != tt.wantAlg {
-				t.Errorf("ResponseDetails() gotAlg = %v, want %v", gotAlg, tt.wantAlg)
+			if gotDetails.Alg != tt.wantAlg {
+				t.Errorf("ResponseDetails() gotAlg = %v, want %v", gotDetails.Alg, tt.wantAlg)
 			}
 		})
 	}
@@ -1857,6 +1917,33 @@ func TestRequestSignatureNames(t *testing.T) {
 	names, err := RequestSignatureNames(req, false)
 	assert.NoError(t, err, "failed to fetch signature names")
 	assert.ElementsMatch(t, names, []string{"sig3", "sig2", "sig1"}, "did not find all signature names")
+
+	// parseRequest(nil) should return error, not (nil, nil)
+	_, err = RequestSignatureNames(nil, false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "nil request")
+}
+
+func TestSignResponseNilRequestWhenAssocFieldsRequired(t *testing.T) {
+	// Signer has fields from associated request; req=nil should fail with clear error
+	priv, pub, err := genP256KeyPair()
+	assert.NoError(t, err)
+	fields := *NewFields().AddHeaders("@status", "date").
+		AddHeaderExt("@authority", false, false, true, false) // requires associated request
+	signer, err := NewP256Signer(*priv, NewSignConfig().SetKeyID("key"), fields)
+	assert.NoError(t, err)
+	res := readResponse(httpres2)
+	_, _, err = SignResponse("sig1", *signer, res, nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "nil request")
+	_ = pub
+
+	// Signer without assoc fields; req=nil should succeed
+	signerNoAssoc, err := NewP256Signer(*priv, NewSignConfig().SetKeyID("key"),
+		*NewFields().AddHeaders("@status", "date"))
+	assert.NoError(t, err)
+	_, _, err = SignResponse("sig1", *signerNoAssoc, res, nil)
+	assert.NoError(t, err)
 }
 
 func TestResponseSignatureNames(t *testing.T) {
@@ -2021,6 +2108,99 @@ func TestMultipleSignatures(t *testing.T) {
 	assert.NoError(t, err, "cannot create verifier2")
 	_, err = verifyRequestDebug("proxy_sig", *verifier2, req)
 	assert.NoError(t, err, "proxy signature not verified")
+}
+
+// TestSchemeFromRequest verifies that SetSchemeFromRequest correctly overrides @scheme
+// when behind a TLS-terminating reverse proxy (req.TLS is nil, X-Forwarded-Proto: https).
+func TestSchemeFromRequest(t *testing.T) {
+	// Request parsed from raw HTTP has req.TLS == nil; simulate proxy with X-Forwarded-Proto
+	req := readRequest(httpreq1)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	// req.URL may not have Scheme set when parsed from request line; ensure authority matches
+	req.URL.Scheme = "" // force use of msg.scheme / schemeOverride
+
+	schemeFromRequest := func(r *http.Request) string {
+		return r.Header.Get("X-Forwarded-Proto")
+	}
+
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	fields := Headers("@method", "@authority", "@scheme", "content-type")
+	signConfig := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-shared-secret").SetSchemeFromRequest(schemeFromRequest)
+	signer, err := NewHMACSHA256Signer(key, signConfig, fields)
+	assert.NoError(t, err)
+
+	sigInput, sig, err := SignRequest("sig1", *signer, req)
+	assert.NoError(t, err)
+	req.Header.Set("Signature-Input", sigInput)
+	req.Header.Set("Signature", sig)
+
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret").SetSchemeFromRequest(schemeFromRequest), fields)
+	assert.NoError(t, err)
+	err = VerifyRequest("sig1", *verifier, req)
+	assert.NoError(t, err, "verification with SetSchemeFromRequest should succeed")
+
+	// Without SetSchemeFromRequest, req.TLS is nil so scheme would be "http" -> verification fails.
+	// Use a fresh request: parseMessage mutates req.URL.Scheme in place, so reuse would give wrong result.
+	req2 := readRequest(httpreq1)
+	req2.Header.Set("X-Forwarded-Proto", "https")
+	req2.URL.Scheme = ""
+	req2.Header.Set("Signature-Input", sigInput)
+	req2.Header.Set("Signature", sig)
+	verifierNoOverride, _ := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-shared-secret"), fields)
+	err = VerifyRequest("sig1", *verifierNoOverride, req2)
+	assert.Error(t, err, "verification without SetSchemeFromRequest should fail (scheme mismatch)")
+}
+
+// TestNonceValidator verifies SetNonceValidator callback for replay prevention.
+func TestNonceValidator(t *testing.T) {
+	pubKey, err := parseRsaPublicKeyFromPemStr(rsaPSSPubKey)
+	assert.NoError(t, err)
+	fields := *NewFields()
+
+	t.Run("rejects when validator returns error", func(t *testing.T) {
+		req := readRequest(httpreq1pssMinimal) // has nonce "b3k2pp5k7z-50gnwp.yemd"
+		verifier, _ := NewRSAPSSVerifier(*pubKey,
+			NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss").
+				SetNonceValidator(func(nonce string) error { return fmt.Errorf("nonce already seen") }),
+			fields)
+		err := VerifyRequest("sig-b21", *verifier, req)
+		assert.Error(t, err)
+	})
+
+	t.Run("accepts when validator returns nil", func(t *testing.T) {
+		req := readRequest(httpreq1pssMinimal)
+		verifier, _ := NewRSAPSSVerifier(*pubKey,
+			NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss").
+				SetNonceValidator(func(nonce string) error { return nil }),
+			fields)
+		err := VerifyRequest("sig-b21", *verifier, req)
+		assert.NoError(t, err)
+	})
+
+	t.Run("no nonce in signature skips validator", func(t *testing.T) {
+		req := readRequest(httpreq1pssSelective) // sig-b22 has no nonce
+		validatorCalled := false
+		sigB22Fields := *NewFields().AddHeaders("@authority", "content-digest").AddQueryParam("Pet")
+		verifier, _ := NewRSAPSSVerifier(*pubKey,
+			NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss").
+				SetNonceValidator(func(nonce string) error {
+					validatorCalled = true
+					return fmt.Errorf("should not be called")
+				}),
+			sigB22Fields)
+		err := VerifyRequest("sig-b22", *verifier, req)
+		assert.NoError(t, err)
+		assert.False(t, validatorCalled, "validator should not be called when signature has no nonce")
+	})
+
+	t.Run("nil validator unchanged behavior", func(t *testing.T) {
+		req := readRequest(httpreq1pssMinimal)
+		verifier, _ := NewRSAPSSVerifier(*pubKey,
+			NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-rsa-pss"),
+			fields)
+		err := VerifyRequest("sig-b21", *verifier, req)
+		assert.NoError(t, err)
+	})
 }
 
 // Same as TestMultipleSignatures but using Message

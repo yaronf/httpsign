@@ -29,6 +29,9 @@ in the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign).
 ### Notes and Missing Features
 * The `Accept-Signature` header is unimplemented.
 * In responses, when using the "wrapped handler" feature, the `Content-Type` header is only signed if set explicitly by the server. This is different, but arguably more secure, than the normal `net.http` behavior.
+* **Behind a TLS-terminating reverse proxy:** The `@scheme` derived component defaults to `req.TLS != nil`. Behind nginx, Envoy, AWS ALB, etc., `req.TLS` is nil, so `@scheme` becomes `"http"` even for HTTPS traffic. Use `SetSchemeFromRequest` on `SignConfig` and `VerifyConfig` to derive the scheme from `X-Forwarded-Proto` or similar headers.
+* **Nonce-based replay prevention:** The signer can include a nonce via `SetNonce`; the verifier does not track seen nonces by default. Use `SetNonceValidator` on `VerifyConfig` to implement replay prevention—the callback must check uniqueness (e.g. via a cache or database) and return an error for duplicates.
+* **Replay window:** Without nonce validation, `SetNotOlderThan` (default 10s) is the only replay defense. For sensitive operations, reduce this value or use `SetNonceValidator`. See the method docstrings for details.
 
 ### Contributing
 Contributions to this project are welcome, both as issues and pull requests.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"github.com/dunglas/httpsfv"
@@ -16,11 +17,30 @@ const (
 	DigestSha512 = "sha-512"
 )
 
+// DigestOptions holds optional parameters for digest generation and validation.
+type DigestOptions struct {
+	// MaxBodySize limits the message body size in bytes. 0 means no limit.
+	MaxBodySize int64
+}
+
+// NewDigestOptions returns default digest options.
+func NewDigestOptions() *DigestOptions {
+	return &DigestOptions{}
+}
+
+// SetMaxBodySize sets the maximum message body size in bytes.
+// Default: 0 (no limit).
+func (o *DigestOptions) SetMaxBodySize(maxBytes int64) *DigestOptions {
+	o.MaxBodySize = maxBytes
+	return o
+}
+
 // GenerateContentDigestHeader generates a digest of the message body according to the given scheme(s)
 // (currently supporting DigestSha256 and DigestSha512).
 // Side effect: the message body is fully read, and replaced by a static buffer
 // containing the body contents.
-func GenerateContentDigestHeader(body *io.ReadCloser, schemes []string) (string, error) {
+// opts: optional; when provided, MaxBodySize limits the body size (0 means no limit).
+func GenerateContentDigestHeader(body *io.ReadCloser, schemes []string, opts ...*DigestOptions) (string, error) {
 	if len(schemes) == 0 {
 		return "", fmt.Errorf("received empty list of digest schemes")
 	}
@@ -28,7 +48,11 @@ func GenerateContentDigestHeader(body *io.ReadCloser, schemes []string) (string,
 	if err != nil {
 		return "", err
 	}
-	buff, err := duplicateBody(body)
+	var maxSize int64
+	if len(opts) > 0 && opts[0] != nil {
+		maxSize = opts[0].MaxBodySize
+	}
+	buff, err := duplicateBody(body, maxSize)
 	if err != nil {
 		return "", err
 	}
@@ -44,13 +68,24 @@ func GenerateContentDigestHeader(body *io.ReadCloser, schemes []string) (string,
 	return httpsfv.Marshal(dict)
 }
 
-// Note side effect: the value of body is replaced
-func duplicateBody(body *io.ReadCloser) (*bytes.Buffer, error) {
+var errBodyExceedsMaxSize = fmt.Errorf("body exceeds maximum size")
+
+// Note side effect: the value of body is replaced.
+// maxSize: 0 means no limit; when > 0, returns error if body exceeds maxSize bytes.
+func duplicateBody(body *io.ReadCloser, maxSize int64) (*bytes.Buffer, error) {
 	buff := &bytes.Buffer{}
 	if body != nil && *body != nil {
-		_, err := buff.ReadFrom(*body)
+		var r io.Reader = *body
+		if maxSize > 0 {
+			r = io.LimitReader(r, maxSize+1)
+		}
+		n, err := buff.ReadFrom(r)
 		if err != nil {
 			return nil, err
+		}
+		if maxSize > 0 && n > maxSize {
+			_ = (*body).Close()
+			return nil, errBodyExceedsMaxSize
 		}
 
 		_ = (*body).Close()
@@ -90,7 +125,8 @@ func validateSchemes(schemes []string) error {
 // digest of the message body. Schemes are constants defined in this file, e.g. DigestSha256.
 // Note that "received" is a string array, typically retrieved through the
 // "Values" method of the header. Returns nil if validation is successful.
-func ValidateContentDigestHeader(received []string, body *io.ReadCloser, accepted []string) error {
+// opts: optional; when provided, MaxBodySize limits the body size (0 means no limit).
+func ValidateContentDigestHeader(received []string, body *io.ReadCloser, accepted []string, opts ...*DigestOptions) error {
 	if len(accepted) == 0 {
 		return fmt.Errorf("received an empty list of acceptable digest schemes")
 	}
@@ -102,7 +138,11 @@ func ValidateContentDigestHeader(received []string, body *io.ReadCloser, accepte
 	if err != nil {
 		return fmt.Errorf("received Content-Digest header: %w", err)
 	}
-	buff, err := duplicateBody(body)
+	var maxSize int64
+	if len(opts) > 0 && opts[0] != nil {
+		maxSize = opts[0].MaxBodySize
+	}
+	buff, err := duplicateBody(body, maxSize)
 	if err != nil {
 		return err
 	}
@@ -136,7 +176,7 @@ found:
 		if !ok {
 			return fmt.Errorf("non-byte string in received Content-Digest header")
 		}
-		if !bytes.Equal(raw, b) {
+		if subtle.ConstantTimeCompare(raw, b) != 1 {
 			return fmt.Errorf("digest mismatch for scheme %s", scheme)
 		}
 	}

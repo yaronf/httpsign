@@ -10,7 +10,7 @@ import (
 
 // MessageDetails aggregates the details of a signed message, for a given signature
 type MessageDetails struct {
-	KeyID   string
+	KeyID   *string // nil when keyid parameter is absent (RFC 9421 does not require it)
 	Alg     string
 	Fields  Fields
 	Created *time.Time
@@ -185,6 +185,10 @@ func (b *MessageConfig) WithRequest(req *http.Request) *MessageConfig {
 		WithScheme(scheme)
 }
 
+// WithResponse configures the message from a response and optional associated request.
+// If the scheme was set via WithScheme before WithResponse, that value is used for the
+// associated request's @scheme (e.g. from X-Forwarded-Proto when behind a reverse proxy).
+// Otherwise, the scheme is derived from req.TLS.
 func (b *MessageConfig) WithResponse(res *http.Response, req *http.Request) *MessageConfig {
 	if res == nil {
 		return b
@@ -200,6 +204,9 @@ func (b *MessageConfig) WithResponse(res *http.Response, req *http.Request) *Mes
 		scheme := "http"
 		if req.TLS != nil {
 			scheme = "https"
+		}
+		if b.scheme != "" {
+			scheme = b.scheme
 		}
 		b = b.WithAssociatedRequest(req.Method, req.URL, req.Header, req.Host, scheme)
 	}

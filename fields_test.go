@@ -55,6 +55,52 @@ func TestFields_asSignatureInput(t *testing.T) {
 	}
 }
 
+func TestFields_hasHeader(t *testing.T) {
+	tests := []struct {
+		name   string
+		fields *Fields
+		header string
+		want   bool
+	}{
+		{
+			name:   "bare header via AddHeaders",
+			fields: NewFields().AddHeaders("content-digest"),
+			header: "content-digest",
+			want:   true,
+		},
+		{
+			name:   "optional header via AddHeaderOptional",
+			fields: NewFields().AddHeaderOptional("content-digest"),
+			header: "content-digest",
+			want:   true,
+		},
+		{
+			name:   "header with params via AddHeaderExt",
+			fields: NewFields().AddHeaderExt("content-digest", true, false, false, false),
+			header: "Content-Digest",
+			want:   true,
+		},
+		{
+			name:   "header not in fields",
+			fields: NewFields().AddHeaders("content-type"),
+			header: "content-digest",
+			want:   false,
+		},
+		{
+			name:   "query param not a header",
+			fields: NewFields().AddQueryParam("foo"),
+			header: "content-digest",
+			want:   false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.fields.hasHeader(tt.header)
+			assert.Equalf(t, tt.want, got, "hasHeader(%q)", tt.header)
+		})
+	}
+}
+
 func Test_field_String(t *testing.T) {
 	tests := []struct {
 		name string

@@ -208,12 +208,19 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 	}
 	switch s.alg {
 	case "hmac-sha256":
-		mac := hmac.New(sha256.New, s.key.([]byte))
+		key, ok := s.key.([]byte)
+		if !ok {
+			return nil, fmt.Errorf("malformed key")
+		}
+		mac := hmac.New(sha256.New, key)
 		mac.Write(buff)
 		return mac.Sum(nil), nil
 	case "rsa-v1_5-sha256":
 		hashed := sha256.Sum256(buff)
-		key := s.key.(rsa.PrivateKey)
+		key, ok := s.key.(rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("malformed key")
+		}
 		sig, err := rsa.SignPKCS1v15(nil, &key, crypto.SHA256, hashed[:])
 		if err != nil {
 			return nil, fmt.Errorf("RSA signature failed")
@@ -221,7 +228,10 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		return sig, nil
 	case "rsa-pss-sha512":
 		hashed := sha512.Sum512(buff)
-		key := s.key.(rsa.PrivateKey)
+		key, ok := s.key.(rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("malformed key")
+		}
 		// RFC 9421 Section 3.3.1 requires salt length = hash output length (64 bytes for SHA-512)
 		// to match TLS 1.3 and ensure interoperability with WebCrypto and other implementations
 		opts := &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash}
@@ -232,14 +242,23 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 		return sig, nil
 	case "ecdsa-p256-sha256":
 		hashed := sha256.Sum256(buff)
-		key := s.key.(ecdsa.PrivateKey)
+		key, ok := s.key.(ecdsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("malformed key")
+		}
 		return ecdsaSignRaw(rand.Reader, &key, hashed[:])
 	case "ecdsa-p384-sha384":
 		hashed := sha512.Sum384(buff)
-		key := s.key.(ecdsa.PrivateKey)
+		key, ok := s.key.(ecdsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("malformed key")
+		}
 		return ecdsaSignRaw(rand.Reader, &key, hashed[:])
 	case "ed25519":
-		key := s.key.(ed25519.PrivateKey)
+		key, ok := s.key.(ed25519.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("malformed key")
+		}
 		if len(key) != ed25519.PrivateKeySize {
 			return nil, fmt.Errorf("key must be %d bytes long", ed25519.PrivateKeySize)
 		}
@@ -413,7 +432,8 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		if verifierV2, ok := v.foreignVerifier.(jws.Verifier); ok {
 			err := verifierV2.Verify(buff, sig, v.key)
 			if err != nil {
-				return false, err
+				// Return opaque error; underlying err discarded for consistency
+				return false, fmt.Errorf("signature verification failed")
 			}
 			return true, nil
 		}
@@ -426,7 +446,8 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 		if verifierV3, ok := v.foreignVerifier.(Verifier2); ok {
 			err := verifierV3.Verify(v.key, buff, sig) // Note: key first, then payload, then signature
 			if err != nil {
-				return false, err
+				// Return opaque error; underlying err discarded for consistency
+				return false, fmt.Errorf("signature verification failed")
 			}
 			return true, nil
 		}
@@ -436,38 +457,60 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 
 	switch v.alg {
 	case "hmac-sha256":
-		mac := hmac.New(sha256.New, v.key.([]byte))
+		key, ok := v.key.([]byte)
+		if !ok {
+			return false, fmt.Errorf("malformed key")
+		}
+		mac := hmac.New(sha256.New, key)
 		mac.Write(buff)
 		return subtle.ConstantTimeCompare(mac.Sum(nil), sig) == 1, nil
 	case "rsa-v1_5-sha256":
 		hashed := sha256.Sum256(buff)
-		key := v.key.(rsa.PublicKey)
+		key, ok := v.key.(rsa.PublicKey)
+		if !ok {
+			return false, fmt.Errorf("malformed key")
+		}
 		err := rsa.VerifyPKCS1v15(&key, crypto.SHA256, hashed[:], sig)
 		if err != nil {
-			return false, fmt.Errorf("RSA verification failed: %w", err)
+			// Return opaque error; underlying crypto err discarded to avoid leaking internals
+			return false, fmt.Errorf("signature verification failed")
 		}
 		return true, nil
 	case "rsa-pss-sha512":
 		hashed := sha512.Sum512(buff)
-		key := v.key.(rsa.PublicKey)
+		key, ok := v.key.(rsa.PublicKey)
+		if !ok {
+			return false, fmt.Errorf("malformed key")
+		}
+		// nil opts: accept any valid salt length for backward compatibility with pre-RFC-9421 signers
 		err := rsa.VerifyPSS(&key, crypto.SHA512, hashed[:], sig, nil)
 		if err != nil {
-			return false, fmt.Errorf("RSA-PSS verification failed: %w", err)
+			// Return opaque error; underlying crypto err discarded to avoid leaking internals
+			return false, fmt.Errorf("signature verification failed")
 		}
 		return true, nil
 	case "ecdsa-p256-sha256":
 		hashed := sha256.Sum256(buff)
-		key := v.key.(ecdsa.PublicKey)
+		key, ok := v.key.(ecdsa.PublicKey)
+		if !ok {
+			return false, fmt.Errorf("malformed key")
+		}
 		return ecdsaVerifyRaw(&key, hashed[:], sig)
 	case "ecdsa-p384-sha384":
 		hashed := sha512.Sum384(buff)
-		key := v.key.(ecdsa.PublicKey)
+		key, ok := v.key.(ecdsa.PublicKey)
+		if !ok {
+			return false, fmt.Errorf("malformed key")
+		}
 		return ecdsaVerifyRaw(&key, hashed[:], sig)
 	case "ed25519":
-		key := v.key.(ed25519.PublicKey)
+		key, ok := v.key.(ed25519.PublicKey)
+		if !ok {
+			return false, fmt.Errorf("malformed key")
+		}
 		verified := ed25519.Verify(key, buff, sig)
 		if !verified {
-			return false, fmt.Errorf("failed Ed25519 verification")
+			return false, fmt.Errorf("signature verification failed")
 		}
 		return true, nil
 	default:

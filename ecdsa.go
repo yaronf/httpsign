@@ -38,16 +38,21 @@ func ecdsaVerifyRaw(pub *ecdsa.PublicKey, hash []byte, sig []byte) (bool, error)
 	curve := pub.Params().Name
 	lr, ls, err := sigComponentLen(curve)
 	if err != nil {
-		return false, err
+		// Return opaque error; underlying err (e.g. unknown curve) discarded for consistency
+		return false, fmt.Errorf("signature verification failed")
 	}
 	if len(sig) != lr+ls {
-		return false, fmt.Errorf("signature length is %d, expecting %d", len(sig), lr+ls)
+		// Return opaque error; specific length mismatch discarded to avoid leaking structure
+		return false, fmt.Errorf("signature verification failed")
 	}
 	r := new(big.Int)
 	r.SetBytes(sig[0:lr])
 	s := new(big.Int)
 	s.SetBytes(sig[lr : lr+ls])
-	return ecdsa.Verify(pub, hash, r, s), nil
+	if !ecdsa.Verify(pub, hash, r, s) {
+		return false, fmt.Errorf("signature verification failed")
+	}
+	return true, nil
 }
 
 func sigComponentLen(curve string) (int, int, error) {

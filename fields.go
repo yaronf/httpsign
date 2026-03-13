@@ -346,11 +346,20 @@ outer:
 	return true
 }
 
-// TODO: should only compare the header name, Equal() would fail if there are params
 func (fs *Fields) hasHeader(name string) bool {
-	h := *fromHeaderName(name)
+	target := strings.ToLower(name)
 	for _, f := range fs.f {
-		if f.Equal(h) {
+		ok, hdr := f.headerName()
+		if ok && strings.ToLower(hdr) == target {
+			return true
+		}
+	}
+	return false
+}
+
+func (fs *Fields) hasAssociatedRequestFields() bool {
+	for _, f := range fs.f {
+		if f.associatedRequest() {
 			return true
 		}
 	}

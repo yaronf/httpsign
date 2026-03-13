@@ -10,13 +10,15 @@ import (
 
 // SignConfig contains additional configuration for the signer.
 type SignConfig struct {
-	signAlg     bool
-	signCreated bool
-	fakeCreated int64
-	expires     int64
-	nonce       string
-	tag         string
-	keyID       *string
+	signAlg         bool
+	signCreated     bool
+	fakeCreated     int64
+	expires         int64
+	nonce           string
+	tag             string
+	keyID           *string
+	maxBodySize     int64
+	schemeFromRequest func(*http.Request) string
 }
 
 // NewSignConfig generates a default configuration.
@@ -78,27 +80,61 @@ func (c *SignConfig) SetKeyID(keyID string) *SignConfig {
 	return c
 }
 
+// SetMaxBodySize sets the maximum message body size in bytes when reading for trailers.
+// Default: 0 (no limit).
+func (c *SignConfig) SetMaxBodySize(maxBytes int64) *SignConfig {
+	c.maxBodySize = maxBytes
+	return c
+}
+
+// SetSchemeFromRequest sets a function to derive the @scheme value from the request.
+// The callback should return a string, typically "http" or "https".
+// Use this when behind a TLS-terminating reverse proxy where req.TLS is nil;
+// the callback can read X-Forwarded-Proto or similar headers.
+// Default: nil (use req.TLS to determine scheme).
+func (c *SignConfig) SetSchemeFromRequest(f func(*http.Request) string) *SignConfig {
+	c.schemeFromRequest = f
+	return c
+}
+
 // VerifyConfig contains additional configuration for the verifier.
 type VerifyConfig struct {
-	verifyCreated bool
-	notNewerThan  time.Duration
-	notOlderThan  time.Duration
-	allowedAlgs   []string
-	rejectExpired bool
-	keyID         *string
-	dateWithin    time.Duration
-	allowedTags   []string
+	verifyCreated    bool
+	notNewerThan     time.Duration
+	notOlderThan     time.Duration
+	allowedAlgs      []string
+	rejectExpired    bool
+	keyID            *string
+	dateWithin       time.Duration
+	allowedTags      []string
+	maxBodySize      int64
+	schemeFromRequest func(*http.Request) string
+	nonceValidator   func(string) error
+}
+
+// SetNonceValidator sets a callback to validate the nonce parameter during verification.
+// When the signature includes a nonce, the callback is invoked; returning an error fails verification.
+// Use this for replay prevention: the callback should check that the nonce has not been seen before
+// (e.g. store in a cache or database) and return an error if it has. Nonce uniqueness requires
+// application-layer state—the library does not track seen nonces. Default: nil (no validation).
+func (v *VerifyConfig) SetNonceValidator(f func(string) error) *VerifyConfig {
+	v.nonceValidator = f
+	return v
 }
 
 // SetNotNewerThan sets the window for messages that appear to be newer than the current time,
-// which can only happen if clocks are out of sync. Default: 1,000 ms.
+// which can only happen if clocks are out of sync. Default: 2 seconds.
+// This is a security parameter; tune it for your deployment.
 func (v *VerifyConfig) SetNotNewerThan(notNewerThan time.Duration) *VerifyConfig {
 	v.notNewerThan = notNewerThan
 	return v
 }
 
 // SetNotOlderThan sets the window for messages that are older than the current time,
-// because of network latency. Default: 10,000 ms.
+// because of network latency. Default: 10 seconds.
+// Without nonce validation, this is the only replay defense—signatures can be replayed
+// within the window. For sensitive operations (financial, privileged), reduce this value
+// or use SetNonceValidator. This is a security parameter; tune it for your deployment.
 func (v *VerifyConfig) SetNotOlderThan(notOlderThan time.Duration) *VerifyConfig {
 	v.notOlderThan = notOlderThan
 	return v
@@ -150,6 +186,24 @@ func (v *VerifyConfig) SetAllowedTags(allowedTags []string) *VerifyConfig {
 	return v
 }
 
+// SetMaxBodySize sets the maximum message body size in bytes when reading for trailers.
+// Default: 0 (no limit).
+func (v *VerifyConfig) SetMaxBodySize(maxBytes int64) *VerifyConfig {
+	v.maxBodySize = maxBytes
+	return v
+}
+
+// SetSchemeFromRequest sets a function to derive the @scheme value from the request.
+// The callback should return a string, typically "http" or "https".
+// Use this when behind a TLS-terminating reverse proxy where req.TLS is nil;
+// the callback can read X-Forwarded-Proto or similar headers.
+// When the function returns a non-empty string, it overrides the default (req.TLS).
+// Default: nil (use req.TLS to determine scheme).
+func (v *VerifyConfig) SetSchemeFromRequest(f func(*http.Request) string) *VerifyConfig {
+	v.schemeFromRequest = f
+	return v
+}
+
 // NewVerifyConfig generates a default configuration.
 func NewVerifyConfig() *VerifyConfig {
 	return &VerifyConfig{
@@ -176,6 +230,7 @@ type HandlerConfig struct {
 	computeDigest     bool
 	digestSchemesSend []string
 	digestSchemesRecv []string
+	maxBodySize       int64
 }
 
 // NewHandlerConfig generates a default configuration. When verification or respectively,
@@ -265,6 +320,14 @@ func (h *HandlerConfig) SetDigestSchemesRecv(s []string) *HandlerConfig {
 	return h
 }
 
+// SetMaxBodySize sets the maximum message body size in bytes when computing or validating Content-Digest,
+// and when buffering the response body for signing in WrapHandler. When exceeded, WrapHandler returns HTTP 500.
+// Default: 0 (no limit).
+func (h *HandlerConfig) SetMaxBodySize(maxBytes int64) *HandlerConfig {
+	h.maxBodySize = maxBytes
+	return h
+}
+
 // ClientConfig contains additional configuration for the HTTP client-side wrapper.
 // Signing and verification may either be skipped, independently.
 type ClientConfig struct {
@@ -275,6 +338,7 @@ type ClientConfig struct {
 	computeDigest     bool
 	digestSchemesSend []string
 	digestSchemesRecv []string
+	maxBodySize       int64
 }
 
 // NewClientConfig creates a new, default ClientConfig.
@@ -332,5 +396,12 @@ func (c *ClientConfig) SetDigestSchemesSend(s []string) *ClientConfig {
 // one accepted digest is included. Default: DigestSha256, DigestSha512.
 func (c *ClientConfig) SetDigestSchemesRecv(s []string) *ClientConfig {
 	c.digestSchemesRecv = s
+	return c
+}
+
+// SetMaxBodySize sets the maximum message body size in bytes when computing or validating Content-Digest.
+// Default: 0 (no limit).
+func (c *ClientConfig) SetMaxBodySize(maxBytes int64) *ClientConfig {
+	c.maxBodySize = maxBytes
 	return c
 }
