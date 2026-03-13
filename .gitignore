@@ -1,6 +1,9 @@
 /http2/
 /fuzz/go.sum
 /.idea/inspectionProfiles/Project_Default.xml
+/.idea/copilot.data.migration.*.xml
 /testdata/fuzz/FuzzSignAndVerifyHMAC/
 
+.vscode/
+coverage.out
 .qodo
