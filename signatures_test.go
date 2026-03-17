@@ -981,6 +981,36 @@ func TestMessageSignAndVerifyResponseHMAC(t *testing.T) {
 	}
 }
 
+func TestExpiresAfterCalculation(t *testing.T) {
+	fields := Headers("@status", "date", "content-type")
+	signatureName := "sigres"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	config := NewSignConfig().SetExpiresAfter(60).setFakeCreated(1000).SetKeyID("test-shared-secret")
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
+	res := readResponse(httpres2)
+	sigInput, _, err := SignResponse(signatureName, *signer, res, nil)
+	if err != nil {
+		t.Fatalf("SignResponse failed: %s", err)
+	}
+	// expires should be fakeCreated + expiresAfter = 1000 + 60 = 1060
+	if !strings.Contains(sigInput, "expires=1060") {
+		t.Errorf("expected expires=1060 in signature input, got: %s", sigInput)
+	}
+}
+
+func TestExpiresAndExpiresAfterConflict(t *testing.T) {
+	fields := Headers("@status", "date", "content-type")
+	signatureName := "sigres"
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	config := NewSignConfig().SetExpires(2000).SetExpiresAfter(60).SetKeyID("test-shared-secret")
+	signer, _ := NewHMACSHA256Signer(key, config, fields)
+	res := readResponse(httpres2)
+	_, _, err := SignResponse(signatureName, *signer, res, nil)
+	if err == nil {
+		t.Errorf("expected error when both SetExpires and SetExpiresAfter are set")
+	}
+}
+
 func TestSignAndVerifyRSAPSS(t *testing.T) {
 	config := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("test-key-rsa-pss")
 	fields := Headers("@authority", "date", "content-type")
