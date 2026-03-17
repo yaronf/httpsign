@@ -66,7 +66,9 @@ func (c *SignConfig) SetExpires(expires int64) *SignConfig {
 // Use this for a relative validity window instead of an absolute timestamp.
 // Default: 0 (do not add the parameter).
 func (c *SignConfig) SetExpiresAfter(delay int64) *SignConfig {
-	c.expiresAfter = delay
+	if delay > 0 {
+		c.expiresAfter = delay
+	}
 	return c
 }
 
