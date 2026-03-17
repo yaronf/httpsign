@@ -59,13 +59,15 @@ func Test_WrapHandler(t *testing.T) {
 
 // test various failures
 func TestWrapHandlerServerSigns(t *testing.T) {
-	serverSignsTestCase := func(t *testing.T, nilSigner, dontSignResponse, earlyExpires, noSigner, badKey, badAlgs, verifyRequest bool) {
+	serverSignsTestCase := func(t *testing.T, nilSigner, dontSignResponse, earlyExpires, earlyExpiresAfter, noSigner, badKey, badAlgs, verifyRequest bool) {
 		// Callback to let the server locate its signing key and configuration
 		var signConfig *SignConfig
-		if !earlyExpires {
-			signConfig = NewSignConfig()
-		} else {
+		if earlyExpires {
 			signConfig = NewSignConfig().SetExpires(2000)
+		} else if earlyExpiresAfter {
+			signConfig = NewSignConfig().SetExpiresAfter(1).setFakeCreated(1000)
+		} else {
+			signConfig = NewSignConfig()
 		}
 		fetchSigner := func(res http.Response, r *http.Request) (string, *Signer) {
 			sigName := "sig1"
@@ -128,29 +130,33 @@ func TestWrapHandlerServerSigns(t *testing.T) {
 		}
 	}
 	nilSigner := func(t *testing.T) {
-		serverSignsTestCase(t, true, false, false, false, false, false, false)
+		serverSignsTestCase(t, true, false, false, false, false, false, false, false)
 	}
 	dontSignResponse := func(t *testing.T) {
-		serverSignsTestCase(t, false, true, false, false, false, false, false)
+		serverSignsTestCase(t, false, true, false, false, false, false, false, false)
 	}
 	earlyExpires := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, true, false, false, false, false)
+		serverSignsTestCase(t, false, false, true, false, false, false, false, false)
+	}
+	earlyExpiresAfter := func(t *testing.T) {
+		serverSignsTestCase(t, false, false, false, true, false, false, false, false)
 	}
 	noSigner := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, false, true, false, false, false)
+		serverSignsTestCase(t, false, false, false, false, true, false, false, false)
 	}
 	badKey := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, false, false, true, false, false)
+		serverSignsTestCase(t, false, false, false, false, false, true, false, false)
 	}
 	badAlgs := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, false, false, false, true, false)
+		serverSignsTestCase(t, false, false, false, false, false, false, true, false)
 	}
 	failVerify := func(t *testing.T) {
-		serverSignsTestCase(t, false, false, false, false, false, false, true)
+		serverSignsTestCase(t, false, false, false, false, false, false, false, true)
 	}
 	t.Run("nil Signer", nilSigner)
 	t.Run("don't sign response", dontSignResponse)
 	t.Run("early expires field", earlyExpires)
+	t.Run("early expires after field", earlyExpiresAfter)
 	t.Run("bad fetch Signer", noSigner)
 	t.Run("wrong verification key", badKey)
 	t.Run("failed algorithm check", badAlgs)
