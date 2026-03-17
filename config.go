@@ -62,6 +62,14 @@ func (c *SignConfig) SetExpires(expires int64) *SignConfig {
 	return c
 }
 
+// SetExpiresAfter sets the "expires" parameter to createdTime + delay (seconds).
+// Use this for a relative validity window instead of an absolute timestamp.
+// Default: 0 (do not add the parameter).
+func (c *SignConfig) SetExpiresAfter(delay int64) *SignConfig {
+	c.expiresAfter = delay
+	return c
+}
+
 // SetNonce adds a "nonce" string parameter whose content should be unique per signed message.
 // Default: empty string (do not add the parameter).
 func (c *SignConfig) SetNonce(nonce string) *SignConfig {
