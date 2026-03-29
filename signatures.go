@@ -11,6 +11,17 @@ import (
 	"github.com/dunglas/httpsfv"
 )
 
+// reservedSigParams lists the RFC 9421 standard signature parameter names.
+// Custom parameters must not use these names.
+var reservedSigParams = map[string]bool{
+	"created": true,
+	"expires": true,
+	"nonce":   true,
+	"alg":     true,
+	"tag":     true,
+	"keyid":   true,
+}
+
 func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage, parsedAssocMessage *parsedMessage,
 	fields Fields) (signatureInput, signature, signatureBase string, err error) {
 	filtered := filterOptionalFields(fields, parsedMessage, parsedAssocMessage)
@@ -311,7 +322,31 @@ func generateSigParams(config *SignConfig, alg string, foreignSigner interface{}
 		}
 		p.Add("keyid", *config.keyID)
 	}
-	return fields.asSignatureInput(p)
+	seen := map[string]bool{}
+	for _, cp := range config.customParams {
+		if reservedSigParams[cp.name] {
+			return "", fmt.Errorf("custom param name %q conflicts with reserved parameter", cp.name)
+		}
+		if seen[cp.name] {
+			return "", fmt.Errorf("duplicate custom param name %q", cp.name)
+		}
+		seen[cp.name] = true
+		switch v := cp.value.(type) {
+		case int64:
+			p.Add(cp.name, v)
+		case string:
+			p.Add(cp.name, v)
+		case bool:
+			p.Add(cp.name, v)
+		default:
+			return "", fmt.Errorf("custom param %q: value must be int64, string, or bool", cp.name)
+		}
+	}
+	s, err := fields.asSignatureInput(p)
+	if err != nil && errors.Is(err, httpsfv.ErrInvalidKeyFormat) {
+		return "", fmt.Errorf("invalid custom signature parameter name (RFC 8941 key syntax): %w", err)
+	}
+	return s, err
 }
 
 // SignRequest signs an HTTP request. Returns the Signature-Input and the Signature header values.
@@ -543,6 +578,16 @@ func signatureDetails(signature *psiSignature) (details *MessageDetails, err err
 	}
 	if tag, ok := signature.params["tag"].(string); ok {
 		details.Tag = &tag
+	}
+
+	custom := map[string]interface{}{}
+	for name, val := range signature.params {
+		if !reservedSigParams[name] {
+			custom[name] = val
+		}
+	}
+	if len(custom) > 0 {
+		details.CustomParams = custom
 	}
 
 	return details, nil

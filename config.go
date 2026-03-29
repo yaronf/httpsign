@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+// customParam holds a single custom signature parameter name/value pair.
+type customParam struct {
+	name  string
+	value interface{} // must be int64, string, or bool
+}
+
 // SignConfig contains additional configuration for the signer.
 type SignConfig struct {
 	signAlg           bool
@@ -20,6 +26,7 @@ type SignConfig struct {
 	keyID             *string
 	maxBodySize       int64
 	schemeFromRequest func(*http.Request) string
+	customParams      []customParam
 }
 
 // NewSignConfig generates a default configuration.
@@ -106,6 +113,17 @@ func (c *SignConfig) SetMaxBodySize(maxBytes int64) *SignConfig {
 // Default: nil (use req.TLS to determine scheme).
 func (c *SignConfig) SetSchemeFromRequest(f func(*http.Request) string) *SignConfig {
 	c.schemeFromRequest = f
+	return c
+}
+
+// AddCustomParam adds a custom (non-standard) parameter to the signature.
+// The name must not conflict with reserved parameter names (created, expires, nonce, alg, tag, keyid).
+// Names must conform to the RFC 8941 "key" syntax used for Structured Field parameters: start with
+// a lowercase letter (a–z) or '*', and contain only lowercase letters, digits, and '_', '-', '.', '*'.
+// The value must be int64, string, or bool.
+// Errors (reserved name, duplicate name, unsupported type, invalid name syntax) are reported at sign time.
+func (c *SignConfig) AddCustomParam(name string, value interface{}) *SignConfig {
+	c.customParams = append(c.customParams, customParam{name, value})
 	return c
 }
 

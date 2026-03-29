@@ -3344,6 +3344,93 @@ func TestRequestBindingSignedResponse17(t *testing.T) {
 	assert.NoError(t, err, "validate response digest")
 }
 
+// makeHMACSignerVerifier builds a signer/verifier pair for signVerifyResponseCustomParams.
+// The verifier uses SetVerifyCreated(false) so round-trips do not flake on clock skew
+// (the signer still emits created by default; verification skips the created window check).
+func makeHMACSignerVerifier(t *testing.T, signConfig *SignConfig, fields Fields) (*Signer, *Verifier) {
+	t.Helper()
+	key, _ := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	signer, err := NewHMACSHA256Signer(key, signConfig, fields)
+	assert.NoError(t, err)
+	verifier, err := NewHMACSHA256Verifier(key, NewVerifyConfig().SetVerifyCreated(false), fields)
+	assert.NoError(t, err)
+	return signer, verifier
+}
+
+// Helper function for the next block of tests
+func signVerifyResponseCustomParams(t *testing.T, signConfig *SignConfig) (*MessageDetails, error) {
+	t.Helper()
+	fields := Headers("@status", "date", "content-type")
+	signer, verifier := makeHMACSignerVerifier(t, signConfig, fields)
+	res := readResponse(httpres2)
+	sigInput, sig, err := SignResponse("sig1", *signer, res, nil)
+	if err != nil {
+		return nil, err
+	}
+	res2 := readResponse(httpres2)
+	res2.Header.Add("Signature", sig)
+	res2.Header.Add("Signature-Input", sigInput)
+	msg, err := NewMessage(NewMessageConfig().WithResponse(res2, nil))
+	assert.NoError(t, err)
+	return msg.Verify("sig1", *verifier)
+}
+
+func TestCustomParamStringRoundTrip(t *testing.T) {
+	config := NewSignConfig().AddCustomParam("x-foo", "bar")
+	details, err := signVerifyResponseCustomParams(t, config)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]interface{}{"x-foo": "bar"}, details.CustomParams)
+}
+
+func TestCustomParamInt64RoundTrip(t *testing.T) {
+	config := NewSignConfig().AddCustomParam("x-num", int64(42))
+	details, err := signVerifyResponseCustomParams(t, config)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]interface{}{"x-num": int64(42)}, details.CustomParams)
+}
+
+func TestCustomParamBoolRoundTrip(t *testing.T) {
+	config := NewSignConfig().AddCustomParam("x-flag", true)
+	details, err := signVerifyResponseCustomParams(t, config)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]interface{}{"x-flag": true}, details.CustomParams)
+}
+
+func TestMultipleCustomParams(t *testing.T) {
+	config := NewSignConfig().
+		AddCustomParam("x-foo", "bar").
+		AddCustomParam("x-num", int64(99))
+	details, err := signVerifyResponseCustomParams(t, config)
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]interface{}{"x-foo": "bar", "x-num": int64(99)}, details.CustomParams)
+}
+
+func TestCustomParamReservedNameRejected(t *testing.T) {
+	config := NewSignConfig().AddCustomParam("created", "oops")
+	_, err := signVerifyResponseCustomParams(t, config)
+	assert.Error(t, err)
+}
+
+func TestCustomParamDuplicateNameRejected(t *testing.T) {
+	config := NewSignConfig().
+		AddCustomParam("x-foo", "first").
+		AddCustomParam("x-foo", "second")
+	_, err := signVerifyResponseCustomParams(t, config)
+	assert.Error(t, err)
+}
+
+func TestCustomParamInvalidType(t *testing.T) {
+	config := NewSignConfig().AddCustomParam("x-foo", 3.14)
+	_, err := signVerifyResponseCustomParams(t, config)
+	assert.Error(t, err)
+}
+
+func TestCustomParamInvalidName(t *testing.T) {
+	config := NewSignConfig().AddCustomParam("INVALID", "val")
+	_, err := signVerifyResponseCustomParams(t, config)
+	assert.Error(t, err)
+}
+
 // Same as TestRequestBindingSignedResponse17 but using Message
 func TestMessageRequestBindingSignedResponse17(t *testing.T) {
 	req := readRequest(httpreq14)
