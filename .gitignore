@@ -7,3 +7,4 @@
 .vscode/
 coverage.out
 .qodo
+.DS_Store
