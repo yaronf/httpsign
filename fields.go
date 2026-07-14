@@ -2,8 +2,10 @@ package httpsign
 
 import (
 	"fmt"
-	"github.com/dunglas/httpsfv"
+	"slices"
 	"strings"
+
+	"github.com/dunglas/httpsfv"
 )
 
 // Fields is a list of fields to be signed or verified. To initialize, use Headers or for more complex
@@ -211,29 +213,88 @@ func fromStructuredField(hdr string) *field {
 	return &f
 }
 
-func (f field) structuredField() bool {
-	v, ok := f.Params.Get("sf")
-	return ok && v.(bool)
+func (f field) boolParam(name string) (bool, error) {
+	v, ok := f.Params.Get(name)
+	if !ok {
+		return false, nil
+	}
+	b, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("malformed %q parameter on component %s", name, f.String())
+	}
+	return b, nil
 }
 
-func (f field) binarySequence() bool {
-	v, ok := f.Params.Get("bs")
-	return ok && v.(bool)
+func (f field) structuredField() (bool, error) {
+	return f.boolParam("sf")
 }
 
-func (f field) trailer() bool {
-	v, ok := f.Params.Get("tr")
-	return ok && v.(bool)
+func (f field) binarySequence() (bool, error) {
+	return f.boolParam("bs")
 }
 
-func (f field) optional() bool {
-	v, ok := f.Params.Get("optional")
-	return ok && v.(bool)
+func (f field) trailer() (bool, error) {
+	return f.boolParam("tr")
 }
 
-func (f field) associatedRequest() bool {
-	v, ok := f.Params.Get("req")
-	return ok && v.(bool)
+func (f field) optional() (bool, error) {
+	return f.boolParam("optional")
+}
+
+func (f field) associatedRequest() (bool, error) {
+	return f.boolParam("req")
+}
+
+// componentParams is the fixed set of component parameters this library accepts on verify (RFC 9421 §6.5.2 initial set).
+var componentParams = []string{"sf", "key", "bs", "tr", "req", "name"}
+
+func (f field) validateRFCBoolParams() error {
+	for _, name := range []string{"sf", "bs", "tr", "req"} {
+		if _, err := f.boolParam(name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (f field) validateRFCStringParams() error {
+	for _, name := range []string{"key", "name"} {
+		v, ok := f.Params.Get(name)
+		if !ok {
+			continue
+		}
+		if _, ok := v.(string); !ok {
+			return fmt.Errorf("malformed %q parameter on component %s", name, f.String())
+		}
+	}
+	return nil
+}
+
+// validateSignPathParams checks component parameters on library-configured Fields (sign path).
+// The non-RFC "optional" marker is permitted here but is stripped before Signature-Input is emitted.
+func (f field) validateSignPathParams() error {
+	if _, err := f.optional(); err != nil {
+		return err
+	}
+	if err := f.validateRFCBoolParams(); err != nil {
+		return err
+	}
+	return f.validateRFCStringParams()
+}
+
+// validateVerificationComponentParams rejects parameters outside componentParams.
+func (f field) validateVerificationComponentParams() error {
+	if f.Params != nil {
+		for _, p := range f.Params.Names() {
+			if !slices.Contains(componentParams, p) {
+				return fmt.Errorf("unknown component parameter %q on component %s", p, f.String())
+			}
+		}
+	}
+	if err := f.validateRFCBoolParams(); err != nil {
+		return err
+	}
+	return f.validateRFCStringParams()
 }
 
 // AddStructuredField indicates that a header should be interpreted as a structured field, per RFC 8941.
@@ -357,25 +418,35 @@ func (fs *Fields) hasHeader(name string) bool {
 	return false
 }
 
-func (fs *Fields) hasAssociatedRequestFields() bool {
+func (fs *Fields) hasAssociatedRequestFields() (bool, error) {
 	for _, f := range fs.f {
-		if f.associatedRequest() {
-			return true
+		req, err := f.associatedRequest()
+		if err != nil {
+			return false, err
+		}
+		if req {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
-func (fs *Fields) hasTrailerFields(forAssocRequest bool) bool {
+func (fs *Fields) hasTrailerFields(forAssocRequest bool) (bool, error) {
 	for _, f := range fs.f {
-		_, tr := f.Params.Get("tr")
-		_, req := f.Params.Get("req")
+		tr, err := f.trailer()
+		if err != nil {
+			return false, err
+		}
+		req, err := f.associatedRequest()
+		if err != nil {
+			return false, err
+		}
 		if tr && (req && forAssocRequest) {
-			return true
+			return true, nil
 		}
 		if tr && (!req && !forAssocRequest) {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }

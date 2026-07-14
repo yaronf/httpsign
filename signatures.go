@@ -24,7 +24,10 @@ var reservedSigParams = map[string]bool{
 
 func signMessage(config SignConfig, signatureName string, signer Signer, parsedMessage, parsedAssocMessage *parsedMessage,
 	fields Fields) (signatureInput, signature, signatureBase string, err error) {
-	filtered := filterOptionalFields(fields, parsedMessage, parsedAssocMessage)
+	filtered, err := filterOptionalFields(fields, parsedMessage, parsedAssocMessage)
+	if err != nil {
+		return "", "", "", err
+	}
 	err = applyFieldConstraints(fields)
 	if err != nil {
 		return "", "", "", err
@@ -59,20 +62,47 @@ func applyFieldConstraints(fields Fields) error {
 		if err != nil {
 			return fmt.Errorf("malformed field")
 		}
-		if binaryFields[name] && !f.binarySequence() {
+		if err := f.validateSignPathParams(); err != nil {
+			return err
+		}
+		bs, err := f.binarySequence()
+		if err != nil {
+			return err
+		}
+		if binaryFields[name] && !bs {
 			return fmt.Errorf("field %s should be a binary sequence", name)
 		}
 	}
 	return nil
 }
 
-func filterOptionalFields(fields Fields, message, assocMessage *parsedMessage) Fields {
+func applyVerificationFieldConstraints(fields Fields) error {
+	for _, f := range fields.f {
+		if _, err := f.name(); err != nil {
+			return fmt.Errorf("malformed field")
+		}
+		if err := f.validateVerificationComponentParams(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func filterOptionalFields(fields Fields, message, assocMessage *parsedMessage) (Fields, error) {
 	filtered := *NewFields()
 	for _, f := range fields.f {
-		if !f.optional() {
+		optional, err := f.optional()
+		if err != nil {
+			return Fields{}, err
+		}
+		if !optional {
 			filtered.f = append(filtered.f, f)
 		} else {
-			if !f.associatedRequest() {
+			assoc, err := f.associatedRequest()
+			if err != nil {
+				return Fields{}, err
+			}
+			if !assoc {
 				_, err := generateFieldValues(f, *message)
 				if err == nil { // value was found
 					ff := f.copy()
@@ -89,7 +119,7 @@ func filterOptionalFields(fields Fields, message, assocMessage *parsedMessage) F
 			}
 		}
 	}
-	return filtered
+	return filtered, nil
 }
 
 func generateSignature(name string, signer Signer, input string) (string, error) {
@@ -114,7 +144,11 @@ func generateSignatureBase(message, assocMessage *parsedMessage, fields Fields, 
 			return "", fmt.Errorf("could not marshal %v", f)
 		}
 		var fieldValues []string
-		if !c.associatedRequest() {
+		assoc, err := c.associatedRequest()
+		if err != nil {
+			return "", err
+		}
+		if !assoc {
 			fieldValues, err = generateFieldValues(c, *message)
 			if err != nil {
 				return "", err
@@ -147,7 +181,19 @@ func generateFieldValues(f field, message parsedMessage) ([]string, error) {
 			}
 			return []string{vv}, nil
 		}
-		return message.getHeader(name, f.structuredField(), f.binarySequence(), f.trailer())
+		structured, err := f.structuredField()
+		if err != nil {
+			return nil, err
+		}
+		binary, err := f.binarySequence()
+		if err != nil {
+			return nil, err
+		}
+		trailer, err := f.trailer()
+		if err != nil {
+			return nil, err
+		}
+		return message.getHeader(name, structured, binary, trailer)
 	}
 	ok, name = f.queryParam()
 	if ok {
@@ -159,7 +205,11 @@ func generateFieldValues(f field, message parsedMessage) ([]string, error) {
 	}
 	ok, hdr, key := f.dictHeader()
 	if ok {
-		return message.getDictHeader(hdr, f.trailer(), key)
+		trailer, err := f.trailer()
+		if err != nil {
+			return nil, err
+		}
+		return message.getDictHeader(hdr, trailer, key)
 	}
 	return nil, fmt.Errorf("unrecognized field %s", f)
 }
@@ -364,7 +414,10 @@ func signRequestDebug(signatureName string, signer Signer, req *http.Request) (s
 	if signatureName == "" {
 		return "", "", "", fmt.Errorf("empty signature name")
 	}
-	withTrailers := signer.fields.hasTrailerFields(false)
+	withTrailers, err := signer.fields.hasTrailerFields(false)
+	if err != nil {
+		return "", "", "", err
+	}
 	parsedMessage, err := parseRequest(req, withTrailers, signer.config.maxBodySize, resolvedScheme(signer.config.schemeFromRequest, req))
 	if err != nil {
 		return "", "", "", err
@@ -387,20 +440,32 @@ func signResponseDebug(signatureName string, signer Signer, res *http.Response, 
 	if signatureName == "" {
 		return "", "", "", fmt.Errorf("empty signature name")
 	}
-	resWithTrailers := signer.fields.hasTrailerFields(false)
+	resWithTrailers, err := signer.fields.hasTrailerFields(false)
+	if err != nil {
+		return "", "", "", err
+	}
 	parsedRes, err := parseResponse(res, resWithTrailers, signer.config.maxBodySize)
 	if err != nil {
 		return "", "", "", err
 	}
 	var parsedReq *parsedMessage
 	if req != nil {
-		reqWithTrailers := signer.fields.hasTrailerFields(true)
+		reqWithTrailers, err := signer.fields.hasTrailerFields(true)
+		if err != nil {
+			return "", "", "", err
+		}
 		parsedReq, err = parseRequest(req, reqWithTrailers, signer.config.maxBodySize, resolvedScheme(signer.config.schemeFromRequest, req))
 		if err != nil {
 			return "", "", "", err
 		}
-	} else if signer.fields.hasAssociatedRequestFields() {
-		return "", "", "", fmt.Errorf("nil request")
+	} else {
+		hasAssoc, err := signer.fields.hasAssociatedRequestFields()
+		if err != nil {
+			return "", "", "", err
+		}
+		if hasAssoc {
+			return "", "", "", fmt.Errorf("nil request")
+		}
 	}
 	return signMessage(*signer.config, signatureName, signer, parsedRes, parsedReq, signer.fields)
 }
@@ -623,7 +688,11 @@ func extractSignatureFields(signatureName string, verifier *Verifier,
 	*/
 	var needTrailers = false
 	if verifier != nil {
-		needTrailers = needTrailers || verifier.fields.hasTrailerFields(false)
+		verifierTrailers, err := verifier.fields.hasTrailerFields(false)
+		if err != nil {
+			return false, nil, nil, err
+		}
+		needTrailers = needTrailers || verifierTrailers
 	}
 	sigRaw, parsedSigInput, err := signatureFieldsFromHeaders(headers, signatureName)
 	if err != nil {
@@ -641,17 +710,27 @@ func extractSignatureFields(signatureName string, verifier *Verifier,
 			return false, nil, nil, err
 		}
 	}
-	needTrailers = needTrailers || parsedSigInput.fields.hasTrailerFields(false)
+	sigTrailers, err := parsedSigInput.fields.hasTrailerFields(false)
+	if err != nil {
+		return false, nil, nil, err
+	}
+	needTrailers = needTrailers || sigTrailers
 	return needTrailers, sigRaw, parsedSigInput, nil
 }
 
 func verifyMessage(config VerifyConfig, verifier Verifier, message, assocMessage *parsedMessage,
 	fields Fields, wantSigRaw []byte, psiSig *psiSignature) (string, error) {
-	filtered := filterOptionalFields(fields, message, assocMessage)
+	filtered, err := filterOptionalFields(fields, message, assocMessage)
+	if err != nil {
+		return "", err
+	}
 	if !(psiSig.fields.contains(&filtered)) {
 		return "", fmt.Errorf("actual signature does not cover all required fields")
 	}
-	err := applyVerificationPolicy(*message, psiSig, config)
+	if err := applyVerificationFieldConstraints(psiSig.fields); err != nil {
+		return "", err
+	}
+	err = applyVerificationPolicy(*message, psiSig, config)
 	if err != nil {
 		return "", err
 	}
