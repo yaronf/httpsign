@@ -1,9 +1,22 @@
 version: "2"
 
 linters:
-  # Default set (govet, errcheck, staticcheck, unused, ineffassign, …).
-  # Intentionally leave revive unchecked-type-assertion off for now.
   default: standard
+  enable:
+    - revive
+  settings:
+    revive:
+      rules:
+        # GHSA-6wwm-chj6-h3p2: unchecked v.(bool) on attacker-controlled
+        # Signature-Input params panicked during verify. Keep this rule on so
+        # similar single-value type assertions in production code get caught.
+        - name: unchecked-type-assertion
+  exclusions:
+    rules:
+      # Test fixtures often assert known key types from generated material.
+      - path: _test\.go
+        linters:
+          - revive
 
 issues:
   max-issues-per-linter: 0
