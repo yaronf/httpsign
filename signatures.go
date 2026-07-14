@@ -586,18 +586,15 @@ func ResponseSignatureNames(res *http.Response, withTrailers bool) ([]string, er
 }
 
 func messageSignatureNames(parsedMessage *parsedMessage, withTrailers bool) ([]string, error) {
-	// Note: parsedMessage.headers intentionally uses lowercase keys (see httpparse.go)
-	// Linter warning about non-canonical key is expected and can be ignored
-	signatureField := parsedMessage.headers["signature"]
+	// parsedMessage.headers/trailers use lowercase keys (see httpparse.go), not http.Header canonical form.
+	signatureField := parsedMessage.headers["signature"] //nolint:staticcheck // SA1008: lowercase map keys by design
 	dict, err := httpsfv.UnmarshalDictionary(signatureField)
 	if err != nil {
 		return nil, fmt.Errorf("cannot parse signature field: %w", err)
 	}
 	names := dict.Names()
 	if withTrailers {
-		// Note: parsedMessage.trailers intentionally uses lowercase keys (see httpparse.go)
-		// Linter warning about non-canonical key is expected and can be ignored
-		signatureField := parsedMessage.trailers["signature"]
+		signatureField := parsedMessage.trailers["signature"] //nolint:staticcheck // SA1008: lowercase map keys by design
 		dict, err := httpsfv.UnmarshalDictionary(signatureField)
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse signature field in trailers: %w", err)

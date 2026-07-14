@@ -26,7 +26,7 @@ func ExampleWrapHandler_clientSigns() {
 	simpleHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Header().Set("bar", "baz")
-		fmt.Fprintln(w, "Hey client, your message verified just fine")
+		_, _ = fmt.Fprintln(w, "Hey client, your message verified just fine")
 	}
 
 	// Configure the wrapper and set it up
@@ -45,7 +45,7 @@ func ExampleWrapHandler_clientSigns() {
 	res, _ := client.Post(host+path, "application/json", bufio.NewReader(strings.NewReader(body)))
 
 	serverText, _ := io.ReadAll(res.Body)
-	res.Body.Close()
+	_ = res.Body.Close()
 
 	fmt.Println("Status: ", res.Status)
 	fmt.Println("Server sent: ", string(serverText))
@@ -67,7 +67,7 @@ func ExampleWrapHandler_serverSigns() {
 		w.WriteHeader(200)
 		w.Header().Set("bar", "some text here") // note: a single word in the header value would be interpreted is a trivial dictionary!
 		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintln(w, "Hello, client")
+		_, _ = fmt.Fprintln(w, "Hello, client")
 	}
 
 	// Configure the wrapper and set it up
@@ -86,7 +86,7 @@ func ExampleWrapHandler_serverSigns() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	res.Body.Close()
+	_ = res.Body.Close()
 
 	fmt.Println("Server sent: ", string(serverText))
 	// output: Server sent:  Hello, client

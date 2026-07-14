@@ -57,8 +57,8 @@ func sigFailed(w http.ResponseWriter, _ *http.Request, logger *log.Logger, err e
 	w.WriteHeader(http.StatusInternalServerError)
 	if logger != nil { // sanitize error string, just in case
 		escapedErr := err.Error()
-		escapedErr = strings.Replace(escapedErr, "\n", "", -1)
-		escapedErr = strings.Replace(escapedErr, "\r", "", -1)
+		escapedErr = strings.ReplaceAll(escapedErr, "\n", "")
+		escapedErr = strings.ReplaceAll(escapedErr, "\r", "")
 		logger.Printf("Failed to sign response: %v\n", escapedErr)
 	}
 	_, _ = fmt.Fprintln(w, "Failed to sign response.") // For security reasons, error is not printed

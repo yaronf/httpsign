@@ -38,5 +38,5 @@ Contributions to this project are welcome, both as issues and pull requests.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/yaronf/httpsign.svg)](https://pkg.go.dev/github.com/yaronf/httpsign)
 [![Test](https://github.com/yaronf/httpsign/actions/workflows/test.yml/badge.svg)](https://github.com/yaronf/httpsign/actions/workflows/test.yml)
-[![GoReportCard example](https://goreportcard.com/badge/github.com/yaronf/httpsign)](https://goreportcard.com/report/github.com/yaronf/httpsign)
+[![Lint](https://github.com/yaronf/httpsign/actions/workflows/lint.yml/badge.svg)](https://github.com/yaronf/httpsign/actions/workflows/lint.yml)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yaronf/httpsign)

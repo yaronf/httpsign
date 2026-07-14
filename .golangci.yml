@@ -1,0 +1,10 @@
+version: "2"
+
+linters:
+  # Default set (govet, errcheck, staticcheck, unused, ineffassign, …).
+  # Intentionally leave revive unchecked-type-assertion off for now.
+  default: standard
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
