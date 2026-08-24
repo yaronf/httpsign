@@ -1,0 +1,157 @@
+{
+  "format": "wimse-conformance/v1",
+  "suite": "httpsig",
+  "id": "sign-basic",
+  "spec": "draft-ietf-wimse-http-signature-06",
+  "description": "WIMSE HTTP Message Signature (RFC 9421, ed25519) carrying a WIT, plus the inputs a verifier must reject",
+  "pop_signing_key_seed_b64u": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk",
+  "issuer_verifying_key_b64u": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w",
+  "verify_now": 1700000100,
+  "label": "wimse",
+  "components": [
+    "\"@method\"",
+    "\"@request-target\"",
+    "\"content-type\"",
+    "\"content-digest\"",
+    "\"workload-identity-token\""
+  ],
+  "params": {
+    "created": 1700000000,
+    "expires": 1700000300,
+    "nonce": "abcd1111",
+    "tag": "wimse-workload-to-workload",
+    "wimse_aud": "https://service.example/transfer"
+  },
+  "request": {
+    "method": "POST",
+    "authority": "service.example",
+    "path": "/transfer",
+    "query": null,
+    "headers": [
+      [
+        "Content-Type",
+        "application/json"
+      ],
+      [
+        "Content-Digest",
+        "sha-256=:TUu+Wcaq0iRCzeGZpqil8DRAX814+1qBwk7ySd4cRfE=:"
+      ],
+      [
+        "Workload-Identity-Token",
+        "eyJ0eXAiOiJ3aXQrand0IiwiYWxnIjoiRWREU0EiLCJraWQiOiJpc3N1ZXIta2V5LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoic3BpZmZlOi8vZXhhbXBsZS5vcmcvd29ya2xvYWQvYXBpIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsImp0aSI6ImExYjJjMyIsImNuZiI6eyJqd2siOnsiYWxnIjoiRWREU0EiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Il9SY2tPRnFneDF0ay0zak5ZQy1oMlpIOTZfZHJFOFdPMXdMcXlEWHA5aGcifX19.gEOIwRVXNwJTSXRGBDPV4CQLRUFeKYx-oK_nwSxaxegepaEEcKbn1TIPacMI0rWR2M8kRikyzB4jkcudkUtXCA"
+      ]
+    ]
+  },
+  "body": "{\"amount\":100}",
+  "wit": "eyJ0eXAiOiJ3aXQrand0IiwiYWxnIjoiRWREU0EiLCJraWQiOiJpc3N1ZXIta2V5LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoic3BpZmZlOi8vZXhhbXBsZS5vcmcvd29ya2xvYWQvYXBpIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsImp0aSI6ImExYjJjMyIsImNuZiI6eyJqd2siOnsiYWxnIjoiRWREU0EiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Il9SY2tPRnFneDF0ay0zak5ZQy1oMlpIOTZfZHJFOFdPMXdMcXlEWHA5aGcifX19.gEOIwRVXNwJTSXRGBDPV4CQLRUFeKYx-oK_nwSxaxegepaEEcKbn1TIPacMI0rWR2M8kRikyzB4jkcudkUtXCA",
+  "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\"",
+  "signature": "wimse=:7wug7wUAtTZkqCo8X2mMySacneAidDDsIldEAL7NLVYv+4c/wnQqClXBxEiuGZQgF6Q4qTnjHw46oEvq3/XYDw==:",
+  "negative": [
+    {
+      "id": "forbidden-alg-parameter",
+      "description": "the signature carries the `alg` parameter, which the profile forbids",
+      "expect": "forbidden_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;alg=\"ed25519\";nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\"",
+      "signature": "wimse=:7/gmpqDCKZYNgSsQtcVZp2nclqlx9OQk9u9/TQv7brNfF/HCR3iUGSByw+gG76DElEPrBPEMnFT/By8AzUwABg==:"
+    },
+    {
+      "id": "forbidden-keyid-parameter",
+      "description": "the signature carries the `keyid` parameter, which the profile forbids",
+      "expect": "forbidden_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;keyid=\"issuer-key-1\";nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\"",
+      "signature": "wimse=:Ue9Zw5RggvORbc4mcDtk6aBG20ddmCcp2fR7DbqF73AQHaMezs2nuMQCyj0ilIY0kiDrXoa/VO3xq2V7DKtTDQ==:"
+    },
+    {
+      "id": "missing-nonce",
+      "description": "the signature omits the mandatory `nonce` parameter",
+      "expect": "missing_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\"",
+      "signature": "wimse=:iq2jrPDHBRAtdh17iq3fYxOOHUwlp5Gz6eJSNRH2vkbt2WZJZRvxjTgeSkRXPZg3Ily1XoFVIKp9CB61HlzfCg==:"
+    },
+    {
+      "id": "missing-expires",
+      "description": "the signature omits the mandatory `expires` parameter",
+      "expect": "missing_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\"",
+      "signature": "wimse=:aZQ+nRBonH4ANWM+yXqxPkwqsINAZ51jGN7sdgYW/z2pJK3C840b3Mu1HfKFURepNHYLeywVnzMpaEiPWIuVDw==:"
+    },
+    {
+      "id": "missing-wimse-aud",
+      "description": "the request signature omits the mandatory `wimse-aud` parameter",
+      "expect": "missing_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\"",
+      "signature": "wimse=:yiAx6JLxQmJ8xp2jaS+3/mHCBORLgD4baGsX8GFFSfGW3m1gS241/2p7UvlgKLvLlylp/eQmJcsjPOjXc00QDQ==:"
+    },
+    {
+      "id": "wrong-tag",
+      "description": "the signature's `tag` is not `wimse-workload-to-workload`",
+      "expect": "wrong_tag",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;nonce=\"abcd1111\";tag=\"some-other-protocol\";wimse-aud=\"https://service.example/transfer\"",
+      "signature": "wimse=:1TlIWI/ISc34P9z75NxLcaBNc3jSoCjPeSGSkYPBXsLfZXlyG6cllNxhUftjADUZQZlVYrlUPF9ntOs7QF4hCg==:"
+    },
+    {
+      "id": "audience-mismatch",
+      "description": "the signature was minted for a different service than the one verifying it",
+      "expect": "audience_mismatch",
+      "accept_audience": "https://other.example/inbox"
+    },
+    {
+      "id": "tampered-body",
+      "description": "the body no longer hashes to the signed `Content-Digest`",
+      "expect": "content_digest_mismatch",
+      "body": "{\"amount\":999}"
+    },
+    {
+      "id": "rerouted-path",
+      "description": "an intermediary changed `@path` after the signature was made",
+      "expect": "invalid_signature",
+      "request": {
+        "method": "POST",
+        "authority": "service.example",
+        "path": "/admin",
+        "query": null,
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Content-Digest",
+            "sha-256=:TUu+Wcaq0iRCzeGZpqil8DRAX814+1qBwk7ySd4cRfE=:"
+          ],
+          [
+            "Workload-Identity-Token",
+            "eyJ0eXAiOiJ3aXQrand0IiwiYWxnIjoiRWREU0EiLCJraWQiOiJpc3N1ZXIta2V5LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoic3BpZmZlOi8vZXhhbXBsZS5vcmcvd29ya2xvYWQvYXBpIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsImp0aSI6ImExYjJjMyIsImNuZiI6eyJqd2siOnsiYWxnIjoiRWREU0EiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Il9SY2tPRnFneDF0ay0zak5ZQy1oMlpIOTZfZHJFOFdPMXdMcXlEWHA5aGcifX19.gEOIwRVXNwJTSXRGBDPV4CQLRUFeKYx-oK_nwSxaxegepaEEcKbn1TIPacMI0rWR2M8kRikyzB4jkcudkUtXCA"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "created-in-future",
+      "description": "the signature's `created` is ahead of the verifier's clock",
+      "expect": "created_in_future",
+      "verify_now": 1699999999
+    },
+    {
+      "id": "too-old",
+      "description": "the signature is still unexpired but older than the verifier's `max_age`",
+      "expect": "too_old",
+      "verify_now": 1700000120,
+      "max_age": 30
+    },
+    {
+      "id": "label-mismatch",
+      "description": "the verifier only accepts a label the request does not carry",
+      "expect": "label_mismatch",
+      "accept_label": "other"
+    },
+    {
+      "id": "missing-required-component",
+      "description": "the verifier requires a component the signature does not cover",
+      "expect": "missing_required_component",
+      "required_components": [
+        "\"authorization\""
+      ]
+    }
+  ]
+}
