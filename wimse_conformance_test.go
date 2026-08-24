@@ -129,8 +129,8 @@ func wimseP256Key(t *testing.T, jwk wimseJWK) (*ecdsa.PrivateKey, ecdsa.PublicKe
 		PublicKey: ecdsa.PublicKey{Curve: elliptic.P256()},
 		D:         new(big.Int).SetBytes(wimseB64u(t, jwk.D)),
 	}
-	priv.PublicKey.X = new(big.Int).SetBytes(wimseB64u(t, jwk.X))
-	priv.PublicKey.Y = new(big.Int).SetBytes(wimseB64u(t, jwk.Y))
+	priv.X = new(big.Int).SetBytes(wimseB64u(t, jwk.X))
+	priv.Y = new(big.Int).SetBytes(wimseB64u(t, jwk.Y))
 	return priv, priv.PublicKey
 }
 
