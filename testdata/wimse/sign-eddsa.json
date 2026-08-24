@@ -1,0 +1,246 @@
+{
+  "format": "wimse-conformance/v2",
+  "suite": "httpsig",
+  "id": "sign-eddsa",
+  "spec": "draft-ietf-wimse-http-signature-06",
+  "description": "WIMSE HTTP Message Signature (RFC 9421, EdDSA) carrying a WIT, plus the inputs a verifier must reject",
+  "pop_signing_key": {
+    "alg": "EdDSA",
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "x": "_RckOFqgx1tk-3jNYC-h2ZH96_drE8WO1wLqyDXp9hg",
+    "d": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"
+  },
+  "issuer_verifying_key": {
+    "alg": "EdDSA",
+    "kty": "OKP",
+    "crv": "Ed25519",
+    "x": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+  },
+  "verify_now": 1700000100,
+  "label": "wimse",
+  "components": [
+    "\"@method\"",
+    "\"@request-target\"",
+    "\"content-type\"",
+    "\"content-digest\"",
+    "\"workload-identity-token\""
+  ],
+  "params": {
+    "created": 1700000000,
+    "expires": 1700000300,
+    "nonce": "abcd1111",
+    "tag": "wimse-workload-to-workload",
+    "wimse_aud": "https://service.example/transfer",
+    "wimse_sign_response": true
+  },
+  "request": {
+    "method": "POST",
+    "authority": "service.example",
+    "path": "/transfer",
+    "query": null,
+    "headers": [
+      [
+        "Content-Type",
+        "application/json"
+      ],
+      [
+        "Content-Digest",
+        "sha-256=:TUu+Wcaq0iRCzeGZpqil8DRAX814+1qBwk7ySd4cRfE=:"
+      ],
+      [
+        "Workload-Identity-Token",
+        "eyJ0eXAiOiJ3aXQrand0IiwiYWxnIjoiRWREU0EiLCJraWQiOiJpc3N1ZXIta2V5LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoic3BpZmZlOi8vZXhhbXBsZS5vcmcvd29ya2xvYWQvYXBpIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsImp0aSI6ImExYjJjMyIsImNuZiI6eyJqd2siOnsiYWxnIjoiRWREU0EiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Il9SY2tPRnFneDF0ay0zak5ZQy1oMlpIOTZfZHJFOFdPMXdMcXlEWHA5aGcifX19.gEOIwRVXNwJTSXRGBDPV4CQLRUFeKYx-oK_nwSxaxegepaEEcKbn1TIPacMI0rWR2M8kRikyzB4jkcudkUtXCA"
+      ]
+    ]
+  },
+  "body": "{\"amount\":100}",
+  "wit": "eyJ0eXAiOiJ3aXQrand0IiwiYWxnIjoiRWREU0EiLCJraWQiOiJpc3N1ZXIta2V5LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoic3BpZmZlOi8vZXhhbXBsZS5vcmcvd29ya2xvYWQvYXBpIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsImp0aSI6ImExYjJjMyIsImNuZiI6eyJqd2siOnsiYWxnIjoiRWREU0EiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Il9SY2tPRnFneDF0ay0zak5ZQy1oMlpIOTZfZHJFOFdPMXdMcXlEWHA5aGcifX19.gEOIwRVXNwJTSXRGBDPV4CQLRUFeKYx-oK_nwSxaxegepaEEcKbn1TIPacMI0rWR2M8kRikyzB4jkcudkUtXCA",
+  "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\";wimse-sign-response",
+  "signature": "wimse=:katKyeq7rWthUkDpgal/Zta7ktMJ9jqUqGFBWjZw9rLeb7UqHwCuaJybtyt0kDdNMtzy1jaBmb2OhdOiKBqUCg==:",
+  "negative": [
+    {
+      "id": "forbidden-alg-parameter",
+      "description": "the signature carries the `alg` parameter, which the profile forbids",
+      "expect": "forbidden_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;alg=\"ed25519\";nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\";wimse-sign-response",
+      "signature": "wimse=:pIj6LjAUqTES17qdQiJYzcX4uu3LJJD6CFFMjHoYxE90A+1M1OPh5LZwUfDAStSf1mc8cm6wB3RGk7GvX2+6DQ==:"
+    },
+    {
+      "id": "forbidden-keyid-parameter",
+      "description": "the signature carries the `keyid` parameter, which the profile forbids",
+      "expect": "forbidden_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;keyid=\"issuer-key-1\";nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\";wimse-sign-response",
+      "signature": "wimse=:BbpQ5T+YDz6OqYpl+WqG4HlMGI1oL/vgvE9STDO95C+CkXYkSpCHUbRowRY8RzXvdkI2HL+/GahrgBt3ScpaAg==:"
+    },
+    {
+      "id": "missing-nonce",
+      "description": "the signature omits the mandatory `nonce` parameter",
+      "expect": "missing_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\";wimse-sign-response",
+      "signature": "wimse=:6E/+3yBeTOOQ4fMt9V7bf5cKnAYXBOQBhcrAcA78PXl2u2T33vgCgMEomgoj0O6XBaso36YXyfNWqoSPw/3zAg==:"
+    },
+    {
+      "id": "missing-created",
+      "description": "the signature omits the mandatory `created` parameter",
+      "expect": "missing_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");expires=1700000300;nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\";wimse-sign-response",
+      "signature": "wimse=:89/LcsLxkO+KbNL5c3Tljhh0kK+i0hmablqTCyQkY98bhHoMDe1Eh214toX/6RWIIUy81hIzI2X3oR9wXd4JAg==:"
+    },
+    {
+      "id": "missing-expires",
+      "description": "the signature omits the mandatory `expires` parameter",
+      "expect": "missing_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\";wimse-sign-response",
+      "signature": "wimse=:UZAKuXHbxRHeJMr0/BJpjPHK8aqKW+kxyksxHSLwnq6rVy3GZtDKVPXzOFTGubQ+wQwfbT/O88xkem69rUuKCg==:"
+    },
+    {
+      "id": "missing-wimse-aud",
+      "description": "the request signature omits the mandatory `wimse-aud` parameter",
+      "expect": "missing_parameter",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-sign-response",
+      "signature": "wimse=:Lr4kxK1ZAry1sxooEgPqOhAgFOZbOuLpqM9rICVtb2RiuaE3lMxiuUwAMalr2cogd6dpFg1E7NI8AEqd7meGAA==:"
+    },
+    {
+      "id": "wrong-tag",
+      "description": "the signature's `tag` is not `wimse-workload-to-workload`",
+      "expect": "wrong_tag",
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;nonce=\"abcd1111\";tag=\"some-other-protocol\";wimse-aud=\"https://service.example/transfer\";wimse-sign-response",
+      "signature": "wimse=:N4dwnp1CpwVqoUWQUgvFWddbVb30Gnu9dEL/xeCEVyCcqq8D984Ff5uEAdKSSHdgGu9S07WG+SwMnmFRpzLwDg==:"
+    },
+    {
+      "id": "audience-mismatch",
+      "description": "the signature was minted for a different service than the one verifying it",
+      "expect": "audience_mismatch",
+      "accept_audience": "https://other.example/inbox"
+    },
+    {
+      "id": "tampered-body",
+      "description": "the body no longer hashes to the signed `Content-Digest`",
+      "expect": "content_digest_mismatch",
+      "body": "{\"amount\":999}"
+    },
+    {
+      "id": "rerouted-path",
+      "description": "an intermediary changed `@path` after the signature was made",
+      "expect": "invalid_signature",
+      "request": {
+        "method": "POST",
+        "authority": "service.example",
+        "path": "/admin",
+        "query": null,
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Content-Digest",
+            "sha-256=:TUu+Wcaq0iRCzeGZpqil8DRAX814+1qBwk7ySd4cRfE=:"
+          ],
+          [
+            "Workload-Identity-Token",
+            "eyJ0eXAiOiJ3aXQrand0IiwiYWxnIjoiRWREU0EiLCJraWQiOiJpc3N1ZXIta2V5LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoic3BpZmZlOi8vZXhhbXBsZS5vcmcvd29ya2xvYWQvYXBpIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsImp0aSI6ImExYjJjMyIsImNuZiI6eyJqd2siOnsiYWxnIjoiRWREU0EiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Il9SY2tPRnFneDF0ay0zak5ZQy1oMlpIOTZfZHJFOFdPMXdMcXlEWHA5aGcifX19.gEOIwRVXNwJTSXRGBDPV4CQLRUFeKYx-oK_nwSxaxegepaEEcKbn1TIPacMI0rWR2M8kRikyzB4jkcudkUtXCA"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "created-in-future",
+      "description": "the signature's `created` is ahead of the verifier's clock",
+      "expect": "created_in_future",
+      "verify_now": 1699999999
+    },
+    {
+      "id": "too-old",
+      "description": "the signature is still unexpired but older than the verifier's `max_age`",
+      "expect": "too_old",
+      "verify_now": 1700000120,
+      "max_age": 30
+    },
+    {
+      "id": "label-mismatch",
+      "description": "the verifier only accepts a label the request does not carry",
+      "expect": "label_mismatch",
+      "accept_label": "other"
+    },
+    {
+      "id": "missing-required-component",
+      "description": "the verifier requires a component the signature does not cover",
+      "expect": "missing_required_component",
+      "required_components": [
+        "\"authorization\""
+      ]
+    }
+  ],
+  "response": {
+    "status": 200,
+    "headers": [
+      [
+        "Content-Type",
+        "application/json"
+      ],
+      [
+        "Content-Digest",
+        "sha-256=:C6fANWFJlGvwZC+rTvhblecJD294XQ+4QyPQxELlGQo=:"
+      ],
+      [
+        "Workload-Identity-Token",
+        "eyJ0eXAiOiJ3aXQrand0IiwiYWxnIjoiRWREU0EiLCJraWQiOiJpc3N1ZXIta2V5LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoic3BpZmZlOi8vZXhhbXBsZS5vcmcvd29ya2xvYWQvYXBpIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsImp0aSI6ImExYjJjMyIsImNuZiI6eyJqd2siOnsiYWxnIjoiRWREU0EiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Il9SY2tPRnFneDF0ay0zak5ZQy1oMlpIOTZfZHJFOFdPMXdMcXlEWHA5aGcifX19.gEOIwRVXNwJTSXRGBDPV4CQLRUFeKYx-oK_nwSxaxegepaEEcKbn1TIPacMI0rWR2M8kRikyzB4jkcudkUtXCA"
+      ]
+    ],
+    "body": "{\"status\":\"accepted\"}",
+    "components": [
+      "\"@status\"",
+      "\"@method\";req",
+      "\"@request-target\";req",
+      "\"content-type\"",
+      "\"content-digest\"",
+      "\"workload-identity-token\""
+    ],
+    "params": {
+      "created": 1700000000,
+      "expires": 1700000300,
+      "nonce": "abcd2222",
+      "tag": "wimse-workload-to-workload",
+      "wimse_aud": "",
+      "wimse_req_nonce": "abcd1111"
+    },
+    "signature_input": "wimse=(\"@status\" \"@method\";req \"@request-target\";req \"content-type\" \"content-digest\" \"workload-identity-token\");created=1700000000;expires=1700000300;nonce=\"abcd2222\";tag=\"wimse-workload-to-workload\";wimse-req-nonce=\"abcd1111\"",
+    "signature": "wimse=:5cStMKi8sJluxZGXL1xLgE+PAId9bgbKaZlF3ibPW9vHmD8lhalIo/7v61ka++0xc5fj0s/dHIqltx3nEmcWAg==:",
+    "expected_req_nonce": "abcd1111",
+    "negative": [
+      {
+        "id": "lifted-onto-another-request",
+        "description": "the same signed response, verified against a different request",
+        "expect": "invalid_signature",
+        "request": {
+          "method": "POST",
+          "authority": "service.example",
+          "path": "/admin",
+          "query": null,
+          "headers": [
+            [
+              "Content-Type",
+              "application/json"
+            ],
+            [
+              "Content-Digest",
+              "sha-256=:TUu+Wcaq0iRCzeGZpqil8DRAX814+1qBwk7ySd4cRfE=:"
+            ],
+            [
+              "Workload-Identity-Token",
+              "eyJ0eXAiOiJ3aXQrand0IiwiYWxnIjoiRWREU0EiLCJraWQiOiJpc3N1ZXIta2V5LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoic3BpZmZlOi8vZXhhbXBsZS5vcmcvd29ya2xvYWQvYXBpIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsImp0aSI6ImExYjJjMyIsImNuZiI6eyJqd2siOnsiYWxnIjoiRWREU0EiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Il9SY2tPRnFneDF0ay0zak5ZQy1oMlpIOTZfZHJFOFdPMXdMcXlEWHA5aGcifX19.gEOIwRVXNwJTSXRGBDPV4CQLRUFeKYx-oK_nwSxaxegepaEEcKbn1TIPacMI0rWR2M8kRikyzB4jkcudkUtXCA"
+            ]
+          ]
+        }
+      },
+      {
+        "id": "wrong-req-nonce",
+        "description": "the client's nonce is not the one the response carries back",
+        "expect": "request_nonce_mismatch",
+        "expected_req_nonce": "some-other-nonce"
+      }
+    ]
+  }
+}
