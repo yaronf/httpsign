@@ -51,7 +51,7 @@ fields.go / digest.go      ← Component field abstraction + Content-Digest head
 
 ### JWX dual-version support
 
-The library supports both `lestrrat-go/jwx/v2` (kept for backward compatibility) and `lestrrat-go/jwx/v3` (recommended for new code). Use `NewJWSSignerV3` / `NewJWSVerifierV3` for new integrations.
+Optional foreign JWS uses `lestrrat-go/jwx/v4` via `NewJWSSigner` / `NewJWSVerifier` (including ML-DSA with `crypto/mldsa` on Go 1.27+). Requires Go 1.27+.
 
 ### Content-Digest
 
