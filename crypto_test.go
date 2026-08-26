@@ -248,7 +248,45 @@ func TestNewRSASigner1(t *testing.T) {
 	}
 }
 
+func TestNewJWSSigner(t *testing.T) {
+	hmacKey := []byte("1234")
+	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		alg     jwa.SignatureAlgorithm
+		key     any
+		wantErr bool
+	}{
+		{name: "happy path", alg: jwa.HS256(), key: hmacKey},
+		{name: "none", alg: jwa.NoSignature(), key: hmacKey, wantErr: true},
+		{name: "nil key", alg: jwa.HS256(), key: nil, wantErr: true},
+		{name: "string hmac key", alg: jwa.HS256(), key: "1234", wantErr: true},
+		{name: "key alg mismatch", alg: jwa.HS256(), key: priv, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewJWSSigner(tt.alg, tt.key, nil, *NewFields())
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			require.NotNil(t, got.foreignSigner)
+			assert.Equal(t, hmacKey, got.key)
+			assert.Empty(t, got.alg)
+		})
+	}
+}
+
 func TestNewJWSVerifier(t *testing.T) {
+	hmacKey := []byte("1234")
+	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+
 	type args struct {
 		alg    jwa.SignatureAlgorithm
 		key    any
@@ -265,12 +303,12 @@ func TestNewJWSVerifier(t *testing.T) {
 			name: "happy path",
 			args: args{
 				alg:    jwa.HS256(),
-				key:    "1234",
+				key:    hmacKey,
 				config: nil,
 				fields: *NewFields(),
 			},
 			want: &Verifier{
-				key:             "1234",
+				key:             hmacKey,
 				alg:             "",
 				config:          NewVerifyConfig(),
 				fields:          *NewFields(),
@@ -282,7 +320,7 @@ func TestNewJWSVerifier(t *testing.T) {
 			name: "none",
 			args: args{
 				alg:    jwa.NoSignature(),
-				key:    "1234",
+				key:    hmacKey,
 				config: NewVerifyConfig(),
 				fields: *NewFields(),
 			},
@@ -294,6 +332,28 @@ func TestNewJWSVerifier(t *testing.T) {
 			args: args{
 				alg:    jwa.HS256(),
 				key:    nil,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "string hmac key",
+			args: args{
+				alg:    jwa.HS256(),
+				key:    "1234",
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "key alg mismatch",
+			args: args{
+				alg:    jwa.HS256(),
+				key:    priv.Public(),
 				config: NewVerifyConfig(),
 				fields: *NewFields(),
 			},
@@ -338,25 +398,38 @@ func TestVerify(t *testing.T) {
 	assert.ErrorContains(t, err, "expected", "bad algorithm")
 }
 
-func TestForeignSignerMLDSA65(t *testing.T) {
-	priv, err := mldsa.GenerateKey(mldsa.MLDSA65())
-	require.NoError(t, err)
-	pub := priv.Public().(*mldsa.PublicKey)
+func TestForeignSignerMLDSA(t *testing.T) {
+	cases := []struct {
+		name   string
+		params mldsa.Parameters
+		alg    jwa.SignatureAlgorithm
+	}{
+		{"MLDSA44", mldsa.MLDSA44(), jwa.MLDSA44()},
+		{"MLDSA65", mldsa.MLDSA65(), jwa.MLDSA65()},
+		{"MLDSA87", mldsa.MLDSA87(), jwa.MLDSA87()},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			priv, err := mldsa.GenerateKey(tc.params)
+			require.NoError(t, err)
+			pub := priv.Public().(*mldsa.PublicKey)
 
-	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
-	signatureName := "sig1"
-	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
-	signer, err := NewJWSSigner(jwa.MLDSA65(), priv, config.SetKeyID("pq1"), fields)
-	require.NoError(t, err)
+			config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
+			signatureName := "sig1"
+			fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
+			signer, err := NewJWSSigner(tc.alg, priv, config.SetKeyID("pq1"), fields)
+			require.NoError(t, err)
 
-	req := readRequest(httpreq2)
-	sigInput, sig, err := SignRequest(signatureName, *signer, req)
-	require.NoError(t, err)
-	req.Header.Add("Signature", sig)
-	req.Header.Add("Signature-Input", sigInput)
+			req := readRequest(httpreq2)
+			sigInput, sig, err := SignRequest(signatureName, *signer, req)
+			require.NoError(t, err)
+			req.Header.Add("Signature", sig)
+			req.Header.Add("Signature-Input", sigInput)
 
-	verifier, err := NewJWSVerifier(jwa.MLDSA65(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("pq1"), fields)
-	require.NoError(t, err)
-	require.NoError(t, VerifyRequest(signatureName, *verifier, req))
+			verifier, err := NewJWSVerifier(tc.alg, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("pq1"), fields)
+			require.NoError(t, err)
+			require.NoError(t, VerifyRequest(signatureName, *verifier, req))
+		})
+	}
 }
 

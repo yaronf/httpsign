@@ -12,6 +12,7 @@ import (
 	"crypto/sha512"
 	"crypto/subtle"
 	"fmt"
+	"slices"
 
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jws"
@@ -128,13 +129,21 @@ func NewEd25519SignerFromSeed(seed []byte, config *SignConfig, fields Fields) (*
 
 // NewJWSSigner creates a generic signer for JWS algorithms via github.com/lestrrat-go/jwx/v4.
 // The particular key type for each algorithm is documented in that package (including
-// crypto/mldsa keys for ML-DSA on Go 1.27+). Config may be nil for a default configuration.
+// crypto/mldsa keys for ML-DSA on Go 1.27+). HMAC keys must be []byte (not string).
+// Config may be nil for a default configuration.
+//
+// Note: foreign JWS signers do not emit the HTTP Message Signatures "alg" parameter
+// (see SignConfig.SignAlg). VerifyConfig.SetAllowedAlgs therefore only applies if a peer
+// still includes that parameter; it does not constrain the JWS algorithm passed here.
 func NewJWSSigner(alg jwa.SignatureAlgorithm, key interface{}, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
 	if alg == jwa.NoSignature() {
 		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
+	}
+	if err := validateJWSKeyAlg(alg, key); err != nil {
+		return nil, err
 	}
 	if config == nil {
 		config = NewSignConfig()
@@ -150,6 +159,20 @@ func NewJWSSigner(alg jwa.SignatureAlgorithm, key interface{}, config *SignConfi
 		fields:        fields,
 		foreignSigner: jwsSigner,
 	}, nil
+}
+
+// validateJWSKeyAlg rejects keys that jwx does not associate with alg (wrong key family).
+// It uses jws.AlgorithmsForKey; some families list multiple algs (e.g. all HS*, all ML-DSA*),
+// so finer mismatches may still fail later at Sign/Verify time.
+func validateJWSKeyAlg(alg jwa.SignatureAlgorithm, key interface{}) error {
+	algs, err := jws.AlgorithmsForKey(key)
+	if err != nil {
+		return fmt.Errorf("key is not usable for JWS signing/verification: %w", err)
+	}
+	if !slices.Contains(algs, alg) {
+		return fmt.Errorf("algorithm %s is not valid for key type %T", alg, key)
+	}
+	return nil
 }
 
 func (s Signer) sign(buff []byte) ([]byte, error) {
@@ -325,17 +348,24 @@ func NewEd25519Verifier(key ed25519.PublicKey, config *VerifyConfig, fields Fiel
 
 // NewJWSVerifier creates a generic verifier for JWS algorithms via github.com/lestrrat-go/jwx/v4.
 // The particular key type for each algorithm is documented in that package (including
-// crypto/mldsa keys for ML-DSA on Go 1.27+). Set config to nil for a default configuration.
+// crypto/mldsa keys for ML-DSA on Go 1.27+). HMAC keys must be []byte (not string).
+// Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
+//
+// Note: SetAllowedAlgs constrains the HTTP Message Signatures "alg" parameter on the wire,
+// not the JWS algorithm passed here. Foreign JWS signers omit that parameter by design.
 func NewJWSVerifier(alg jwa.SignatureAlgorithm, key interface{}, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
-	if config == nil {
-		config = NewVerifyConfig()
-	}
 	if alg == jwa.NoSignature() {
 		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
+	}
+	if err := validateJWSKeyAlg(alg, key); err != nil {
+		return nil, err
+	}
+	if config == nil {
+		config = NewVerifyConfig()
 	}
 	verifier, err := jws.VerifierFor(alg)
 	if err != nil {

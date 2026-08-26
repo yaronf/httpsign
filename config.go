@@ -184,9 +184,11 @@ func (v *VerifyConfig) SetRejectExpired(rejectExpired bool) *VerifyConfig {
 	return v
 }
 
-// SetAllowedAlgs defines the allowed values of the "alg" parameter.
-// This is useful if the actual algorithm used in verification is taken from the message - not a recommended practice.
-// Default: an empty list, signifying all values are accepted.
+// SetAllowedAlgs defines the allowed values of the HTTP Message Signatures "alg" parameter
+// (RFC 9421), not the JWS algorithm passed to NewJWSSigner/NewJWSVerifier.
+// This is useful if the algorithm used in verification is taken from the message — not a recommended practice.
+// With foreign JWS signers the library refuses to emit "alg", so this policy only applies when a peer
+// still includes that parameter. Default: an empty list, signifying all values are accepted.
 func (v *VerifyConfig) SetAllowedAlgs(allowedAlgs []string) *VerifyConfig {
 	v.allowedAlgs = allowedAlgs
 	return v
