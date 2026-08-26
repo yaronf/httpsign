@@ -120,18 +120,6 @@ Scoped to httpsign’s use of **jwa** + **jws** only (no JWT/JWE/JWK fetch in li
 - [x] Hardening: constructor `jws.AlgorithmsForKey` check; reject `NoSignature`; HMAC keys must be `[]byte`; document `SetAllowedAlgs` vs JWS alg.
 - [ ] Tag **`v0.6.0`** and publish. *(after merge)*
 
-### Later action: upstream jwx / dsig (found 2026-08-26 while hardening)
-
-Not blocking `v0.6.0`. File / track upstream issues; optionally tighten httpsign further if upstream stays loose.
-
-| Finding | Severity | Notes |
-|---------|----------|-------|
-| **`jws.AlgorithmsForKey` ignores ECDSA curve** for raw `*ecdsa.{Private,Public}Key` | Correctness | Returns `[ES256, ES384, ES512]` for any EC key. Docs claim curve is inferred from the Go type, but `hasCrv` is never set for stdlib ECDSA; `RegisterAlgorithmForCurve` is only used for Ed25519 in init (no P-256→ES256 etc.). |
-| **ECDSA Sign/Verify do not enforce RFC 7518 curve↔alg** | Spec / footgun | `ES384` effectively means SHA-384 only; a **P-256** key can mint `"alg":"ES384"` and verify with the same P-256 pub (64-byte sig). Will not verify under a real P-384 key. Policy that allows only ES384 expecting P-384 strength can accept weaker P-256+SHA-384 if a P-256 key is registered. dsig examples treat cross-curve as intentional for custom algs. |
-| **`AlgorithmsForKey` lists all ML-DSA algs** for any ML-DSA key | Classifier only | Sign/Verify correctly reject parameter-set mismatch — crypto path is fine; helper is over-broad (same class of bug as ECDSA listing). |
-
-**Suggested upstream asks (lestrrat-go/jwx + dsig):** (1) extract curve from raw ECDSA keys in `AlgorithmsForKey` and register P-256/P-384/P-521 → ES256/ES384/ES512; (2) optionally enforce curve↔alg in ECDSA Sign/Verify; (3) refine ML-DSA listing by parameter set. **httpsign follow-up:** if upstream does not tighten ECDSA, consider our own curve check in `validateJWSKeyAlg` (and ML-DSA `Parameters()` vs `jwa.MLDSA*`).
-
 ### Upstream items likely N/A or low priority
 
 | Topic | httpsign |
