@@ -1,5 +1,5 @@
 {
-  "format": "wimse-conformance/v2",
+  "format": "wimse-conformance/v3",
   "suite": "httpsig",
   "id": "sign-eddsa",
   "spec": "draft-ietf-wimse-http-signature-06",
@@ -146,6 +146,33 @@
       }
     },
     {
+      "id": "authority-rewritten-inside-the-covered-set",
+      "description": "this signature does cover `@authority`, so the same rewritten host that the accepted case tolerates now breaks the signature",
+      "expect": "invalid_signature",
+      "request": {
+        "method": "POST",
+        "authority": "attacker.example.net",
+        "path": "/transfer",
+        "query": null,
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Content-Digest",
+            "sha-256=:TUu+Wcaq0iRCzeGZpqil8DRAX814+1qBwk7ySd4cRfE=:"
+          ],
+          [
+            "Workload-Identity-Token",
+            "eyJ0eXAiOiJ3aXQrand0IiwiYWxnIjoiRWREU0EiLCJraWQiOiJpc3N1ZXIta2V5LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoic3BpZmZlOi8vZXhhbXBsZS5vcmcvd29ya2xvYWQvYXBpIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsImp0aSI6ImExYjJjMyIsImNuZiI6eyJqd2siOnsiYWxnIjoiRWREU0EiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Il9SY2tPRnFneDF0ay0zak5ZQy1oMlpIOTZfZHJFOFdPMXdMcXlEWHA5aGcifX19.gEOIwRVXNwJTSXRGBDPV4CQLRUFeKYx-oK_nwSxaxegepaEEcKbn1TIPacMI0rWR2M8kRikyzB4jkcudkUtXCA"
+          ]
+        ]
+      },
+      "signature_input": "wimse=(\"@method\" \"@request-target\" \"content-type\" \"content-digest\" \"workload-identity-token\" \"@authority\");created=1700000000;expires=1700000300;nonce=\"abcd1111\";tag=\"wimse-workload-to-workload\";wimse-aud=\"https://service.example/transfer\";wimse-sign-response",
+      "signature": "wimse=:NfKo1GMN/+ykiCORV/NelHjfc/80QlByEKGhTsG3HrVOxi6NkW0jAd9wnry2PNxokuZi7A8RIJ189XpPf/myAA==:"
+    },
+    {
       "id": "created-in-future",
       "description": "the signature's `created` is ahead of the verifier's clock",
       "expect": "created_in_future",
@@ -171,6 +198,32 @@
       "required_components": [
         "\"authorization\""
       ]
+    }
+  ],
+  "accepted": [
+    {
+      "id": "authority-rewritten-outside-the-covered-set",
+      "description": "`@authority` is not covered, so a rewritten host leaves the signature valid: a signature protects the components it covers and no others",
+      "request": {
+        "method": "POST",
+        "authority": "attacker.example.net",
+        "path": "/transfer",
+        "query": null,
+        "headers": [
+          [
+            "Content-Type",
+            "application/json"
+          ],
+          [
+            "Content-Digest",
+            "sha-256=:TUu+Wcaq0iRCzeGZpqil8DRAX814+1qBwk7ySd4cRfE=:"
+          ],
+          [
+            "Workload-Identity-Token",
+            "eyJ0eXAiOiJ3aXQrand0IiwiYWxnIjoiRWREU0EiLCJraWQiOiJpc3N1ZXIta2V5LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIiwic3ViIjoic3BpZmZlOi8vZXhhbXBsZS5vcmcvd29ya2xvYWQvYXBpIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjE3MDAwMDM2MDAsImp0aSI6ImExYjJjMyIsImNuZiI6eyJqd2siOnsiYWxnIjoiRWREU0EiLCJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6Il9SY2tPRnFneDF0ay0zak5ZQy1oMlpIOTZfZHJFOFdPMXdMcXlEWHA5aGcifX19.gEOIwRVXNwJTSXRGBDPV4CQLRUFeKYx-oK_nwSxaxegepaEEcKbn1TIPacMI0rWR2M8kRikyzB4jkcudkUtXCA"
+          ]
+        ]
+      }
     }
   ],
   "response": {

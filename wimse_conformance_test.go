@@ -21,7 +21,7 @@ import (
 )
 
 // WIMSE HTTP Message Signature profile (draft-ietf-wimse-http-signature-06).
-// Vectors: https://github.com/kanywst/wimsey/tree/main/conformance/httpsig
+// Vectors: https://github.com/kanywst/wimsey (see testdata/wimse/SOURCE for tag/commit).
 //
 // httpsign implements RFC 9421, not the WIMSE profile. This harness:
 //  1. checks we can mint/verify the golden HTTP signatures
@@ -67,6 +67,16 @@ type wimseNegative struct {
 	ExpectedReqNonce   string            `json:"expected_req_nonce"`
 }
 
+// wimseAccepted is a positive case that must still verify (e.g. uncovered component mutated).
+type wimseAccepted struct {
+	ID             string            `json:"id"`
+	Description    string            `json:"description"`
+	SignatureInput string            `json:"signature_input"`
+	Signature      string            `json:"signature"`
+	Body           string            `json:"body"`
+	Request        *wimseHTTPRequest `json:"request"`
+}
+
 type wimseResponse struct {
 	Status           int             `json:"status"`
 	Headers          [][2]string     `json:"headers"`
@@ -91,10 +101,11 @@ type wimseSuite struct {
 	Params        map[string]any   `json:"params"`
 	Request       wimseHTTPRequest `json:"request"`
 	Body          string           `json:"body"`
-	SignatureInput string          `json:"signature_input"`
-	Signature     string           `json:"signature"`
-	Negative      []wimseNegative  `json:"negative"`
-	Response      *wimseResponse   `json:"response"`
+	SignatureInput string           `json:"signature_input"`
+	Signature      string           `json:"signature"`
+	Negative       []wimseNegative  `json:"negative"`
+	Accepted       []wimseAccepted  `json:"accepted"`
+	Response       *wimseResponse   `json:"response"`
 }
 
 func loadWimseSuite(t *testing.T, name string) wimseSuite {
@@ -386,6 +397,14 @@ func TestWimseConformance(t *testing.T) {
 				}
 			})
 
+			t.Run("Accepted", func(t *testing.T) {
+				for _, a := range s.Accepted {
+					t.Run(a.ID, func(t *testing.T) {
+						runWimseRequestAccepted(t, s, keys, reqFields, a)
+					})
+				}
+			})
+
 			if s.Response == nil {
 				return
 			}
@@ -432,6 +451,38 @@ func TestWimseConformance(t *testing.T) {
 			})
 		})
 	}
+}
+
+func runWimseRequestAccepted(t *testing.T, s wimseSuite, keys wimseKeyPair, reqFields Fields, a wimseAccepted) {
+	t.Helper()
+	body := s.Body
+	if a.Body != "" {
+		body = a.Body
+	}
+	httpReq := s.Request
+	if a.Request != nil {
+		httpReq = *a.Request
+	}
+	sigIn := s.SignatureInput
+	if a.SignatureInput != "" {
+		sigIn = a.SignatureInput
+	}
+	sig := s.Signature
+	if a.Signature != "" {
+		sig = a.Signature
+	}
+
+	req := wimseHTTPReq(t, httpReq, body)
+	req.Header.Set("Signature-Input", sigIn)
+	req.Header.Set("Signature", sig)
+
+	details, err := RequestDetails(s.Label, req)
+	require.NoError(t, err, a.Description)
+	got := wimseRequestProfileCheck(t, details, req, time.Unix(s.VerifyNow, 0), 0, "https://service.example/transfer", s.Components)
+	require.Empty(t, got, a.Description)
+
+	err = VerifyRequest(s.Label, *wimseRFCVerifier(t, keys, reqFields), req)
+	require.NoError(t, err, a.Description)
 }
 
 func runWimseRequestNegative(t *testing.T, s wimseSuite, keys wimseKeyPair, reqFields Fields, n wimseNegative) {

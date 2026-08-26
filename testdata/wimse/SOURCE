@@ -1,0 +1,10 @@
+# Vendored from https://github.com/kanywst/wimsey
+#
+# Tag:    v0.5.0
+# Commit: 2a7569a8e89ffcfd63ebb1dd454f2a425ca877a4
+# Tree:   https://github.com/kanywst/wimsey/tree/v0.5.0/conformance/httpsig
+# Path:   conformance/httpsig/
+# Spec:   draft-ietf-wimse-http-signature-06
+# Format: wimse-conformance/v3
+#
+# Files: sign-eddsa.json, sign-es256.json
