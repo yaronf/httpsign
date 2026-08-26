@@ -4,7 +4,7 @@ This directory contains internal documentation for maintainers of the httpsign l
 
 ## Contents
 
-- **JWX.md** — Optional jwx / foreign-JWS support: current dual v2/v3 state, and the plan to move to **jwx v4.2.0+** after **Go 1.27 stable** (httpsign major).
+- **JWX.md** — Optional jwx / foreign-JWS: cut over to jwx v4.4.0+ on Go 1.27+ as **httpsign `v0.6.0`**, with **ML-DSA PQ signatures** as an explicit goal. Gate met 2026-08-26.
 
 ## Purpose
 
