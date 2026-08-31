@@ -1,7 +1,9 @@
 package httpsign
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
@@ -249,8 +251,12 @@ func TestNewRSASigner1(t *testing.T) {
 }
 
 func TestNewJWSSigner(t *testing.T) {
-	hmacKey := []byte("1234")
+	hmacKey := []byte(strings.Repeat("x", 32)) // RFC 7518 HS256 minimum
 	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+	p256, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	mldsa44, err := mldsa.GenerateKey(mldsa.MLDSA44())
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -263,7 +269,15 @@ func TestNewJWSSigner(t *testing.T) {
 		{name: "none", alg: jwa.NoSignature(), key: hmacKey, wantErr: true},
 		{name: "nil key", alg: jwa.HS256(), key: nil, wantErr: true},
 		{name: "string hmac key", alg: jwa.HS256(), key: "1234", wantErr: true},
+		{name: "short hmac key", alg: jwa.HS256(), key: []byte("too-short"), wantErr: true},
+		{name: "empty hmac key", alg: jwa.HS256(), key: []byte{}, wantErr: true},
 		{name: "key alg mismatch", alg: jwa.HS256(), key: priv, wantErr: true},
+		{name: "rsa match", alg: jwa.RS256(), key: priv},
+		{name: "ecdsa curve match", alg: jwa.ES256(), key: p256},
+		{name: "ecdsa curve mismatch", alg: jwa.ES384(), key: p256, wantErr: true},
+		{name: "mldsa params match", alg: jwa.MLDSA44(), key: mldsa44},
+		{name: "mldsa params mismatch", alg: jwa.MLDSA65(), key: mldsa44, wantErr: true},
+		{name: "mldsa wrong key type", alg: jwa.MLDSA44(), key: p256, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -276,15 +290,19 @@ func TestNewJWSSigner(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, got)
 			require.NotNil(t, got.foreignSigner)
-			assert.Equal(t, hmacKey, got.key)
+			assert.Equal(t, tt.key, got.key)
 			assert.Empty(t, got.alg)
 		})
 	}
 }
 
 func TestNewJWSVerifier(t *testing.T) {
-	hmacKey := []byte("1234")
+	hmacKey := []byte(strings.Repeat("x", 32)) // RFC 7518 HS256 minimum
 	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+	p256, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	mldsa44, err := mldsa.GenerateKey(mldsa.MLDSA44())
 	require.NoError(t, err)
 
 	type args struct {
@@ -354,6 +372,60 @@ func TestNewJWSVerifier(t *testing.T) {
 			args: args{
 				alg:    jwa.HS256(),
 				key:    priv.Public(),
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "ecdsa curve match",
+			args: args{
+				alg:    jwa.ES256(),
+				key:    &p256.PublicKey,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want: &Verifier{
+				key:             &p256.PublicKey,
+				alg:             "",
+				config:          NewVerifyConfig(),
+				fields:          *NewFields(),
+				foreignVerifier: nil,
+			},
+		},
+		{
+			name: "ecdsa curve mismatch",
+			args: args{
+				alg:    jwa.ES384(),
+				key:    &p256.PublicKey,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "mldsa params match",
+			args: args{
+				alg:    jwa.MLDSA44(),
+				key:    mldsa44.Public().(*mldsa.PublicKey),
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want: &Verifier{
+				key:             mldsa44.Public().(*mldsa.PublicKey),
+				alg:             "",
+				config:          NewVerifyConfig(),
+				fields:          *NewFields(),
+				foreignVerifier: nil,
+			},
+		},
+		{
+			name: "mldsa params mismatch",
+			args: args{
+				alg:    jwa.MLDSA65(),
+				key:    mldsa44.Public().(*mldsa.PublicKey),
 				config: NewVerifyConfig(),
 				fields: *NewFields(),
 			},
