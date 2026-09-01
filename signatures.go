@@ -913,7 +913,7 @@ func applyPolicyCreated(psi *psiSignature, message parsedMessage, config VerifyC
 		}
 
 		if config.dateWithin != 0 {
-			dateHdr, ok := message.headers["date"]
+			dateHdr, ok := message.headers["date"] //nolint:staticcheck // SA1008: lowercase map keys by design
 			if ok {
 				if len(dateHdr) > 1 {
 					return fmt.Errorf("multiple Date headers")
