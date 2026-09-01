@@ -26,9 +26,39 @@ in the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign).
 	serverText, _ := io.ReadAll(res.Body)
 	_ = res.Body.Close()
 ```
+
+### Upgrading from v0.5.x
+
+**v0.6.0** is a breaking release for foreign-JWS users and raises the Go floor to **1.27+**.
+
+| Caller | Change |
+|--------|--------|
+| Native algorithms only (RSA, ECDSA, Ed25519, HMAC) | Upgrade Go to 1.27+; no API changes. |
+| `NewJWSSignerV3` / `NewJWSVerifierV3` | Use `NewJWSSigner` / `NewJWSVerifier` with `github.com/lestrrat-go/jwx/v4/jwa`. |
+| `NewJWSSigner` / `NewJWSVerifier` (jwx v2) | Same: v4 import path; algorithms are functions (`jwa.ES256()`, not string constants). |
+
+Foreign JWS signing must use `SignConfig.SignAlg(false)` — RFC 9421 does not define an HTTP `alg` value for arbitrary JWS algorithms. Verification policy `SetAllowedAlgs` applies to the optional HTTP `alg` signature parameter in the message, not to the JWS algorithm passed to `NewJWSVerifier`.
+
+Full migration notes: [internal-docs/RELEASE-v0.6.0.md](internal-docs/RELEASE-v0.6.0.md) (maintainers: paste **Summary** into the GitHub release).
+
+### Foreign JWS and ML-DSA
+
+Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) (≥ v4.4.0) via `NewJWSSigner` / `NewJWSVerifier`. Requires **Go 1.27+** (stdlib `encoding/json/v2`; no `GOEXPERIMENT`).
+
+**ML-DSA (FIPS 204)** is supported through the same constructors with `crypto/mldsa` keys and `jwa.MLDSA44()` / `MLDSA65()` / `MLDSA87()`. RFC 9421 does not assign HTTP Message Signatures algorithm identifiers for ML-DSA; treat it like other foreign JWS algorithms (`SignAlg(false)`, JWS `alg` in the JWS layer only if your profile requires it).
+
+```go
+priv, _ := mldsa.GenerateKey(mldsa.MLDSA65())
+pub := priv.Public().(*mldsa.PublicKey)
+signer, _ := httpsign.NewJWSSigner(jwa.MLDSA65(), priv,
+    httpsign.NewSignConfig().SignAlg(false), fields)
+verifier, _ := httpsign.NewJWSVerifier(jwa.MLDSA65(), pub, httpsign.NewVerifyConfig(), fields)
+```
+
+HMAC keys must be `[]byte` (minimum length per RFC 7518).
+
 ### Notes and Missing Features
 * Requires **Go 1.27+**.
-* Optional foreign JWS (including **ML-DSA** via `crypto/mldsa`) uses [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) through `NewJWSSigner` / `NewJWSVerifier`.
 * The `Accept-Signature` header is unimplemented.
 * In responses, when using the "wrapped handler" feature, the `Content-Type` header is only signed if set explicitly by the server. This is different, but arguably more secure, than the normal `net.http` behavior.
 * **Behind a TLS-terminating reverse proxy:** The `@scheme` derived component defaults to `req.TLS != nil`. Behind nginx, Envoy, AWS ALB, etc., `req.TLS` is nil, so `@scheme` becomes `"http"` even for HTTPS traffic. Use `SetSchemeFromRequest` on `SignConfig` and `VerifyConfig` to derive the scheme from `X-Forwarded-Proto` or similar headers.
