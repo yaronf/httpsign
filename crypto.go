@@ -137,7 +137,7 @@ func NewJWSSigner(alg jwa.SignatureAlgorithm, key interface{}, config *SignConfi
 	if alg == jwa.NoSignature() {
 		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
 	}
-	if err := validateJWSKeyAlg(alg, key); err != nil {
+	if err := validateJWSKeyAlg(alg, key, true); err != nil {
 		return nil, err
 	}
 	if config == nil {
@@ -339,7 +339,7 @@ func NewJWSVerifier(alg jwa.SignatureAlgorithm, key interface{}, config *VerifyC
 	if alg == jwa.NoSignature() {
 		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
 	}
-	if err := validateJWSKeyAlg(alg, key); err != nil {
+	if err := validateJWSKeyAlg(alg, key, false); err != nil {
 		return nil, err
 	}
 	if config == nil {

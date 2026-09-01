@@ -273,9 +273,12 @@ func TestNewJWSSigner(t *testing.T) {
 		{name: "empty hmac key", alg: jwa.HS256(), key: []byte{}, wantErr: true},
 		{name: "key alg mismatch", alg: jwa.HS256(), key: priv, wantErr: true},
 		{name: "rsa match", alg: jwa.RS256(), key: priv},
+		{name: "rsa public key", alg: jwa.RS256(), key: &priv.PublicKey, wantErr: true},
 		{name: "ecdsa curve match", alg: jwa.ES256(), key: p256},
+		{name: "ecdsa public key", alg: jwa.ES256(), key: &p256.PublicKey, wantErr: true},
 		{name: "ecdsa curve mismatch", alg: jwa.ES384(), key: p256, wantErr: true},
 		{name: "mldsa params match", alg: jwa.MLDSA44(), key: mldsa44},
+		{name: "mldsa public key", alg: jwa.MLDSA44(), key: mldsa44.Public().(*mldsa.PublicKey), wantErr: true},
 		{name: "mldsa params mismatch", alg: jwa.MLDSA65(), key: mldsa44, wantErr: true},
 		{name: "mldsa wrong key type", alg: jwa.MLDSA44(), key: p256, wantErr: true},
 	}
@@ -379,6 +382,17 @@ func TestNewJWSVerifier(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "rsa private key",
+			args: args{
+				alg:    jwa.RS256(),
+				key:    priv,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
 			name: "ecdsa curve match",
 			args: args{
 				alg:    jwa.ES256(),
@@ -406,6 +420,17 @@ func TestNewJWSVerifier(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "ecdsa private key",
+			args: args{
+				alg:    jwa.ES256(),
+				key:    p256,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
 			name: "mldsa params match",
 			args: args{
 				alg:    jwa.MLDSA44(),
@@ -426,6 +451,17 @@ func TestNewJWSVerifier(t *testing.T) {
 			args: args{
 				alg:    jwa.MLDSA65(),
 				key:    mldsa44.Public().(*mldsa.PublicKey),
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "mldsa private key",
+			args: args{
+				alg:    jwa.MLDSA44(),
+				key:    mldsa44,
 				config: NewVerifyConfig(),
 				fields: *NewFields(),
 			},
