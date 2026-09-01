@@ -923,6 +923,22 @@ func TestGetRawHeaderEmptyValues(t *testing.T) {
 	}
 }
 
+func TestSignRequestNilSignerConfig(t *testing.T) {
+	_, _, err := SignRequest("sig1", Signer{fields: *NewFields()}, readRequest(httpreq1))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	assert.Contains(t, err.Error(), "nil signer config")
+}
+
+func TestVerifyRequestNilVerifierConfig(t *testing.T) {
+	err := VerifyRequest("sig1", Verifier{fields: *NewFields()}, readRequest(httpreq1))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	assert.Contains(t, err.Error(), "nil verifier config")
+}
+
 // Same as TestCreated but using Message
 func TestMessageCreated(t *testing.T) {
 	testOnceWithConfig := func(t *testing.T, createdTime int64, verifyConfig *VerifyConfig, wantSuccess bool) {

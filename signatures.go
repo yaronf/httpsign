@@ -417,6 +417,9 @@ func signRequestDebug(signatureName string, signer Signer, req *http.Request) (s
 	if signatureName == "" {
 		return "", "", "", fmt.Errorf("empty signature name")
 	}
+	if signer.config == nil {
+		return "", "", "", fmt.Errorf("nil signer config")
+	}
 	withTrailers, err := signer.fields.hasTrailerFields(false)
 	if err != nil {
 		return "", "", "", err
@@ -442,6 +445,9 @@ func signResponseDebug(signatureName string, signer Signer, res *http.Response, 
 	}
 	if signatureName == "" {
 		return "", "", "", fmt.Errorf("empty signature name")
+	}
+	if signer.config == nil {
+		return "", "", "", fmt.Errorf("nil signer config")
 	}
 	resWithTrailers, err := signer.fields.hasTrailerFields(false)
 	if err != nil {
@@ -480,6 +486,9 @@ func VerifyRequest(signatureName string, verifier Verifier, req *http.Request) e
 }
 
 func verifyRequestDebug(signatureName string, verifier Verifier, req *http.Request) (signatureBase string, err error) {
+	if verifier.config == nil {
+		return "", fmt.Errorf("nil verifier config")
+	}
 	config := NewMessageConfig().WithRequest(req)
 	if s := resolvedScheme(verifier.config.schemeFromRequest, req); s != "" {
 		config = config.WithScheme(s)
@@ -513,6 +522,9 @@ func verifyDebug(signatureName string, verifier Verifier, message *Message) (str
 	}
 	if signatureName == "" {
 		return "", nil, fmt.Errorf("empty signature name")
+	}
+	if verifier.config == nil {
+		return "", nil, fmt.Errorf("nil verifier config")
 	}
 
 	withTrailers, wantSigRaw, psiSig, err := extractSignatureFields(
@@ -665,6 +677,9 @@ func VerifyResponse(signatureName string, verifier Verifier, res *http.Response,
 }
 
 func verifyResponseDebug(signatureName string, verifier Verifier, res *http.Response, req *http.Request) (signatureBase string, err error) {
+	if verifier.config == nil {
+		return "", fmt.Errorf("nil verifier config")
+	}
 	config := NewMessageConfig()
 	if s := resolvedScheme(verifier.config.schemeFromRequest, req); s != "" {
 		config = config.WithScheme(s)
