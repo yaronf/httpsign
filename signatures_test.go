@@ -915,6 +915,14 @@ func TestVerifyDateWithin(t *testing.T) {
 	})
 }
 
+func TestGetRawHeaderEmptyValues(t *testing.T) {
+	msg := &parsedMessage{headers: http.Header{"x-custom": {}}}
+	_, err := msg.getRawHeader("x-custom", false)
+	if err == nil {
+		t.Fatal("expected error for header with no values")
+	}
+}
+
 // Same as TestCreated but using Message
 func TestMessageCreated(t *testing.T) {
 	testOnceWithConfig := func(t *testing.T, createdTime int64, verifyConfig *VerifyConfig, wantSuccess bool) {

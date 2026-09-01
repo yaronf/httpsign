@@ -79,6 +79,16 @@ func Test_ecdsaVerifyRaw(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "nil curve",
+			args: args{
+				pub:  &ecdsa.PublicKey{},
+				hash: bytes.Repeat([]byte{88}, 32),
+				sig:  make([]byte, 64),
+			},
+			want:    false,
+			wantErr: true,
+		},
+		{
 			name: "bad curve",
 			args: args{
 				pub:  pubKey,

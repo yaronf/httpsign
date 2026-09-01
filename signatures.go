@@ -254,6 +254,9 @@ func (message *parsedMessage) getRawHeader(hdr string, trailer bool) ([]string, 
 	if !found {
 		return nil, fmt.Errorf("header %s not found", hdr)
 	}
+	if len(vv) == 0 {
+		return nil, fmt.Errorf("header %s has no values", hdr)
+	}
 	return vv, nil
 }
 
@@ -917,6 +920,9 @@ func applyPolicyCreated(psi *psiSignature, message parsedMessage, config VerifyC
 			if ok {
 				if len(dateHdr) > 1 {
 					return fmt.Errorf("multiple Date headers")
+				}
+				if len(dateHdr) == 0 {
+					return fmt.Errorf("empty Date header")
 				}
 				date, err := http.ParseTime(dateHdr[0])
 				if err != nil {

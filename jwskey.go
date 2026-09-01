@@ -99,6 +99,9 @@ func validateECDSAKey(alg jwa.SignatureAlgorithm, key interface{}, signing bool)
 	if !signing && isPrivate {
 		return fmt.Errorf("algorithm %s requires an ECDSA public key for verification", alg)
 	}
+	if curve == nil {
+		return fmt.Errorf("algorithm %s: ECDSA key has nil curve", alg)
+	}
 	var want elliptic.Curve
 	switch alg {
 	case jwa.ES256():

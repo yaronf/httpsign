@@ -277,6 +277,7 @@ func TestNewJWSSigner(t *testing.T) {
 		{name: "ecdsa curve match", alg: jwa.ES256(), key: p256},
 		{name: "ecdsa public key", alg: jwa.ES256(), key: &p256.PublicKey, wantErr: true},
 		{name: "ecdsa curve mismatch", alg: jwa.ES384(), key: p256, wantErr: true},
+		{name: "ecdsa nil curve", alg: jwa.ES256(), key: ecdsa.PrivateKey{}, wantErr: true},
 		{name: "mldsa params match", alg: jwa.MLDSA44(), key: mldsa44},
 		{name: "mldsa public key", alg: jwa.MLDSA44(), key: mldsa44.Public().(*mldsa.PublicKey), wantErr: true},
 		{name: "mldsa params mismatch", alg: jwa.MLDSA65(), key: mldsa44, wantErr: true},
