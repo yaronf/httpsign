@@ -862,6 +862,59 @@ func TestCreated(t *testing.T) {
 	t.Run("verify logic requires to verify Created", testDateFail)
 }
 
+func TestVerifyDateWithin(t *testing.T) {
+	now := time.Now().Unix()
+	fields := Headers("@status", "date", "content-type")
+	signatureName := "sigres"
+	key, err := base64.StdEncoding.DecodeString("uzvJfB4u3N0Jy4T7NZ75MDVcr8zSTInedJtkgcu46YW4XByzNJjxBdtjUkdJPBtbmHhIDi6pcl8jsasjlTMtDQ==")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signConfig := NewSignConfig().SignCreated(true).setFakeCreated(now).SetKeyID("test-shared-secret")
+	signer, err := NewHMACSHA256Signer(key, signConfig, fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := readResponse(httpres2)
+	alignedDate := time.Unix(now, 0).UTC().Format(http.TimeFormat)
+	res.Header.Set("Date", alignedDate)
+	sigInput, sig, err := SignResponse(signatureName, *signer, res, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifyConfig := NewVerifyConfig().SetVerifyDateWithin(time.Minute)
+
+	t.Run("aligned Date passes", func(t *testing.T) {
+		res2 := readResponse(httpres2)
+		res2.Header.Set("Date", alignedDate)
+		res2.Header.Add("Signature", sig)
+		res2.Header.Add("Signature-Input", sigInput)
+		verifier, err := NewHMACSHA256Verifier(key, verifyConfig, fields)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := VerifyResponse(signatureName, *verifier, res2, nil); err != nil {
+			t.Errorf("verification error: %s", err)
+		}
+	})
+
+	t.Run("misaligned Date fails", func(t *testing.T) {
+		res2 := readResponse(httpres2)
+		res2.Header.Set("Date", time.Unix(now-3600, 0).UTC().Format(http.TimeFormat))
+		res2.Header.Add("Signature", sig)
+		res2.Header.Add("Signature-Input", sigInput)
+		verifier, err := NewHMACSHA256Verifier(key, verifyConfig, fields)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = VerifyResponse(signatureName, *verifier, res2, nil)
+		if err == nil {
+			t.Fatal("expected verification to fail")
+		}
+		assert.Contains(t, err.Error(), "Date header")
+	})
+}
+
 // Same as TestCreated but using Message
 func TestMessageCreated(t *testing.T) {
 	testOnceWithConfig := func(t *testing.T, createdTime int64, verifyConfig *VerifyConfig, wantSuccess bool) {

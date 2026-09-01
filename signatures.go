@@ -913,7 +913,7 @@ func applyPolicyCreated(psi *psiSignature, message parsedMessage, config VerifyC
 		}
 
 		if config.dateWithin != 0 {
-			dateHdr, ok := message.headers["Date"]
+			dateHdr, ok := message.headers["date"]
 			if ok {
 				if len(dateHdr) > 1 {
 					return fmt.Errorf("multiple Date headers")
