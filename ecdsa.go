@@ -13,6 +13,9 @@ func ecdsaSignRaw(rd io.Reader, priv *ecdsa.PrivateKey, hash []byte) ([]byte, er
 	if priv == nil {
 		return nil, fmt.Errorf("nil private key")
 	}
+	if priv.Curve == nil {
+		return nil, fmt.Errorf("nil curve on private key")
+	}
 	r, s, err := ecdsa.Sign(rd, priv, hash)
 	if err != nil {
 		return nil, err
@@ -34,6 +37,9 @@ func ecdsaSignRaw(rd io.Reader, priv *ecdsa.PrivateKey, hash []byte) ([]byte, er
 func ecdsaVerifyRaw(pub *ecdsa.PublicKey, hash []byte, sig []byte) (bool, error) {
 	if pub == nil {
 		return false, fmt.Errorf("nil public key")
+	}
+	if pub.Curve == nil {
+		return false, fmt.Errorf("signature verification failed")
 	}
 	curve := pub.Params().Name
 	lr, ls, err := sigComponentLen(curve)

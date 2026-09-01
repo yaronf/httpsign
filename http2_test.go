@@ -11,8 +11,6 @@ import (
 	"strings"
 	"testing"
 	"text/template"
-
-	"github.com/andreyvit/diff"
 )
 
 var wantFields = `"kuku": my awesome header
@@ -88,7 +86,7 @@ func testHTTP(t *testing.T, proto string) {
 		}
 
 		if sigInput != wf {
-			t.Errorf("unexpected fields: %s\n", diff.CharacterDiff(sigInput, wantFields))
+			t.Errorf("unexpected fields: %s\n", characterDiff(sigInput, wantFields))
 		}
 		w.WriteHeader(200)
 	}
@@ -143,7 +141,7 @@ func testMessageHTTP(t *testing.T, proto string) {
 		}
 
 		if sigInput != wf {
-			t.Errorf("unexpected fields: %s\n", diff.CharacterDiff(sigInput, wantFields))
+			t.Errorf("unexpected fields: %s\n", characterDiff(sigInput, wantFields))
 		}
 		w.WriteHeader(200)
 	}

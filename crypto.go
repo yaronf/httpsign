@@ -13,13 +13,8 @@ import (
 	"crypto/subtle"
 	"fmt"
 
-	// JWX v2 - for backward compatibility (used by existing NewJWSSigner/NewJWSVerifier)
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jws"
-
-	// JWX v3 - for new V3 functions (used by NewJWSSignerV3/NewJWSVerifierV3)
-	jwav3 "github.com/lestrrat-go/jwx/v3/jwa"
-	jwsv3 "github.com/lestrrat-go/jwx/v3/jws"
+	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jws"
 )
 
 // Signer includes a cryptographic key (typically a private key) and configuration of what needs to be signed.
@@ -131,51 +126,24 @@ func NewEd25519SignerFromSeed(seed []byte, config *SignConfig, fields Fields) (*
 	return NewEd25519Signer(key, config, fields)
 }
 
-// NewJWSSigner creates a generic signer for JWS algorithms, using the go-jwx v2 package. The particular key type for each algorithm
-// is documented in that package.
-// Config may be nil for a default configuration.
-//
-// Note: This function uses jwx v2. For jwx v3 support, use NewJWSSignerV3 instead.
+// NewJWSSigner creates a generic signer for JWS algorithms via github.com/lestrrat-go/jwx/v4.
+// The particular key type for each algorithm is documented in that package (including
+// crypto/mldsa keys for ML-DSA on Go 1.27+). HMAC keys must be []byte (not string).
+// Config may be nil for a default configuration; SignAlg must be false (see SignConfig.SignAlg).
 func NewJWSSigner(alg jwa.SignatureAlgorithm, key interface{}, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
-	if alg == jwa.NoSignature {
+	if alg == jwa.NoSignature() {
 		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
 	}
-	if config == nil {
-		config = NewSignConfig()
-	}
-	jwsSigner, err := jws.NewSigner(alg)
-	if err != nil {
+	if err := validateJWSKeyAlg(alg, key, true); err != nil {
 		return nil, err
 	}
-	return &Signer{
-		key:           key,
-		alg:           "",
-		config:        config,
-		fields:        fields,
-		foreignSigner: jwsSigner,
-	}, nil
-}
-
-// NewJWSSignerV3 creates a generic signer for JWS algorithms, using the go-jwx v3 package. The particular key type for each algorithm
-// is documented in that package.
-// Config may be nil for a default configuration.
-//
-// This function uses jwx v3 and is the recommended choice for new code using jwx v3.
-// It uses the recommended SignerFor() API which returns Signer2 interface.
-func NewJWSSignerV3(alg jwav3.SignatureAlgorithm, key interface{}, config *SignConfig, fields Fields) (*Signer, error) {
-	if key == nil {
-		return nil, fmt.Errorf("key must not be nil")
-	}
-	if alg == jwav3.NoSignature() {
-		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
-	}
 	if config == nil {
 		config = NewSignConfig()
 	}
-	jwsSigner, err := jwsv3.SignerFor(alg)
+	jwsSigner, err := jws.SignerFor(alg)
 	if err != nil {
 		return nil, err
 	}
@@ -190,21 +158,11 @@ func NewJWSSignerV3(alg jwav3.SignatureAlgorithm, key interface{}, config *SignC
 
 func (s Signer) sign(buff []byte) ([]byte, error) {
 	if s.foreignSigner != nil {
-		// Try v2 signer first (jws.Signer interface: Sign(payload, key))
-		if signerV2, ok := s.foreignSigner.(jws.Signer); ok {
-			return signerV2.Sign(buff, s.key)
+		signer, ok := s.foreignSigner.(jws.Signer)
+		if !ok {
+			return nil, fmt.Errorf("expected jws.Signer, got %T", s.foreignSigner)
 		}
-
-		// Try v3 Signer2 interface (new recommended API: Sign(key, payload))
-		// Note: parameter order is SWAPPED compared to v2!
-		type Signer2 interface {
-			Sign(key interface{}, payload []byte) ([]byte, error)
-		}
-		if signerV3, ok := s.foreignSigner.(Signer2); ok {
-			return signerV3.Sign(s.key, buff) // Note: key first, payload second
-		}
-
-		return nil, fmt.Errorf("expected jws.Signer or Signer2 interface, got %T", s.foreignSigner)
+		return signer.Sign(s.key, buff)
 	}
 	switch s.alg {
 	case "hmac-sha256":
@@ -369,51 +327,25 @@ func NewEd25519Verifier(key ed25519.PublicKey, config *VerifyConfig, fields Fiel
 	}, nil
 }
 
-// NewJWSVerifier creates a generic verifier for JWS algorithms, using the go-jwx v2 package. The particular key type for each algorithm
-// is documented in that package. Set config to nil for a default configuration.
+// NewJWSVerifier creates a generic verifier for JWS algorithms via github.com/lestrrat-go/jwx/v4.
+// The particular key type for each algorithm is documented in that package (including
+// crypto/mldsa keys for ML-DSA on Go 1.27+). HMAC keys must be []byte (not string).
+// Set config to nil for a default configuration.
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
-//
-// Note: This function uses jwx v2. For jwx v3 support, use NewJWSVerifierV3 instead.
 func NewJWSVerifier(alg jwa.SignatureAlgorithm, key interface{}, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
-	if config == nil {
-		config = NewVerifyConfig()
-	}
-	if alg == jwa.NoSignature {
+	if alg == jwa.NoSignature() {
 		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
 	}
-	verifier, err := jws.NewVerifier(alg)
-	if err != nil {
+	if err := validateJWSKeyAlg(alg, key, false); err != nil {
 		return nil, err
 	}
-	return &Verifier{
-		key:             key,
-		alg:             "",
-		config:          config,
-		fields:          fields,
-		foreignVerifier: verifier,
-	}, nil
-}
-
-// NewJWSVerifierV3 creates a generic verifier for JWS algorithms, using the go-jwx v3 package. The particular key type for each algorithm
-// is documented in that package. Set config to nil for a default configuration.
-// Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
-//
-// This function uses jwx v3 and is the recommended choice for new code using jwx v3.
-// It uses the recommended VerifierFor() API which returns Verifier2 interface.
-func NewJWSVerifierV3(alg jwav3.SignatureAlgorithm, key interface{}, config *VerifyConfig, fields Fields) (*Verifier, error) {
-	if key == nil {
-		return nil, fmt.Errorf("key must not be nil")
-	}
 	if config == nil {
 		config = NewVerifyConfig()
 	}
-	if alg == jwav3.NoSignature() {
-		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
-	}
-	verifier, err := jwsv3.VerifierFor(alg)
+	verifier, err := jws.VerifierFor(alg)
 	if err != nil {
 		return nil, err
 	}
@@ -428,31 +360,16 @@ func NewJWSVerifierV3(alg jwav3.SignatureAlgorithm, key interface{}, config *Ver
 
 func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 	if v.foreignVerifier != nil {
-		// Try v2 verifier first (jws.Verifier interface: Verify(payload, sig, key))
-		if verifierV2, ok := v.foreignVerifier.(jws.Verifier); ok {
-			err := verifierV2.Verify(buff, sig, v.key)
-			if err != nil {
-				// Return opaque error; underlying err discarded for consistency
-				return false, fmt.Errorf("signature verification failed")
-			}
-			return true, nil
+		verifier, ok := v.foreignVerifier.(jws.Verifier)
+		if !ok {
+			return false, fmt.Errorf("expected jws.Verifier, got %T", v.foreignVerifier)
 		}
-
-		// Try v3 Verifier2 interface (new recommended API: Verify(key, payload, sig))
-		// Note: parameter order is DIFFERENT compared to v2!
-		type Verifier2 interface {
-			Verify(key interface{}, payload, signature []byte) error
+		err := verifier.Verify(v.key, buff, sig)
+		if err != nil {
+			// Return opaque error; underlying err discarded for consistency
+			return false, fmt.Errorf("signature verification failed")
 		}
-		if verifierV3, ok := v.foreignVerifier.(Verifier2); ok {
-			err := verifierV3.Verify(v.key, buff, sig) // Note: key first, then payload, then signature
-			if err != nil {
-				// Return opaque error; underlying err discarded for consistency
-				return false, fmt.Errorf("signature verification failed")
-			}
-			return true, nil
-		}
-
-		return false, fmt.Errorf("expected jws.Verifier or Verifier2 interface, got %T", v.foreignVerifier)
+		return true, nil
 	}
 
 	switch v.alg {

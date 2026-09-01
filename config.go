@@ -43,7 +43,8 @@ func NewSignConfig() *SignConfig {
 	}
 }
 
-// SignAlg indicates that an "alg" signature parameters must be generated and signed (default: true).
+// SignAlg indicates that an "alg" signature parameter must be generated and signed (default: true).
+// Must be false when using NewJWSSigner (foreign JWS has no HTTP Message Signatures algorithm id).
 func (c *SignConfig) SignAlg(b bool) *SignConfig {
 	c.signAlg = b
 	return c
@@ -184,9 +185,11 @@ func (v *VerifyConfig) SetRejectExpired(rejectExpired bool) *VerifyConfig {
 	return v
 }
 
-// SetAllowedAlgs defines the allowed values of the "alg" parameter.
-// This is useful if the actual algorithm used in verification is taken from the message - not a recommended practice.
-// Default: an empty list, signifying all values are accepted.
+// SetAllowedAlgs defines the allowed values of the HTTP Message Signatures "alg" parameter
+// (RFC 9421), not the JWS algorithm passed to NewJWSSigner/NewJWSVerifier.
+// Useful only if verification takes "alg" from the message (not recommended). NewJWSSigner
+// cannot emit "alg" (see SignAlg), so this policy applies only when a peer still includes it.
+// Default: empty list — all values accepted.
 func (v *VerifyConfig) SetAllowedAlgs(allowedAlgs []string) *VerifyConfig {
 	v.allowedAlgs = allowedAlgs
 	return v

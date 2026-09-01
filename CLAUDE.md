@@ -36,7 +36,7 @@ signatures.go              ← Mid-level API: SignRequest, SignResponse, VerifyR
     │
 message.go / httpparse.go  ← RFC 9421 message canonicalization and signature base string construction
     │
-crypto.go / ecdsa.go       ← Signer / Verifier types and algorithm implementations
+crypto.go / ecdsa.go / jwskey.go  ← Signer / Verifier types, native algs, foreign-JWS key checks
     │
 fields.go / digest.go      ← Component field abstraction + Content-Digest header support
 ```
@@ -44,6 +44,7 @@ fields.go / digest.go      ← Component field abstraction + Content-Digest head
 ### Key types
 
 - **`Signer` / `Verifier`** (`crypto.go`) — hold algorithm, key, and signing config. Created via `NewXxxSigner` / `NewXxxVerifier` constructors (HMAC-SHA256, RSA, RSA-PSS, P-256, P-384, Ed25519, JWS).
+- Foreign JWS key↔alg checks live in **`jwskey.go`** (explicit stdlib types; does not use deprecated `jws.AlgorithmsForKey`).
 - **`SignConfig` / `VerifyConfig`** (`config.go`) — builder-style configuration for signature metadata (keyID, nonce, tag, expiry, clock tolerance). Constructed via `NewSignConfig()` / `NewVerifyConfig()` with method chaining.
 - **`Fields`** (`fields.go`) — specifies which HTTP components (headers, derived components) to include in the signature. Use the `Fields("header1", "@method", ...)` helper or `NewFields()` for complex cases.
 - **`Message` / `MessageDetails`** (`message.go`) — internal canonicalized request/response representation. `MessageDetails` is the public output of `RequestDetails` / `ResponseDetails`.
@@ -51,7 +52,7 @@ fields.go / digest.go      ← Component field abstraction + Content-Digest head
 
 ### JWX dual-version support
 
-The library supports both `lestrrat-go/jwx/v2` (kept for backward compatibility) and `lestrrat-go/jwx/v3` (recommended for new code). Use `NewJWSSignerV3` / `NewJWSVerifierV3` for new integrations.
+Optional foreign JWS uses `lestrrat-go/jwx/v4` via `NewJWSSigner` / `NewJWSVerifier` (including ML-DSA with `crypto/mldsa` on Go 1.27+). Requires Go 1.27+.
 
 ### Content-Digest
 

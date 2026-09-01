@@ -21,7 +21,11 @@ type Client struct {
 }
 
 // NewClient constructs a new client, with the flexibility of including a custom http.Client.
+// config may be nil for a default configuration.
 func NewClient(client http.Client, config *ClientConfig) *Client {
+	if config == nil {
+		config = NewClientConfig()
+	}
 	return &Client{config: *config, client: client}
 }
 

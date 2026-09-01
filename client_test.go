@@ -302,3 +302,9 @@ func TestClient_PostForm(t *testing.T) {
 		})
 	}
 }
+
+func TestNewDefaultClientNilConfig(t *testing.T) {
+	c := NewDefaultClient(nil)
+	assert.NotNil(t, c)
+	assert.NoError(t, validateClient(c))
+}

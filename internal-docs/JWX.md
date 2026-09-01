@@ -6,11 +6,9 @@ Single source of truth for optional jwx-backed JWS support in httpsign.
 
 jwx is used only for **optional “foreign” JWS** signing and verification. **Native** algorithms (HMAC-SHA256, RSA, RSASSA-PSS, P-256/P-384, Ed25519) do **not** use jwx.
 
-**Today (pre-cutover):** `go.mod` still pulls both `github.com/lestrrat-go/jwx/v2` and `.../jwx/v3`. Public API is `NewJWSSigner` / `NewJWSVerifier` (v2) and `NewJWSSignerV3` / `NewJWSVerifierV3` (v3). `crypto.go` dispatches on the embedded foreign signer/verifier interfaces (v2 vs v3 parameter order differs).
+**On `jwx-v4-cutover` / for `v0.6.0`:** single dependency `github.com/lestrrat-go/jwx/v4` (**≥ v4.4.0**); public API is `NewJWSSigner` / `NewJWSVerifier` only (v2 and `*V3` removed). Go floor **1.27.0**. ML-DSA via the same constructors.
 
-**Target:** a single jwx **v4** path, one constructor pair, and **post-quantum (PQ) signatures** as a first-class capability (see below).
-
-**Release vehicle:** ship as **httpsign `v0.6.0`** (breaking within `0.x`; not a leap to `v1.0.0`). Under Go modules, `v0.y.z` may introduce breaking API/dependency changes on a minor bump — that is intentional here (Go floor, drop jwx v2/v3, collapse constructors).
+**Previously (≤ v0.5.x):** `go.mod` pulled both `jwx/v2` and `jwx/v3`, with `NewJWSSigner`/`NewJWSVerifier` (v2) and `NewJWSSignerV3`/`NewJWSVerifierV3` (v3).
 
 ---
 
@@ -40,17 +38,17 @@ Go 1.27 adds stdlib [`crypto/mldsa`](https://pkg.go.dev/crypto/mldsa). jwx v4 re
 
 ---
 
-## Status (2026-08-26): execute the cutover
+## Status (2026-08-26): cutover implemented on branch `jwx-v4-cutover`
 
-The July 2026 gate is **met**. Do **`v0.6.0`** now; do **not** keep dual v2+v3 any longer than the cutover PR.
+Ship as **`v0.6.0`** when merged. Dual v2+v3 is removed on this branch.
 
 | Gate | Status |
 |------|--------|
 | Go **1.27.0** stable on [go.dev/dl](https://go.dev/dl/) | **Met** (released 2026-08-19) |
 | `encoding/json/v2` in stdlib (no `GOEXPERIMENT=jsonv2`) | **Met** — see [Go 1.27 notes](https://go.dev/doc/go1.27) |
-| jwx v4 mature | **Met** — use **`v4.4.0+`** (v4.2.0 was the original floor; current latest as of this update is v4.4.0) |
-| Smoke: `go get …/jwx/v4@v4.4.0` under `GOTOOLCHAIN=go1.27.0`, no `GOEXPERIMENT` | **Confirmed** locally (2026-08-26) |
-| Stdlib **`crypto/mldsa`** + jwx native ML-DSA (PQ goal) | **Met** on Go 1.27+ (no `jwx-go/mldsa` companion needed) |
+| jwx v4 mature | **Met** — pinned **`v4.4.0`** |
+| Smoke / full tests under `GOTOOLCHAIN=go1.27.0` | **Met** on cutover branch |
+| Stdlib **`crypto/mldsa`** + jwx native ML-DSA (PQ goal) | **Met** — `TestForeignSignerMLDSA` (44/65/87) |
 
 ### Why this was deferred (history)
 
@@ -95,7 +93,8 @@ No change to key types or httpsign `SignConfig` / `VerifyConfig` / `Fields` for 
 
 | Item | Requirement |
 |------|-------------|
-| Go | **1.27.0+** in `go.mod` / CI (today CI is still 1.24) |
+| Go | **1.27.0+** in `go.mod` / CI |
+| golangci-lint | **≥ v2.13** (built with Go 1.27; v2.12.x fails with go.mod `1.27.0`) |
 | `GOEXPERIMENT=jsonv2` | Not required; do not set |
 | `GOEXPERIMENT=nojsonv2` | Avoid in CI |
 
@@ -109,15 +108,17 @@ Scoped to httpsign’s use of **jwa** + **jws** only (no JWT/JWE/JWK fetch in li
 
 ### Code / deps
 
-- [ ] `go.mod`: Go 1.27.0+; require `github.com/lestrrat-go/jwx/v4` (**≥ v4.4.0**); remove v2 and v3.
-- [ ] Rewrite imports `jwx/v2|v3` → `jwx/v4`; collapse constructors; update `sign()` / `verify()` dispatch for v4 `jws.Signer` / `jws.Verifier` (renamed from v3 `Signer2` / `Verifier2`; parameter order matches today’s V3 path: key before payload).
-- [ ] Confirm factory APIs (`SignerFor` / `VerifierFor`) and `NoSignature` rejection still work.
-- [ ] Drop v2↔v3 cross-compat tests; keep round-trip tests on the single v4 path.
-- [ ] **PQ:** foreign-JWS round-trip with `crypto/mldsa` + `jwa.MLDSA65()` (and smoke 44/87 if cheap); document in README/release notes.
-- [ ] Run `jwxmigrate --fix` if helpful; fix remaining compile/test failures by hand.
-- [ ] CI (`test.yml`, `lint.yml`, CodeQL): Go **1.27**; do not set `jsonv2` / `nojsonv2`.
-- [ ] Docs: README / `CLAUDE.md` / this file — remove dual-version guidance; **`v0.6.0`** release notes with caller steps + PQ; link upstream Changes-v4 if relevant.
-- [ ] Tag **`v0.6.0`** and publish.
+- [x] `go.mod`: Go 1.27.0+; require `github.com/lestrrat-go/jwx/v4` (**≥ v4.4.0**); remove v2 and v3.
+- [x] Rewrite imports `jwx/v2|v3` → `jwx/v4`; collapse constructors; update `sign()` / `verify()` dispatch for v4 `jws.Signer` / `jws.Verifier` (renamed from v3 `Signer2` / `Verifier2`; parameter order matches today’s V3 path: key before payload).
+- [x] Confirm factory APIs (`SignerFor` / `VerifierFor`) and `NoSignature` rejection still work.
+- [x] Drop v2↔v3 cross-compat tests; keep round-trip tests on the single v4 path.
+- [x] **PQ:** foreign-JWS round-trips with `crypto/mldsa` + `jwa.MLDSA44/65/87()`; document in README/release notes.
+- [ ] Run `jwxmigrate --fix` if helpful; fix remaining compile/test failures by hand. *(done by hand; migrate tool optional)*
+- [x] CI (`test.yml`, `lint.yml`, CodeQL): Go **1.27**; do not set `jsonv2` / `nojsonv2`.
+- [x] Lint: bump **golangci-lint ≥ v2.13** (v2.12.2 is built with go1.26 → fails on go.mod 1.27.0).
+- [x] Docs: README / `CLAUDE.md` / this file — remove dual-version guidance; **`v0.6.0`** release notes with caller steps + PQ; link upstream Changes-v4 if relevant.
+- [x] Hardening: constructor `jws.AlgorithmsForKey` check; reject `NoSignature`; HMAC keys must be `[]byte`; document `SetAllowedAlgs` vs JWS alg.
+- [ ] Tag **`v0.6.0`** and publish. *(after merge)*
 
 ### Upstream items likely N/A or low priority
 

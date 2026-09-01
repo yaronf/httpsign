@@ -1,22 +1,20 @@
 package httpsign
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"reflect"
 	"strings"
 	"testing"
 
-	// JWX v2 - for existing tests
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jws"
-
-	// JWX v3 - for new V3 tests
-	jwav3 "github.com/lestrrat-go/jwx/v3/jwa"
-	jwsv3 "github.com/lestrrat-go/jwx/v3/jws"
+	"github.com/lestrrat-go/jwx/v4/jwa"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewHMACSHA256Signer(t *testing.T) {
@@ -148,7 +146,7 @@ func TestForeignSigner(t *testing.T) {
 	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
 	signatureName := "sig1"
 	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
-	signer, err := NewJWSSigner(jwa.ES256, priv, config.SetKeyID("key1"), fields)
+	signer, err := NewJWSSigner(jwa.ES256(), priv, config.SetKeyID("key1"), fields)
 	if err != nil {
 		t.Errorf("Failed to create JWS signer")
 	}
@@ -159,7 +157,7 @@ func TestForeignSigner(t *testing.T) {
 	}
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewJWSVerifier(jwa.ES256, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
+	verifier, err := NewJWSVerifier(jwa.ES256(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -179,7 +177,7 @@ func TestMessageForeignSigner(t *testing.T) {
 	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
 	signatureName := "sig1"
 	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
-	signer, err := NewJWSSigner(jwa.ES256, priv, config.SetKeyID("key1"), fields)
+	signer, err := NewJWSSigner(jwa.ES256(), priv, config.SetKeyID("key1"), fields)
 	if err != nil {
 		t.Errorf("Failed to create JWS signer")
 	}
@@ -190,7 +188,7 @@ func TestMessageForeignSigner(t *testing.T) {
 	}
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewJWSVerifier(jwa.ES256, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
+	verifier, err := NewJWSVerifier(jwa.ES256(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -252,15 +250,71 @@ func TestNewRSASigner1(t *testing.T) {
 	}
 }
 
+func TestNewJWSSigner(t *testing.T) {
+	hmacKey := []byte(strings.Repeat("x", 32)) // RFC 7518 HS256 minimum
+	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+	p256, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	mldsa44, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		alg     jwa.SignatureAlgorithm
+		key     any
+		wantErr bool
+	}{
+		{name: "happy path", alg: jwa.HS256(), key: hmacKey},
+		{name: "none", alg: jwa.NoSignature(), key: hmacKey, wantErr: true},
+		{name: "nil key", alg: jwa.HS256(), key: nil, wantErr: true},
+		{name: "string hmac key", alg: jwa.HS256(), key: "1234", wantErr: true},
+		{name: "short hmac key", alg: jwa.HS256(), key: []byte("too-short"), wantErr: true},
+		{name: "empty hmac key", alg: jwa.HS256(), key: []byte{}, wantErr: true},
+		{name: "key alg mismatch", alg: jwa.HS256(), key: priv, wantErr: true},
+		{name: "rsa match", alg: jwa.RS256(), key: priv},
+		{name: "rsa public key", alg: jwa.RS256(), key: &priv.PublicKey, wantErr: true},
+		{name: "ecdsa curve match", alg: jwa.ES256(), key: p256},
+		{name: "ecdsa public key", alg: jwa.ES256(), key: &p256.PublicKey, wantErr: true},
+		{name: "ecdsa curve mismatch", alg: jwa.ES384(), key: p256, wantErr: true},
+		{name: "ecdsa nil curve", alg: jwa.ES256(), key: ecdsa.PrivateKey{}, wantErr: true},
+		{name: "mldsa params match", alg: jwa.MLDSA44(), key: mldsa44},
+		{name: "mldsa public key", alg: jwa.MLDSA44(), key: mldsa44.Public().(*mldsa.PublicKey), wantErr: true},
+		{name: "mldsa params mismatch", alg: jwa.MLDSA65(), key: mldsa44, wantErr: true},
+		{name: "mldsa wrong key type", alg: jwa.MLDSA44(), key: p256, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewJWSSigner(tt.alg, tt.key, nil, *NewFields())
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			require.NotNil(t, got.foreignSigner)
+			assert.Equal(t, tt.key, got.key)
+			assert.Empty(t, got.alg)
+		})
+	}
+}
+
 func TestNewJWSVerifier(t *testing.T) {
+	hmacKey := []byte(strings.Repeat("x", 32)) // RFC 7518 HS256 minimum
+	priv, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+	p256, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	mldsa44, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	require.NoError(t, err)
+
 	type args struct {
 		alg    jwa.SignatureAlgorithm
 		key    any
-		keyID  string
 		config *VerifyConfig
 		fields Fields
 	}
-	verifier, _ := jws.NewVerifier("HS256")
 	tests := []struct {
 		name    string
 		args    args
@@ -270,27 +324,25 @@ func TestNewJWSVerifier(t *testing.T) {
 		{
 			name: "happy path",
 			args: args{
-				alg:    jwa.SignatureAlgorithm("HS256"),
-				key:    "1234",
-				keyID:  "key200",
+				alg:    jwa.HS256(),
+				key:    hmacKey,
 				config: nil,
 				fields: *NewFields(),
 			},
 			want: &Verifier{
-				key:             "1234",
+				key:             hmacKey,
 				alg:             "",
 				config:          NewVerifyConfig(),
 				fields:          *NewFields(),
-				foreignVerifier: verifier,
+				foreignVerifier: nil, // cleared below
 			},
 			wantErr: false,
 		},
 		{
 			name: "none",
 			args: args{
-				alg:    jwa.NoSignature,
-				key:    "1234",
-				keyID:  "key200",
+				alg:    jwa.NoSignature(),
+				key:    hmacKey,
 				config: NewVerifyConfig(),
 				fields: *NewFields(),
 			},
@@ -298,11 +350,119 @@ func TestNewJWSVerifier(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "bad verifier",
+			name: "nil key",
 			args: args{
-				alg:    jwa.SignatureAlgorithm("bad"),
+				alg:    jwa.HS256(),
+				key:    nil,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "string hmac key",
+			args: args{
+				alg:    jwa.HS256(),
 				key:    "1234",
-				keyID:  "key200",
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "key alg mismatch",
+			args: args{
+				alg:    jwa.HS256(),
+				key:    priv.Public(),
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "rsa private key",
+			args: args{
+				alg:    jwa.RS256(),
+				key:    priv,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "ecdsa curve match",
+			args: args{
+				alg:    jwa.ES256(),
+				key:    &p256.PublicKey,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want: &Verifier{
+				key:             &p256.PublicKey,
+				alg:             "",
+				config:          NewVerifyConfig(),
+				fields:          *NewFields(),
+				foreignVerifier: nil,
+			},
+		},
+		{
+			name: "ecdsa curve mismatch",
+			args: args{
+				alg:    jwa.ES384(),
+				key:    &p256.PublicKey,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "ecdsa private key",
+			args: args{
+				alg:    jwa.ES256(),
+				key:    p256,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "mldsa params match",
+			args: args{
+				alg:    jwa.MLDSA44(),
+				key:    mldsa44.Public().(*mldsa.PublicKey),
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want: &Verifier{
+				key:             mldsa44.Public().(*mldsa.PublicKey),
+				alg:             "",
+				config:          NewVerifyConfig(),
+				fields:          *NewFields(),
+				foreignVerifier: nil,
+			},
+		},
+		{
+			name: "mldsa params mismatch",
+			args: args{
+				alg:    jwa.MLDSA65(),
+				key:    mldsa44.Public().(*mldsa.PublicKey),
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "mldsa private key",
+			args: args{
+				alg:    jwa.MLDSA44(),
+				key:    mldsa44,
 				config: NewVerifyConfig(),
 				fields: *NewFields(),
 			},
@@ -347,209 +507,38 @@ func TestVerify(t *testing.T) {
 	assert.ErrorContains(t, err, "expected", "bad algorithm")
 }
 
-// V3 Tests - Testing jwx v3 functionality
-
-func TestForeignSignerV3(t *testing.T) {
-	priv, pub, err := genP256KeyPair()
-	if err != nil {
-		t.Errorf("Failed to generate keypair: %v", err)
-	}
-
-	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
-	signatureName := "sig1"
-	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
-	signer, err := NewJWSSignerV3(jwav3.ES256(), priv, config.SetKeyID("key1"), fields)
-	if err != nil {
-		t.Errorf("Failed to create JWS V3 signer: %v", err)
-	}
-	req := readRequest(httpreq2)
-	sigInput, sig, err := SignRequest(signatureName, *signer, req)
-	if err != nil {
-		t.Errorf("signature failed: %v", err)
-	}
-	req.Header.Add("Signature", sig)
-	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewJWSVerifierV3(jwav3.ES256(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
-	if err != nil {
-		t.Errorf("could not generate V3 Verifier: %s", err)
-	}
-	err = VerifyRequest(signatureName, *verifier, req)
-	if err != nil {
-		t.Errorf("verification error: %s", err)
-	}
-}
-
-// Same as TestForeignSignerV3 but using Message
-func TestMessageForeignSignerV3(t *testing.T) {
-	priv, pub, err := genP256KeyPair()
-	if err != nil {
-		t.Errorf("Failed to generate keypair: %v", err)
-	}
-
-	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
-	signatureName := "sig1"
-	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
-	signer, err := NewJWSSignerV3(jwav3.ES256(), priv, config.SetKeyID("key1"), fields)
-	if err != nil {
-		t.Errorf("Failed to create JWS V3 signer: %v", err)
-	}
-	req := readRequest(httpreq2)
-	sigInput, sig, err := SignRequest(signatureName, *signer, req)
-	if err != nil {
-		t.Errorf("signature failed: %v", err)
-	}
-	req.Header.Add("Signature", sig)
-	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewJWSVerifierV3(jwav3.ES256(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
-	if err != nil {
-		t.Errorf("could not generate V3 Verifier: %s", err)
-	}
-	msg, err := NewMessage(NewMessageConfig().WithRequest(req))
-	if err != nil {
-		t.Errorf("Failed to create Message")
-	}
-	_, err = msg.Verify(signatureName, *verifier)
-	if err != nil {
-		t.Errorf("verification error: %s", err)
-	}
-}
-
-func TestNewJWSVerifierV3(t *testing.T) {
-	type args struct {
-		alg    jwav3.SignatureAlgorithm
-		key    any
-		config *VerifyConfig
-		fields Fields
-	}
-	verifier, _ := jwsv3.NewVerifier(jwav3.HS256())
-	tests := []struct {
-		name    string
-		args    args
-		want    *Verifier
-		wantErr bool
+func TestForeignSignerMLDSA(t *testing.T) {
+	cases := []struct {
+		name   string
+		params mldsa.Parameters
+		alg    jwa.SignatureAlgorithm
 	}{
-		{
-			name: "happy path",
-			args: args{
-				alg:    jwav3.HS256(),
-				key:    "1234",
-				config: nil,
-				fields: *NewFields(),
-			},
-			want: &Verifier{
-				key:             "1234",
-				alg:             "",
-				config:          NewVerifyConfig(),
-				fields:          *NewFields(),
-				foreignVerifier: verifier,
-			},
-			wantErr: false,
-		},
-		{
-			name: "none",
-			args: args{
-				alg:    jwav3.NoSignature(),
-				key:    "1234",
-				config: NewVerifyConfig(),
-				fields: *NewFields(),
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "nil key",
-			args: args{
-				alg:    jwav3.HS256(),
-				key:    nil,
-				config: NewVerifyConfig(),
-				fields: *NewFields(),
-			},
-			want:    nil,
-			wantErr: true,
-		},
+		{"MLDSA44", mldsa.MLDSA44(), jwa.MLDSA44()},
+		{"MLDSA65", mldsa.MLDSA65(), jwa.MLDSA65()},
+		{"MLDSA87", mldsa.MLDSA87(), jwa.MLDSA87()},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewJWSVerifierV3(tt.args.alg, tt.args.key, tt.args.config, tt.args.fields)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewJWSVerifierV3() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != nil {
-				got.foreignVerifier = nil
-			}
-			if tt.want != nil {
-				tt.want.foreignVerifier = nil
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewJWSVerifierV3() got = %v, want %v", got, tt.want)
-			}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			priv, err := mldsa.GenerateKey(tc.params)
+			require.NoError(t, err)
+			pub := priv.Public().(*mldsa.PublicKey)
+
+			config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
+			signatureName := "sig1"
+			fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
+			signer, err := NewJWSSigner(tc.alg, priv, config.SetKeyID("pq1"), fields)
+			require.NoError(t, err)
+
+			req := readRequest(httpreq2)
+			sigInput, sig, err := SignRequest(signatureName, *signer, req)
+			require.NoError(t, err)
+			req.Header.Add("Signature", sig)
+			req.Header.Add("Signature-Input", sigInput)
+
+			verifier, err := NewJWSVerifier(tc.alg, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("pq1"), fields)
+			require.NoError(t, err)
+			require.NoError(t, VerifyRequest(signatureName, *verifier, req))
 		})
 	}
 }
 
-// Test cross-compatibility between v2 and v3
-func TestCrossVersionCompatibility(t *testing.T) {
-	priv, pub, err := genP256KeyPair()
-	if err != nil {
-		t.Fatalf("Failed to generate keypair: %v", err)
-	}
-
-	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false)
-	signatureName := "sig1"
-	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
-
-	// Test 1: Sign with v2, verify with v3
-	t.Run("v2_sign_v3_verify", func(t *testing.T) {
-		signerV2, err := NewJWSSigner(jwa.ES256, priv, config.SetKeyID("key1"), fields)
-		if err != nil {
-			t.Fatalf("Failed to create v2 signer: %v", err)
-		}
-
-		req := readRequest(httpreq2)
-		sigInput, sig, err := SignRequest(signatureName, *signerV2, req)
-		if err != nil {
-			t.Fatalf("v2 signature failed: %v", err)
-		}
-
-		req.Header.Add("Signature", sig)
-		req.Header.Add("Signature-Input", sigInput)
-
-		verifierV3, err := NewJWSVerifierV3(jwav3.ES256(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
-		if err != nil {
-			t.Fatalf("Failed to create v3 verifier: %v", err)
-		}
-
-		err = VerifyRequest(signatureName, *verifierV3, req)
-		if err != nil {
-			t.Errorf("v3 verification of v2 signature failed: %v", err)
-		}
-	})
-
-	// Test 2: Sign with v3, verify with v2
-	t.Run("v3_sign_v2_verify", func(t *testing.T) {
-		signerV3, err := NewJWSSignerV3(jwav3.ES256(), priv, config.SetKeyID("key1"), fields)
-		if err != nil {
-			t.Fatalf("Failed to create v3 signer: %v", err)
-		}
-
-		req := readRequest(httpreq2)
-		sigInput, sig, err := SignRequest(signatureName, *signerV3, req)
-		if err != nil {
-			t.Fatalf("v3 signature failed: %v", err)
-		}
-
-		req.Header.Add("Signature", sig)
-		req.Header.Add("Signature-Input", sigInput)
-
-		verifierV2, err := NewJWSVerifier(jwa.ES256, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
-		if err != nil {
-			t.Fatalf("Failed to create v2 verifier: %v", err)
-		}
-
-		err = VerifyRequest(signatureName, *verifierV2, req)
-		if err != nil {
-			t.Errorf("v2 verification of v3 signature failed: %v", err)
-		}
-	})
-}
