@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
-	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -136,12 +135,17 @@ func wimseEd25519Key(t *testing.T, jwk wimseJWK) (ed25519.PrivateKey, ed25519.Pu
 func wimseP256Key(t *testing.T, jwk wimseJWK) (*ecdsa.PrivateKey, ecdsa.PublicKey) {
 	t.Helper()
 	require.Equal(t, "ES256", jwk.Alg)
-	priv := &ecdsa.PrivateKey{
-		PublicKey: ecdsa.PublicKey{Curve: elliptic.P256()},
-		D:         new(big.Int).SetBytes(wimseB64u(t, jwk.D)),
+	curve := elliptic.P256()
+	d := wimseB64u(t, jwk.D)
+	orderLen := (curve.Params().N.BitLen() + 7) / 8
+	require.LessOrEqual(t, len(d), orderLen)
+	if len(d) < orderLen {
+		padded := make([]byte, orderLen)
+		copy(padded[orderLen-len(d):], d)
+		d = padded
 	}
-	priv.X = new(big.Int).SetBytes(wimseB64u(t, jwk.X))
-	priv.Y = new(big.Int).SetBytes(wimseB64u(t, jwk.Y))
+	priv, err := ecdsa.ParseRawPrivateKey(curve, d)
+	require.NoError(t, err)
 	return priv, priv.PublicKey
 }
 
