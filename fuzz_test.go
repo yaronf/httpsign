@@ -95,10 +95,9 @@ func FuzzMessageVerifyRequest(f *testing.F) {
 		verifier := makeRSAVerifier(f, "key1", *NewFields())
 		msg, err := NewMessage(NewMessageConfig().WithRequest(req))
 		if err != nil {
-			t.Errorf("Failed to create Message")
+			return // invalid request from fuzz input; only report panics
 		}
 		_, _ = msg.Verify(sigName, verifier)
-		// only report panics
 	})
 }
 
@@ -157,7 +156,7 @@ func FuzzMessageSignAndVerifyHMAC(f *testing.F) {
 			assert.NoError(t, err, "could not generate Verifier")
 			msg, err := NewMessage(NewMessageConfig().WithRequest(req))
 			if err != nil {
-				t.Errorf("Failed to create Message")
+				return
 			}
 			_, err = msg.Verify(signatureName, *verifier)
 			assert.NoError(t, err, "verification error")
