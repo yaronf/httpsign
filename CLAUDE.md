@@ -61,7 +61,7 @@ Optional foreign JWS uses `lestrrat-go/jwx/v4` via `NewJWSSigner` / `NewJWSVerif
 ### Testing conventions
 
 - `signatures_test.go` contains the full RFC 9421 test vector suite (134 KB) — do not modify without understanding the spec.
-- `fuzz_test.go` has fuzz entry points; seed corpus lives in `testdata/fuzz/`.
+- `fuzz_test.go` has fuzz entry points (`FuzzVerifyRequest`, `FuzzVerifyViaMessage`, `FuzzSignAndVerifyHMAC`, `FuzzHMACViaMessage`, `FuzzNewMessage`); see [internal-docs/FUZZ.md](internal-docs/FUZZ.md). Seed corpus: `f.Add` plus optional `testdata/fuzz/`.
 - `http2_test.go` and `trailer_test.go` cover HTTP/2 and trailer-header edge cases.
 - Tests use `github.com/stretchr/testify` assertions and `github.com/andreyvit/diff` for readable diffs.
 

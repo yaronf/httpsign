@@ -4,6 +4,7 @@ This directory contains internal documentation for maintainers of the httpsign l
 
 ## Contents
 
+- **FUZZ.md** — Fuzz suite playbook: targets, local/CI commands, how to read metrics and corpus layout.
 - **JWX.md** — Optional jwx / foreign-JWS: cut over to jwx v4.4.0+ on Go 1.27+ as **httpsign `v0.6.0`**, with **ML-DSA PQ signatures** as an explicit goal. Gate met 2026-08-26.
 - **RELEASE-v0.6.0.md** — Draft GitHub release text and upgrade guide for **v0.6.0** (copy Summary into the release when tagging).
 
