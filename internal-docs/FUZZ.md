@@ -75,7 +75,7 @@ Package-wide `%` is optional secondary context only. It is diluted by client/han
 | `FuzzHMACViaMessage` | ~1.0M | 149 (150) | no |
 | `FuzzNewMessage` | ~664k | 280 (286) | no |
 
-Seed coverage (no mutation), rough mean of per-function statement % on the focus files:
+Seed coverage (no mutation; `f.Add` + committed `testdata` only), rough mean of per-function statement % on the focus files:
 
 | Profile | signatures | httpparse | fields | digest | message | package |
 |---------|------------|-----------|--------|--------|---------|---------|
@@ -85,6 +85,43 @@ Seed coverage (no mutation), rough mean of per-function statement % on the focus
 
 Gaps that seeds now push harder: truncated/malformed SFV, `;tr` / `;bs` / `;sf`, `@query-param`, `content-digest`, trailers, response + associated-request configs.
 
+## Soak (2026-09-05, SFV-weighted ~8h fuzz-time)
+
+Budgets: `FuzzVerifyRequest` 2h, `FuzzVerifyViaMessage` 2h, `FuzzNewMessage` 90m, `FuzzSignAndVerifyHMAC` 75m, `FuzzHMACViaMessage` 75m. Host sleep paused progress overnight; after sleep was disabled, remaining fuzz-time finished on schedule (~22:30 local).
+
+| Target | Result | Execs | New interesting (total) |
+|--------|--------|------:|-------------------------|
+| `FuzzVerifyRequest` | PASS | 220M | 866 (1121) |
+| `FuzzVerifyViaMessage` | PASS | 201M | 826 (1118) |
+| `FuzzNewMessage` | PASS | 151M | 315 (612) |
+| `FuzzSignAndVerifyHMAC` | PASS | 158M | 471 (676) |
+| `FuzzHMACViaMessage` | PASS | 144M | 461 (629) |
+
+**Crashes:** none.
+
+Interesting-input growth continued through the long runs (especially verify / HMAC), with plateaus late in each budget — expected, not a signal to stop early on a short quiet window.
+
+### Post-soak corpus coverage
+
+`go test -fuzz` does not write a coverprofile while mutating. Coverage after a soak is measured by **replaying** the cached corpus:
+
+1. Interesting inputs live under `$GOCACHE/fuzz/github.com/yaronf/httpsign/<Target>/` (not under `testdata/fuzz/` unless copied).
+2. Stage those files into `testdata/fuzz/<Target>/` temporarily (hardlinks are fine).
+3. `go test -run='^FuzzXxx$' -coverprofile=... .` then exercises the soak corpus as ordinary seeds.
+4. Remove the staged files afterward; do **not** bulk-commit the cache dump.
+
+2026-09-05 replay (cache entry counts ≈ soak “total interesting”), mean per-function % on focus files / package total:
+
+| Target | Cache entries | signatures | httpparse | fields | digest | message | package |
+|--------|--------------:|-----------:|----------:|-------:|-------:|--------:|--------:|
+| `FuzzVerifyRequest` | ~1108 | 26.7% | 67.9% | 19.6% | 10.7% | 65.5% | 21.2% |
+| `FuzzVerifyViaMessage` | ~1111 | 21.7% | 67.9% | 19.6% | 10.7% | 70.8% | 20.7% |
+| `FuzzSignAndVerifyHMAC` | ~673 | 44.5% | 76.7% | 39.5% | 41.8% | 65.5% | 33.4% |
+| `FuzzHMACViaMessage` | ~626 | 42.0% | 76.5% | 39.5% | 41.8% | 70.8% | 34.1% |
+| `FuzzNewMessage` | ~604 | 23.5% | 74.7% | 21.3% | 0.0% | 76.5% | 22.2% |
+
+Compared with seed-only baselines, package totals rose a few points (e.g. verify ~18.5%→21.2%, HMAC ~30.8%→33–34%). Most soak “interesting” finds refine edges already near existing coverage rather than opening large new statement regions — still valuable for crash hunting.
+
 ## Harness conventions
 
 - **Panic-oriented** (`FuzzVerifyRequest`, `FuzzVerifyViaMessage`): discard expected verify/setup errors; return early on nil/`NewMessage` failure; never `t.Error` on bad signatures.
@@ -93,7 +130,9 @@ Gaps that seeds now push harder: truncated/malformed SFV, `;tr` / `;bs` / `;sf`,
 
 ## CI
 
-The `fuzz` job in `.github/workflows/test.yml` runs each target with `-run='^$' -fuzztime=15s` sequentially on Go 1.27. It fails on crash or failing corpus. This is a **smoke**, not a long soak; longer nightly budgets can be added later.
+The `fuzz` job in `.github/workflows/test.yml` runs each target with `-run='^$' -fuzztime=15s` sequentially on Go 1.27. It fails on crash or failing corpus. This is a **smoke**, not a long soak.
+
+For occasional long soaks (hours), use the weighted budgets in the soak section above; keep the machine from sleeping so wall clock ≈ fuzz-time. Optional follow-on: a scheduled nightly job with a larger `-fuzztime`.
 
 ## Checklist (after library changes that touch parse/sign/verify)
 
