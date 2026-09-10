@@ -6,7 +6,7 @@ Copy the **Summary** section below into the GitHub release when tagging `v0.6.0`
 
 ## Summary
 
-**Breaking release:** requires **Go 1.27+** and replaces dual `jwx/v2` + `jwx/v3` foreign-JWS support with a single **`github.com/lestrrat-go/jwx/v4`** dependency (≥ v4.4.0).
+**Breaking release:** requires **Go 1.27+** and replaces dual `jwx/v2` + `jwx/v3` foreign-JWS support with a single **`github.com/lestrrat-go/jwx/v4`** dependency (≥ v4.5.0).
 
 ### Highlights
 
@@ -50,12 +50,12 @@ HMAC keys for foreign JWS must be `[]byte` (not `string`), at least 32/48/64 byt
 ### Toolchain
 
 - **Go:** 1.27.0+ (`encoding/json/v2` in stdlib; no `GOEXPERIMENT=jsonv2`).
-- **jwx:** v4.4.0+ only; v2 and v3 are no longer pulled transitively.
+- **jwx:** v4.5.0+ only; v2 and v3 are no longer pulled transitively.
 
 ### Upstream references
 
-- [jwx v4 MIGRATION.md](https://github.com/lestrrat-go/jwx/blob/v4.4.0/MIGRATION.md)
-- [jwx v4 Changes-v4.md](https://github.com/lestrrat-go/jwx/blob/v4.4.0/Changes-v4.md)
+- [jwx v4 MIGRATION.md](https://github.com/lestrrat-go/jwx/blob/v4.5.0/MIGRATION.md)
+- [jwx v4 Changes-v4.md](https://github.com/lestrrat-go/jwx/blob/v4.5.0/Changes-v4.md)
 
 ### Also in v0.6.0 (non-breaking behavior fixes)
 

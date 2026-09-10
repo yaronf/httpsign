@@ -6,7 +6,7 @@ Single source of truth for optional jwx-backed JWS support in httpsign.
 
 jwx is used only for **optional “foreign” JWS** signing and verification. **Native** algorithms (HMAC-SHA256, RSA, RSASSA-PSS, P-256/P-384, Ed25519) do **not** use jwx.
 
-**On `jwx-v4-cutover` / for `v0.6.0`:** single dependency `github.com/lestrrat-go/jwx/v4` (**≥ v4.4.0**); public API is `NewJWSSigner` / `NewJWSVerifier` only (v2 and `*V3` removed). Go floor **1.27.0**. ML-DSA via the same constructors.
+**On `jwx-v4-cutover` / for `v0.6.0`:** single dependency `github.com/lestrrat-go/jwx/v4` (**≥ v4.5.0**); public API is `NewJWSSigner` / `NewJWSVerifier` only (v2 and `*V3` removed). Go floor **1.27.0**. ML-DSA via the same constructors.
 
 **Previously (≤ v0.5.x):** `go.mod` pulled both `jwx/v2` and `jwx/v3`, with `NewJWSSigner`/`NewJWSVerifier` (v2) and `NewJWSSignerV3`/`NewJWSVerifierV3` (v3).
 
@@ -46,7 +46,7 @@ Ship as **`v0.6.0`** when merged. Dual v2+v3 is removed on this branch.
 |------|--------|
 | Go **1.27.0** stable on [go.dev/dl](https://go.dev/dl/) | **Met** (released 2026-08-19) |
 | `encoding/json/v2` in stdlib (no `GOEXPERIMENT=jsonv2`) | **Met** — see [Go 1.27 notes](https://go.dev/doc/go1.27) |
-| jwx v4 mature | **Met** — pinned **`v4.4.0`** |
+| jwx v4 mature | **Met** — pinned **`v4.5.0`** |
 | Smoke / full tests under `GOTOOLCHAIN=go1.27.0` | **Met** on cutover branch |
 | Stdlib **`crypto/mldsa`** + jwx native ML-DSA (PQ goal) | **Met** — `TestForeignSignerMLDSA` (44/65/87) |
 
@@ -61,15 +61,15 @@ Ship as **`v0.6.0`** when merged. Dual v2+v3 is removed on this branch.
 
 ## Decision: all-in on jwx v4 (`v0.6.0`)
 
-Cut over to **`github.com/lestrrat-go/jwx/v4` only**, pin **≥ v4.4.0**, drop v2 and v3 in **`v0.6.0`**.
+Cut over to **`github.com/lestrrat-go/jwx/v4` only**, pin **≥ v4.5.0**, drop v2 and v3 in **`v0.6.0`**.
 
 ### What the cutover does
 
 - Raise `go` / toolchain / CI to **Go 1.27.0+**.
 - Drop `jwx/v2` and `jwx/v3` from `go.mod`.
 - Single constructor pair on v4 types: **`NewJWSSigner` / `NewJWSVerifier`** (remove `*V3`; retire the v2-typed overloads).
-- Follow upstream [MIGRATION.md](https://github.com/lestrrat-go/jwx/blob/v4.4.0/MIGRATION.md) and optionally [jwxmigrate](https://github.com/jwx-go/jwxmigrate) (`jwxmigrate/v4`).
-- Re-run foreign-JWS tests (classical + **ML-DSA**); note behavioral tightenings in [Changes-v4.md](https://github.com/lestrrat-go/jwx/blob/v4.4.0/Changes-v4.md) if any affect jwa/jws-only use.
+- Follow upstream [MIGRATION.md](https://github.com/lestrrat-go/jwx/blob/v4.5.0/MIGRATION.md) and optionally [jwxmigrate](https://github.com/jwx-go/jwxmigrate) (`jwxmigrate/v4`).
+- Re-run foreign-JWS tests (classical + **ML-DSA**); note behavioral tightenings in [Changes-v4.md](https://github.com/lestrrat-go/jwx/blob/v4.5.0/Changes-v4.md) if any affect jwa/jws-only use.
 - Update `CLAUDE.md` / README snippets that still recommend dual v2/v3 or `*V3`; document PQ via foreign JWS.
 - Tag and release **`v0.6.0`**.
 
@@ -104,11 +104,11 @@ Upstream still allows Go 1.26 + `GOEXPERIMENT=jsonv2` for jwx v4; **httpsign wil
 
 ## Implementation checklist (do now)
 
-Scoped to httpsign’s use of **jwa** + **jws** only (no JWT/JWE/JWK fetch in library glue). Upstream detail: [MIGRATION.md (v4.4.0)](https://github.com/lestrrat-go/jwx/blob/v4.4.0/MIGRATION.md).
+Scoped to httpsign’s use of **jwa** + **jws** only (no JWT/JWE/JWK fetch in library glue). Upstream detail: [MIGRATION.md (v4.5.0)](https://github.com/lestrrat-go/jwx/blob/v4.5.0/MIGRATION.md).
 
 ### Code / deps
 
-- [x] `go.mod`: Go 1.27.0+; require `github.com/lestrrat-go/jwx/v4` (**≥ v4.4.0**); remove v2 and v3.
+- [x] `go.mod`: Go 1.27.0+; require `github.com/lestrrat-go/jwx/v4` (**≥ v4.5.0**); remove v2 and v3.
 - [x] Rewrite imports `jwx/v2|v3` → `jwx/v4`; collapse constructors; update `sign()` / `verify()` dispatch for v4 `jws.Signer` / `jws.Verifier` (renamed from v3 `Signer2` / `Verifier2`; parameter order matches today’s V3 path: key before payload).
 - [x] Confirm factory APIs (`SignerFor` / `VerifierFor`) and `NoSignature` rejection still work.
 - [x] Drop v2↔v3 cross-compat tests; keep round-trip tests on the single v4 path.

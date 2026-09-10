@@ -43,7 +43,7 @@ Full migration notes: [internal-docs/RELEASE-v0.6.0.md](internal-docs/RELEASE-v0
 
 ### Foreign JWS and ML-DSA
 
-Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) (≥ v4.4.0) via `NewJWSSigner` / `NewJWSVerifier`. Requires **Go 1.27+** (stdlib `encoding/json/v2`; no `GOEXPERIMENT`).
+Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) (≥ v4.5.0) via `NewJWSSigner` / `NewJWSVerifier`. Requires **Go 1.27+** (stdlib `encoding/json/v2`; no `GOEXPERIMENT`).
 
 **ML-DSA (FIPS 204)** is supported through the same constructors with `crypto/mldsa` keys and `jwa.MLDSA44()` / `MLDSA65()` / `MLDSA87()`. RFC 9421 does not assign HTTP Message Signatures algorithm identifiers for ML-DSA; treat it like other foreign JWS algorithms (`SignAlg(false)`, JWS `alg` in the JWS layer only if your profile requires it).
 
