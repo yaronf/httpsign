@@ -129,19 +129,23 @@ func NewEd25519SignerFromSeed(seed []byte, config *SignConfig, fields Fields) (*
 // NewJWSSigner creates a generic signer for JWS algorithms via github.com/lestrrat-go/jwx/v4.
 // The particular key type for each algorithm is documented in that package (including
 // crypto/mldsa keys for ML-DSA on Go 1.27+). HMAC keys must be []byte (not string).
-// Config may be nil for a default configuration; SignAlg must be false (see SignConfig.SignAlg).
-func NewJWSSigner(alg jwa.SignatureAlgorithm, key interface{}, config *SignConfig, fields Fields) (*Signer, error) {
+// Config may be nil (defaults with SignAlg(false)). A non-nil config that would emit
+// HTTP Signature-Input "alg" is rejected — foreign JWS has no RFC 9421 algorithm id.
+func NewJWSSigner(alg jwa.SignatureAlgorithm, key any, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
-	if alg == jwa.NoSignature() {
-		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
+	alg, err := resolveRegisteredJWSAlg(alg)
+	if err != nil {
+		return nil, err
 	}
 	if err := validateJWSKeyAlg(alg, key, true); err != nil {
 		return nil, err
 	}
 	if config == nil {
-		config = NewSignConfig()
+		config = NewSignConfig().SignAlg(false)
+	} else if config.signAlg {
+		return nil, fmt.Errorf("NewJWSSigner requires SignAlg(false): foreign JWS has no HTTP Message Signatures algorithm identifier")
 	}
 	jwsSigner, err := jws.SignerFor(alg)
 	if err != nil {
@@ -327,17 +331,41 @@ func NewEd25519Verifier(key ed25519.PublicKey, config *VerifyConfig, fields Fiel
 	}, nil
 }
 
-// NewJWSVerifier creates a generic verifier for JWS algorithms via github.com/lestrrat-go/jwx/v4.
-// The particular key type for each algorithm is documented in that package (including
-// crypto/mldsa keys for ML-DSA on Go 1.27+). HMAC keys must be []byte (not string).
-// Set config to nil for a default configuration.
-// Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
-func NewJWSVerifier(alg jwa.SignatureAlgorithm, key interface{}, config *VerifyConfig, fields Fields) (*Verifier, error) {
+// NewJWSVerifier creates a foreign-JWS verifier by inferring the JWS algorithm from key.
+// Preferred over NewJWSVerifierWithAlg when the key type uniquely determines the alg.
+//
+// Allowed key types:
+//   - jwk.Key with alg, or EC/OKP with unambiguous crv (P-256→ES256, …, Ed25519→EdDSA)
+//   - *ecdsa.PublicKey (curve → ES256/384/512)
+//   - *mldsa.PublicKey (Parameters → ML-DSA-44/65/87)
+//
+// Raw RSA/HMAC keys cannot be inferred — use NewJWSVerifierWithAlg.
+// allowed may be nil to skip alg policy; prefer a non-nil allowlist when keyid can select keys.
+func NewJWSVerifier(allowed *JWSAlgAllowlist, key any, config *VerifyConfig, fields Fields) (*Verifier, error) {
+	alg, raw, err := inferJWSVerifierKey(key)
+	if err != nil {
+		return nil, err
+	}
+	return NewJWSVerifierWithAlg(allowed, alg, raw, config, fields)
+}
+
+// NewJWSVerifierWithAlg creates a foreign-JWS verifier for an explicit JWS algorithm.
+// Use when the algorithm cannot be inferred (raw RSA/HMAC) or the store already chose alg.
+// Do not pass jwk.Key here — use NewJWSVerifier so alg can be taken from the JWK.
+// allowed may be nil to skip alg policy.
+func NewJWSVerifierWithAlg(allowed *JWSAlgAllowlist, alg jwa.SignatureAlgorithm, key any, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
-	if alg == jwa.NoSignature() {
-		return nil, fmt.Errorf("the NONE signing algorithm is expressly disallowed")
+	if err := rejectJWKKey(key); err != nil {
+		return nil, err
+	}
+	alg, err := resolveRegisteredJWSAlg(alg)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkJWSAlgAllowed(allowed, alg); err != nil {
+		return nil, err
 	}
 	if err := validateJWSKeyAlg(alg, key, false); err != nil {
 		return nil, err

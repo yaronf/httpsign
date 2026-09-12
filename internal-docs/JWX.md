@@ -6,7 +6,9 @@ Single source of truth for optional jwx-backed JWS support in httpsign.
 
 jwx is used only for **optional “foreign” JWS** signing and verification. **Native** algorithms (HMAC-SHA256, RSA, RSASSA-PSS, P-256/P-384, Ed25519) do **not** use jwx.
 
-**On `jwx-v4-cutover` / for `v0.6.0`:** single dependency `github.com/lestrrat-go/jwx/v4` (**≥ v4.5.0**); public API is `NewJWSSigner` / `NewJWSVerifier` only (v2 and `*V3` removed). Go floor **1.27.0**. ML-DSA via the same constructors.
+**Shipped as `v0.6.0`:** single dependency `github.com/lestrrat-go/jwx/v4`; public API `NewJWSSigner` / `NewJWSVerifier` (v2 and `*V3` removed). Go floor **1.27.0**. ML-DSA via the same constructors.
+
+**Follow-on `v0.6.1`:** JWS alg allowlist + infer-alg verify — see [JWS-ALG-POLICY.md](./JWS-ALG-POLICY.md) / [RELEASE-v0.6.1.md](./RELEASE-v0.6.1.md). (Branch may also bump jwx to ≥ v4.5.0.)
 
 **Previously (≤ v0.5.x):** `go.mod` pulled both `jwx/v2` and `jwx/v3`, with `NewJWSSigner`/`NewJWSVerifier` (v2) and `NewJWSSignerV3`/`NewJWSVerifierV3` (v3).
 
@@ -118,7 +120,8 @@ Scoped to httpsign’s use of **jwa** + **jws** only (no JWT/JWE/JWK fetch in li
 - [x] Lint: bump **golangci-lint ≥ v2.13** (v2.12.2 is built with go1.26 → fails on go.mod 1.27.0).
 - [x] Docs: README / `CLAUDE.md` / this file — remove dual-version guidance; **`v0.6.0`** release notes with caller steps + PQ; link upstream Changes-v4 if relevant.
 - [x] Hardening: constructor `jws.AlgorithmsForKey` check; reject `NoSignature`; HMAC keys must be `[]byte`; document `SetAllowedAlgs` vs JWS alg.
-- [ ] Tag **`v0.6.0`** and publish. *(after merge)*
+- [x] Tag **`v0.6.0`** and publish. *(done)*
+- [ ] Tag **`v0.6.1`** (allowlist / infer verify) — see [RELEASE-v0.6.1.md](./RELEASE-v0.6.1.md).
 
 ### Upstream items likely N/A or low priority
 

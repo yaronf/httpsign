@@ -16,7 +16,7 @@ import (
 // When signing is true, asymmetric keys must be private; when false, they must be public.
 // HMAC keys are symmetric and accepted for either role. Only raw stdlib key types are
 // accepted; crypto.Signer / JWK wrappers are rejected here so callers convert first.
-func validateJWSKeyAlg(alg jwa.SignatureAlgorithm, key interface{}, signing bool) error {
+func validateJWSKeyAlg(alg jwa.SignatureAlgorithm, key any, signing bool) error {
 	switch alg {
 	case jwa.HS256(), jwa.HS384(), jwa.HS512():
 		return validateHMACKey(alg, key)
@@ -29,11 +29,13 @@ func validateJWSKeyAlg(alg jwa.SignatureAlgorithm, key interface{}, signing bool
 	case jwa.MLDSA44(), jwa.MLDSA65(), jwa.MLDSA87():
 		return validateMLDSAKey(alg, key, signing)
 	default:
-		return fmt.Errorf("unsupported JWS algorithm %s", alg)
+		// Passthrough: unknown/new jwx algs are left to jws.SignerFor / VerifierFor.
+		// Keep hardening above for known classical/PQ algs only.
+		return nil
 	}
 }
 
-func validateHMACKey(alg jwa.SignatureAlgorithm, key interface{}) error {
+func validateHMACKey(alg jwa.SignatureAlgorithm, key any) error {
 	k, ok := key.([]byte)
 	if !ok {
 		return fmt.Errorf("algorithm %s requires []byte key, got %T", alg, key)
@@ -56,7 +58,7 @@ func validateHMACKey(alg jwa.SignatureAlgorithm, key interface{}) error {
 	return nil
 }
 
-func validateRSAKey(alg jwa.SignatureAlgorithm, key interface{}, signing bool) error {
+func validateRSAKey(alg jwa.SignatureAlgorithm, key any, signing bool) error {
 	switch k := key.(type) {
 	case *rsa.PrivateKey:
 		if k == nil {
@@ -88,7 +90,7 @@ func validateRSAKey(alg jwa.SignatureAlgorithm, key interface{}, signing bool) e
 
 // validateECDSAKey enforces RFC 7518 §3.4: ES256/ES384/ES512 bind to P-256/P-384/P-521.
 // jwx's SignerFor path does not enforce this.
-func validateECDSAKey(alg jwa.SignatureAlgorithm, key interface{}, signing bool) error {
+func validateECDSAKey(alg jwa.SignatureAlgorithm, key any, signing bool) error {
 	curve, isPrivate, ok := ecdsaKeyOf(key)
 	if !ok {
 		return fmt.Errorf("algorithm %s requires an ECDSA key, got %T", alg, key)
@@ -119,7 +121,7 @@ func validateECDSAKey(alg jwa.SignatureAlgorithm, key interface{}, signing bool)
 	return nil
 }
 
-func ecdsaKeyOf(key interface{}) (curve elliptic.Curve, isPrivate, ok bool) {
+func ecdsaKeyOf(key any) (curve elliptic.Curve, isPrivate, ok bool) {
 	switch k := key.(type) {
 	case *ecdsa.PrivateKey:
 		if k == nil {
@@ -140,7 +142,7 @@ func ecdsaKeyOf(key interface{}) (curve elliptic.Curve, isPrivate, ok bool) {
 	}
 }
 
-func validateEd25519Key(alg jwa.SignatureAlgorithm, key interface{}, signing bool) error {
+func validateEd25519Key(alg jwa.SignatureAlgorithm, key any, signing bool) error {
 	switch k := key.(type) {
 	case ed25519.PrivateKey:
 		if len(k) != ed25519.PrivateKeySize {
@@ -178,7 +180,7 @@ func validateEd25519Key(alg jwa.SignatureAlgorithm, key interface{}, signing boo
 
 // validateMLDSAKey enforces that an ML-DSA JWS algorithm matches the key's parameter set.
 // jwx also rejects mismatches at Sign/Verify; this fails earlier at NewJWS* construction.
-func validateMLDSAKey(alg jwa.SignatureAlgorithm, key interface{}, signing bool) error {
+func validateMLDSAKey(alg jwa.SignatureAlgorithm, key any, signing bool) error {
 	got, isPrivate, ok := mldsaKeyOf(key)
 	if !ok {
 		return fmt.Errorf("algorithm %s requires a crypto/mldsa key, got %T", alg, key)
@@ -206,7 +208,7 @@ func validateMLDSAKey(alg jwa.SignatureAlgorithm, key interface{}, signing bool)
 	return nil
 }
 
-func mldsaKeyOf(key interface{}) (params mldsa.Parameters, isPrivate, ok bool) {
+func mldsaKeyOf(key any) (params mldsa.Parameters, isPrivate, ok bool) {
 	switch k := key.(type) {
 	case *mldsa.PrivateKey:
 		if k == nil {

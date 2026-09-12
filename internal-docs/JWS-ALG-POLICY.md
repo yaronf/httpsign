@@ -1,8 +1,8 @@
 # Plan: Foreign JWS algorithm policy (httpsign 0.6.x)
 
-Status: proposed  
+Status: implemented (on branch; target **v0.6.1**)  
 Scope: **jwx / foreign-JWS API only** — no changes to native signers/verifiers, HTTP `SetAllowedAlgs` / `applyPolicyAlgs`, or generic verify/handler behavior except where a foreign `Verifier` is in use.  
-Release target: fold into **v0.6.0** if that tag is not yet cut; otherwise **v0.6.1**. Breaking foreign-JWS API is acceptable (0.6.0 is already a break; migration unlikely complete).
+Release target: **v0.6.1** (`v0.6.0` already shipped the jwx v4 / ML-DSA cutover). Breaking foreign-JWS verify API is acceptable.
 
 Related discussion: on-demand key lookup (no in-library key set); JWK sugar; allowlist of JWS algs separate from HTTP Message Signatures `alg`.
 
@@ -51,7 +51,7 @@ func NewJWSAlgAllowlist(algs ...jwa.SignatureAlgorithm) (*JWSAlgAllowlist, error
 func (a *JWSAlgAllowlist) Contains(alg jwa.SignatureAlgorithm) bool
 ```
 
-- Reject empty allowlist and `jwa.NoSignature()` at construction.
+- Reject empty allowlist, unregistered algs (`LookupSignatureAlgorithm`), and `jwa.NoSignature()` at construction (canonical registry names only).
 - Do **not** filter allowlist membership to “algs we harden.” Any non-`none` `jwa` value may appear; unknown algs still work if jwx + key accept them.
 - **`nil` allowlist:** constructors accept `allowed == nil` as “no alg policy” (lazy / tests / pinned single-key demos). Non-nil empty set is not representable via `NewJWSAlgAllowlist` (construction rejects empty). Docs: prefer a real allowlist whenever `keyid` (or similar) can select among keys. 
 
@@ -70,12 +70,12 @@ func (a *JWSAlgAllowlist) Contains(alg jwa.SignatureAlgorithm) bool
 
 ```go
 // Preferred (breaking rename of today’s arity: alg moves to inference or WithAlg).
-NewJWSVerifier(allowed *JWSAlgAllowlist, key interface{}, config *VerifyConfig, fields Fields) (*Verifier, error)
+NewJWSVerifier(allowed *JWSAlgAllowlist, key any, config *VerifyConfig, fields Fields) (*Verifier, error)
 
 // Escape hatch (today’s NewJWSVerifier(alg, key, …) migrates here + allowlist).
-NewJWSVerifierWithAlg(allowed *JWSAlgAllowlist, alg jwa.SignatureAlgorithm, key interface{}, config *VerifyConfig, fields Fields) (*Verifier, error)
+NewJWSVerifierWithAlg(allowed *JWSAlgAllowlist, alg jwa.SignatureAlgorithm, key any, config *VerifyConfig, fields Fields) (*Verifier, error)
 
-NewJWSSigner(alg jwa.SignatureAlgorithm, key interface{}, config *SignConfig, fields Fields) (*Signer, error) // no allowlist (outbound)
+NewJWSSigner(alg jwa.SignatureAlgorithm, key any, config *SignConfig, fields Fields) (*Signer, error) // no allowlist (outbound)
 ```
 
 **Migration:** `NewJWSVerifier(alg, key, cfg, fields)` → `NewJWSVerifierWithAlg(allowed, alg, key, cfg, fields)`, or preferably `NewJWSVerifier(allowed, key, …)` when the key type is inferrable.
@@ -90,7 +90,7 @@ NewJWSSigner(alg jwa.SignatureAlgorithm, key interface{}, config *SignConfig, fi
 **`NewJWSVerifierWithAlg`:**
 
 1. Same nil/allowlist rule on the provided `alg`.
-2. Reject `jwa.NoSignature()` / nil key.
+2. Resolve alg via jwx registry (`LookupSignatureAlgorithm`); reject empty / unregistered / `none`. Nil key rejected.
 3. Existing **`validateJWSKeyAlg`**; default “unsupported” → fall through to **`jws.VerifierFor(alg)`** (jwx).
 4. Reject raw `jwk.Key` here — use preferred `NewJWSVerifier` (or convert).
 

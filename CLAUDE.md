@@ -44,15 +44,16 @@ fields.go / digest.go      ← Component field abstraction + Content-Digest head
 ### Key types
 
 - **`Signer` / `Verifier`** (`crypto.go`) — hold algorithm, key, and signing config. Created via `NewXxxSigner` / `NewXxxVerifier` constructors (HMAC-SHA256, RSA, RSA-PSS, P-256, P-384, Ed25519, JWS).
-- Foreign JWS key↔alg checks live in **`jwskey.go`** (explicit stdlib types; does not use deprecated `jws.AlgorithmsForKey`).
+- Foreign JWS key↔alg checks live in **`jwskey.go`** / **`jwsinfer.go`** (explicit stdlib types + JWK/ECDSA/ML-DSA alg inference; does not use deprecated `jws.AlgorithmsForKey`).
 - **`SignConfig` / `VerifyConfig`** (`config.go`) — builder-style configuration for signature metadata (keyID, nonce, tag, expiry, clock tolerance). Constructed via `NewSignConfig()` / `NewVerifyConfig()` with method chaining.
+- **`JWSAlgAllowlist`** (`jwsallow.go`) — foreign-verify alg policy for `NewJWSVerifier` / `NewJWSVerifierWithAlg` (`nil` = no policy).
 - **`Fields`** (`fields.go`) — specifies which HTTP components (headers, derived components) to include in the signature. Use the `Fields("header1", "@method", ...)` helper or `NewFields()` for complex cases.
 - **`Message` / `MessageDetails`** (`message.go`) — internal canonicalized request/response representation. `MessageDetails` is the public output of `RequestDetails` / `ResponseDetails`.
 - **`HandlerConfig` / `ClientConfig`** (`config.go`) — configures server-side and client-side HTTP wrappers.
 
 ### JWX dual-version support
 
-Optional foreign JWS uses `lestrrat-go/jwx/v4` via `NewJWSSigner` / `NewJWSVerifier` (including ML-DSA with `crypto/mldsa` on Go 1.27+). Requires Go 1.27+.
+Optional foreign JWS uses `lestrrat-go/jwx/v4` via `NewJWSSigner` / `NewJWSVerifier` (infer) / `NewJWSVerifierWithAlg` (including ML-DSA with `crypto/mldsa` on Go 1.27+). Requires Go 1.27+.
 
 ### Content-Digest
 

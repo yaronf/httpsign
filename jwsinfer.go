@@ -1,0 +1,179 @@
+package httpsign
+
+import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/mldsa"
+	"fmt"
+
+	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwk"
+)
+
+// inferJWSVerifierKey resolves a JWS signature algorithm and a raw key suitable for
+// NewJWSVerifierWithAlg from a finite set of key types (see docs for NewJWSVerifier).
+func inferJWSVerifierKey(key any) (jwa.SignatureAlgorithm, any, error) {
+	if key == nil {
+		return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("key must not be nil")
+	}
+	switch k := key.(type) {
+	case jwk.Key:
+		return inferFromJWK(k)
+	case *ecdsa.PublicKey:
+		if k == nil {
+			return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("key must not be nil")
+		}
+		alg, err := algFromECDSACurve(k.Curve)
+		if err != nil {
+			return jwa.EmptySignatureAlgorithm(), nil, err
+		}
+		return alg, k, nil
+	case *mldsa.PublicKey:
+		if k == nil {
+			return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("key must not be nil")
+		}
+		alg, err := algFromMLDSAParams(k.Parameters())
+		if err != nil {
+			return jwa.EmptySignatureAlgorithm(), nil, err
+		}
+		return alg, k, nil
+	default:
+		return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf(
+			"cannot infer JWS algorithm from %T; use NewJWSVerifierWithAlg or a jwk.Key / *ecdsa.PublicKey / *mldsa.PublicKey",
+			key,
+		)
+	}
+}
+
+func inferFromJWK(key jwk.Key) (jwa.SignatureAlgorithm, any, error) {
+	var fromAlg jwa.SignatureAlgorithm
+	var hasAlg bool
+	if ka, ok := key.Algorithm(); ok {
+		sig, ok := jwa.LookupSignatureAlgorithm(ka.String())
+		if !ok {
+			return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("JWK alg %q is not a known JWS signature algorithm", ka.String())
+		}
+		fromAlg = sig
+		hasAlg = true
+	}
+
+	fromStruct, hasStruct, err := structuralAlgFromJWK(key)
+	if err != nil {
+		return jwa.EmptySignatureAlgorithm(), nil, err
+	}
+
+	var alg jwa.SignatureAlgorithm
+	switch {
+	case hasAlg && hasStruct:
+		if fromAlg.String() != fromStruct.String() {
+			return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf(
+				"JWK alg %s disagrees with structural mapping %s", fromAlg, fromStruct,
+			)
+		}
+		alg = fromAlg
+	case hasAlg:
+		alg = fromAlg
+	case hasStruct:
+		alg = fromStruct
+	default:
+		return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf(
+			"cannot infer JWS algorithm from JWK (kty=%s): set alg, or use NewJWSVerifierWithAlg",
+			key.KeyType(),
+		)
+	}
+
+	raw, err := jwk.Export[any](key)
+	if err != nil {
+		return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("export JWK: %w", err)
+	}
+	// Prefer public material for verify constructors.
+	switch r := raw.(type) {
+	case *ecdsa.PrivateKey:
+		raw = &r.PublicKey
+	case *mldsa.PrivateKey:
+		raw = r.Public().(*mldsa.PublicKey)
+	case ed25519.PrivateKey:
+		raw = r.Public().(ed25519.PublicKey)
+	}
+	return alg, raw, nil
+}
+
+type jwkHasCrv interface {
+	Crv() (jwa.EllipticCurveAlgorithm, bool)
+}
+
+func structuralAlgFromJWK(key jwk.Key) (jwa.SignatureAlgorithm, bool, error) {
+	switch key.KeyType() {
+	case jwa.EC(), jwa.OKP():
+		crvKey, ok := key.(jwkHasCrv)
+		if !ok {
+			return jwa.EmptySignatureAlgorithm(), false, fmt.Errorf("JWK kty=%s missing curve", key.KeyType())
+		}
+		crv, ok := crvKey.Crv()
+		if !ok {
+			return jwa.EmptySignatureAlgorithm(), false, fmt.Errorf("JWK kty=%s missing crv", key.KeyType())
+		}
+		alg, err := algFromJWKCurve(crv)
+		if err != nil {
+			return jwa.EmptySignatureAlgorithm(), false, err
+		}
+		return alg, true, nil
+	case jwa.RSA(), jwa.OctetSeq(), jwa.AKP():
+		// RSA/oct ambiguous without alg; AKP requires alg (RFC 9964).
+		return jwa.EmptySignatureAlgorithm(), false, nil
+	default:
+		return jwa.EmptySignatureAlgorithm(), false, nil
+	}
+}
+
+func algFromJWKCurve(crv jwa.EllipticCurveAlgorithm) (jwa.SignatureAlgorithm, error) {
+	switch crv {
+	case jwa.P256():
+		return jwa.ES256(), nil
+	case jwa.P384():
+		return jwa.ES384(), nil
+	case jwa.P521():
+		return jwa.ES512(), nil
+	case jwa.Ed25519():
+		return jwa.EdDSA(), nil
+	default:
+		return jwa.EmptySignatureAlgorithm(), fmt.Errorf("cannot infer JWS algorithm from crv %s", crv)
+	}
+}
+
+func algFromECDSACurve(curve elliptic.Curve) (jwa.SignatureAlgorithm, error) {
+	if curve == nil {
+		return jwa.EmptySignatureAlgorithm(), fmt.Errorf("ECDSA key has nil curve")
+	}
+	switch curve {
+	case elliptic.P256():
+		return jwa.ES256(), nil
+	case elliptic.P384():
+		return jwa.ES384(), nil
+	case elliptic.P521():
+		return jwa.ES512(), nil
+	default:
+		return jwa.EmptySignatureAlgorithm(), fmt.Errorf("cannot infer JWS algorithm from ECDSA curve %s", curve.Params().Name)
+	}
+}
+
+func algFromMLDSAParams(params mldsa.Parameters) (jwa.SignatureAlgorithm, error) {
+	switch params {
+	case mldsa.MLDSA44():
+		return jwa.MLDSA44(), nil
+	case mldsa.MLDSA65():
+		return jwa.MLDSA65(), nil
+	case mldsa.MLDSA87():
+		return jwa.MLDSA87(), nil
+	default:
+		return jwa.EmptySignatureAlgorithm(), fmt.Errorf("cannot infer JWS algorithm from ML-DSA parameter set %s", params)
+	}
+}
+
+func rejectJWKKey(key any) error {
+	if _, ok := key.(jwk.Key); ok {
+		return fmt.Errorf("jwk.Key is not accepted here; use NewJWSVerifier to infer alg from the JWK")
+	}
+	return nil
+}

@@ -4,9 +4,10 @@ This directory contains internal documentation for maintainers of the httpsign l
 
 ## Contents
 
-- **JWX.md** — Optional jwx / foreign-JWS: cut over to jwx v4.5.0+ on Go 1.27+ as **httpsign `v0.6.0`**, with **ML-DSA PQ signatures** as an explicit goal. Gate met 2026-08-26.
-- **JWS-ALG-POLICY.md** — Proposed foreign-JWS alg allowlist; preferred infer-alg `NewJWSVerifier` / escape `WithAlg` (on-demand keys).
-- **RELEASE-v0.6.0.md** — Draft GitHub release text and upgrade guide for **v0.6.0** (copy Summary into the release when tagging).
+- **JWX.md** — Optional jwx / foreign-JWS: cut over to jwx v4 on Go 1.27+ as **httpsign `v0.6.0`**, with **ML-DSA PQ signatures**.
+- **JWS-ALG-POLICY.md** — Foreign-JWS alg allowlist + infer-alg `NewJWSVerifier` (ships in **`v0.6.1`**).
+- **RELEASE-v0.6.0.md** — Shipped **v0.6.0** release notes (archive).
+- **RELEASE-v0.6.1.md** — Draft GitHub release text for **v0.6.1** (allowlist / infer verify API).
 
 ## Purpose
 
