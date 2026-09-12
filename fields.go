@@ -131,6 +131,13 @@ func (fs *Fields) AddHeaderOptional(hdr string) *Fields {
 	return fs.AddHeaderExt(hdr, true, false, false, false)
 }
 
+// AddRequestComponent appends a required component from the associated request (sets ;req).
+// Equivalent to AddHeaderExt(name, false, false, true, false). Typical for response signatures
+// that bind derived components such as @method, @path, or @query from the request (RFC 9421 §2.2).
+func (fs *Fields) AddRequestComponent(name string) *Fields {
+	return fs.AddHeaderExt(name, false, false, true, false)
+}
+
 func fromQueryParam(qp string) *field {
 	i := httpsfv.NewItem("@query-param")
 	i.Params.Add("name", QueryEscapeForSignature(qp))
