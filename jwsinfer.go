@@ -92,9 +92,17 @@ func inferFromJWK(key jwk.Key) (jwa.SignatureAlgorithm, any, error) {
 	case *ecdsa.PrivateKey:
 		raw = &r.PublicKey
 	case *mldsa.PrivateKey:
-		raw = r.Public().(*mldsa.PublicKey)
+		pub, ok := r.Public().(*mldsa.PublicKey)
+		if !ok {
+			return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("ML-DSA private key Public() returned %T, want *mldsa.PublicKey", r.Public())
+		}
+		raw = pub
 	case ed25519.PrivateKey:
-		raw = r.Public().(ed25519.PublicKey)
+		pub, ok := r.Public().(ed25519.PublicKey)
+		if !ok {
+			return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("Ed25519 private key Public() returned %T, want ed25519.PublicKey", r.Public())
+		}
+		raw = pub
 	}
 	return alg, raw, nil
 }

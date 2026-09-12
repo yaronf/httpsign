@@ -7,7 +7,6 @@ import (
 	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
-	"math/big"
 	"strings"
 	"testing"
 
@@ -88,7 +87,7 @@ func TestValidateECDSAKey(t *testing.T) {
 	require.Error(t, validateECDSAKey(jwa.ES256(), []byte("x"), true))
 	require.Error(t, validateECDSAKey(jwa.ES256(), &p256.PublicKey, true))
 	require.Error(t, validateECDSAKey(jwa.ES256(), p256, false))
-	require.Error(t, validateECDSAKey(jwa.ES256(), &ecdsa.PublicKey{Curve: nil, X: big.NewInt(1), Y: big.NewInt(1)}, false))
+	require.Error(t, validateECDSAKey(jwa.ES256(), &ecdsa.PublicKey{Curve: nil}, false))
 	require.Error(t, validateECDSAKey(jwa.ES256(), p384, true)) // curve mismatch
 	require.Error(t, validateECDSAKey(jwa.HS256(), p256, true)) // unsupported ECDSA alg
 

@@ -7,7 +7,6 @@ import (
 	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
-	"math/big"
 	"testing"
 
 	"github.com/lestrrat-go/jwx/v4/jwa"
@@ -252,7 +251,7 @@ func TestAlgFromCurveHelpers(t *testing.T) {
 		require.Error(t, err)
 		_, err = algFromECDSACurve(elliptic.P224())
 		require.Error(t, err)
-		_, _, err = inferJWSVerifierKey(&ecdsa.PublicKey{Curve: nil, X: big.NewInt(1), Y: big.NewInt(1)})
+		_, _, err = inferJWSVerifierKey(&ecdsa.PublicKey{Curve: nil})
 		require.Error(t, err)
 	})
 
