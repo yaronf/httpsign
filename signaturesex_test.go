@@ -3,6 +3,9 @@ package httpsign_test
 import (
 	"bufio"
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"fmt"
 	"net/http"
 	"strings"
@@ -44,4 +47,32 @@ Signature:       sig77=:3e9KqLP62NHfHY5OMG4036+U6tvBowZF35ALzTjpsf0=:
 	err := httpsign.VerifyRequest("sig77", *verifier, req)
 	fmt.Printf("verified: %t", err == nil)
 	// Output: verified: true
+}
+
+func ExampleRequestDetailsByTag() {
+	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	fields := httpsign.Headers("@authority", "Date", "@method")
+	reqStr := `GET /foo HTTP/1.1
+Host: example.org
+Date: Tue, 20 Apr 2021 02:07:55 GMT
+
+`
+	req, _ := http.ReadRequest(bufio.NewReader(strings.NewReader(reqStr)))
+
+	signer, _ := httpsign.NewP256Signer(*priv,
+		httpsign.NewSignConfig().SignCreated(false).SetTag("app").SetKeyID("key1"), fields)
+	sigInput, sig, _ := httpsign.SignRequest("sig1", *signer, req)
+	req.Header.Add("Signature-Input", sigInput)
+	req.Header.Add("Signature", sig)
+
+	details, err := httpsign.RequestDetailsByTag(req, "app")
+	if err != nil {
+		fmt.Printf("details: %v\n", err)
+		return
+	}
+	verifier, _ := httpsign.NewP256Verifier(priv.PublicKey,
+		httpsign.NewVerifyConfig().SetKeyID("key1").SetVerifyCreated(false), fields)
+	err = httpsign.VerifyRequest(details.Label, *verifier, req)
+	fmt.Printf("label=%s tag=%s verified=%t", details.Label, *details.Tag, err == nil)
+	// Output: label=sig1 tag=app verified=true
 }

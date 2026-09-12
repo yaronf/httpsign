@@ -513,7 +513,7 @@ func RequestDetails(signatureName string, req *http.Request) (details *MessageDe
 	if err != nil {
 		return nil, fmt.Errorf("could not extract signature: %w", err)
 	}
-	return signatureDetails(psiSig)
+	return signatureDetails(signatureName, psiSig)
 }
 
 func verifyDebug(signatureName string, verifier Verifier, message *Message) (string, *psiSignature, error) {
@@ -571,7 +571,7 @@ func ResponseDetails(signatureName string, res *http.Response) (details *Message
 	if err != nil {
 		return nil, fmt.Errorf("could not extract signature: %w", err)
 	}
-	return signatureDetails(psiSig)
+	return signatureDetails(signatureName, psiSig)
 }
 
 // RequestSignatureNames returns the list of signature names present in a request (empty list if none found).
@@ -619,7 +619,7 @@ func messageSignatureNames(parsedMessage *parsedMessage, withTrailers bool) ([]s
 	return names, nil
 }
 
-func signatureDetails(signature *psiSignature) (details *MessageDetails, err error) {
+func signatureDetails(label string, signature *psiSignature) (details *MessageDetails, err error) {
 	var keyID *string
 	if keyIDParam, ok := signature.params["keyid"]; ok {
 		k, ok := keyIDParam.(string)
@@ -637,6 +637,7 @@ func signatureDetails(signature *psiSignature) (details *MessageDetails, err err
 		}
 	}
 	details = &MessageDetails{
+		Label:  label,
 		KeyID:  keyID,
 		Alg:    alg,
 		Fields: signature.fields,

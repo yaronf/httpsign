@@ -15,6 +15,7 @@ Copy the **Summary** section below into the GitHub release when tagging `v0.6.1`
 - **`JWSAlgAllowlist`:** both verify constructors take an allowlist (`nil` skips policy for tests/lazy use). Prefer a non-nil allowlist when `keyid` can select among keys.
 - **`NewJWSSigner`:** nil config defaults to `SignAlg(false)`; configs with `SignAlg(true)` are rejected.
 - **`Fields.AddRequestComponent`:** convenience for required associated-request components (`;req`), equivalent to `AddHeaderExt(name, false, false, true, false)`.
+- **Details by tag:** `RequestDetailsByTag` / `ResponseDetailsByTag` (strict) and `*DetailsListByTag` (lenient) locate signatures by the `tag` parameter; `MessageDetails.Label` holds the dictionary member name for `Verify*`. Sentinels: `ErrSignatureTagNotFound` / `ErrSignatureTagAmbiguous`.
 - **jwx** bump to **≥ v4.5.0** (if not already on the release branch).
 
 ### Upgrade from v0.6.0
@@ -26,12 +27,24 @@ Copy the **Summary** section below into the GitHub release when tagging `v0.6.1`
 | **`NewJWSSigner`** | Omit config or keep `SignAlg(false)`; `SignAlg(true)` now errors. |
 | **HTTP `SetAllowedAlgs`** | Unchanged — Signature-Input `alg` only, not JWS `jwa`. |
 | **Response `;req` fields** | Prefer `AddRequestComponent("@method")` (etc.) over `AddHeaderExt(..., false, false, true, false)`. |
+| **Locate signature by `tag`** | Prefer `RequestDetailsByTag` / `ResponseDetailsByTag`, then `Verify*` on `details.Label` (see below). |
 
 ```go
 allowed, _ := httpsign.NewJWSAlgAllowlist(jwa.ES256(), jwa.MLDSA65())
 verifier, err := httpsign.NewJWSVerifier(allowed, pubKey, verifyConfig, fields)
 // or:
 verifier, err := httpsign.NewJWSVerifierWithAlg(allowed, jwa.RS256(), rsaPub, verifyConfig, fields)
+```
+
+**Details by tag** (when the dictionary label is not semantic):
+
+```go
+details, err := httpsign.RequestDetailsByTag(req, "app")
+if err != nil {
+	return err // includes ErrSignatureTagNotFound / ErrSignatureTagAmbiguous
+}
+// use details.KeyID to obtain verifier, then:
+err = httpsign.VerifyRequest(details.Label, *verifier, req)
 ```
 
 **ML-DSA:**
