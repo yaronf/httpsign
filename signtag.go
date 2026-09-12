@@ -23,13 +23,11 @@ func RequestDetailsByTag(req *http.Request, tag string) (*MessageDetails, error)
 	if req == nil {
 		return nil, fmt.Errorf("nil request")
 	}
-	names, err := RequestSignatureNames(req, false)
+	all, err := signatureDetailsListFromHeaders(req.Header)
 	if err != nil {
 		return nil, err
 	}
-	return detailsByTag(names, tag, func(name string) (*MessageDetails, error) {
-		return RequestDetails(name, req)
-	})
+	return detailsByTag(all, tag)
 }
 
 // ResponseDetailsByTag returns MessageDetails for the unique Signature whose
@@ -41,13 +39,11 @@ func ResponseDetailsByTag(res *http.Response, tag string) (*MessageDetails, erro
 	if res == nil {
 		return nil, fmt.Errorf("nil response")
 	}
-	names, err := ResponseSignatureNames(res, false)
+	all, err := signatureDetailsListFromHeaders(res.Header)
 	if err != nil {
 		return nil, err
 	}
-	return detailsByTag(names, tag, func(name string) (*MessageDetails, error) {
-		return ResponseDetails(name, res)
-	})
+	return detailsByTag(all, tag)
 }
 
 // RequestDetailsListByTag returns MessageDetails for every Signature whose
@@ -57,13 +53,11 @@ func RequestDetailsListByTag(req *http.Request, tag string) ([]*MessageDetails, 
 	if req == nil {
 		return nil, fmt.Errorf("nil request")
 	}
-	names, err := RequestSignatureNames(req, false)
+	all, err := signatureDetailsListFromHeaders(req.Header)
 	if err != nil {
 		return nil, err
 	}
-	return detailsListByTag(names, tag, func(name string) (*MessageDetails, error) {
-		return RequestDetails(name, req)
-	})
+	return detailsListByTag(all, tag), nil
 }
 
 // ResponseDetailsListByTag returns MessageDetails for every Signature whose
@@ -73,37 +67,27 @@ func ResponseDetailsListByTag(res *http.Response, tag string) ([]*MessageDetails
 	if res == nil {
 		return nil, fmt.Errorf("nil response")
 	}
-	names, err := ResponseSignatureNames(res, false)
+	all, err := signatureDetailsListFromHeaders(res.Header)
 	if err != nil {
 		return nil, err
 	}
-	return detailsListByTag(names, tag, func(name string) (*MessageDetails, error) {
-		return ResponseDetails(name, res)
-	})
+	return detailsListByTag(all, tag), nil
 }
 
-func detailsListByTag(names []string, tag string, detailsFn func(string) (*MessageDetails, error)) ([]*MessageDetails, error) {
+func detailsListByTag(all []*MessageDetails, tag string) []*MessageDetails {
 	var found []*MessageDetails
-	for _, name := range names {
-		details, err := detailsFn(name)
-		if err != nil {
-			return nil, fmt.Errorf("details for %q: %w", name, err)
-		}
+	for _, details := range all {
 		if details.Tag != nil && *details.Tag == tag {
 			found = append(found, details)
 		}
 	}
-	return found, nil
+	return found
 }
 
-func detailsByTag(names []string, tag string, detailsFn func(string) (*MessageDetails, error)) (*MessageDetails, error) {
+func detailsByTag(all []*MessageDetails, tag string) (*MessageDetails, error) {
 	var match *MessageDetails
 	n := 0
-	for _, name := range names {
-		details, err := detailsFn(name)
-		if err != nil {
-			return nil, fmt.Errorf("details for %q: %w", name, err)
-		}
+	for _, details := range all {
 		if details.Tag == nil || *details.Tag != tag {
 			continue
 		}
