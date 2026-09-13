@@ -33,9 +33,11 @@
     {
       "description": "jwx majors require dashboard approval (API/crypto risk)",
       "matchManagers": ["gomod"],
-      "matchPackagePatterns": ["^github\\.com/lestrrat-go/jwx"],
       "matchUpdateTypes": ["major"],
-      "dependencyDashboardApproval": true
+      "dependencyDashboardApproval": true,
+      "matchPackageNames": [
+        "/^github\\.com/lestrrat-go/jwx/"
+      ]
     },
     {
       "description": "Do not bump the go directive automatically",
