@@ -1,6 +1,6 @@
-# Release notes draft: httpsign v0.6.1
+# Release notes: httpsign v0.6.1 (shipped)
 
-Copy the **Summary** section below into the GitHub release when tagging `v0.6.1`.
+Published GitHub release for tag `v0.6.1`. Kept here for maintainers; do not treat as a draft for retagging.
 
 ---
 
