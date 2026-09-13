@@ -4,7 +4,7 @@
 /.idea/copilot.data.migration.*.xml
 /testdata/fuzz/FuzzSignAndVerifyHMAC/
 /testdata/fuzz/FuzzSignAndVerifyJWS/
-/testdata/fuzz/FuzzVerifyRequestJWS/
+/testdata/fuzz/FuzzJWSVerifyRequest/
 /testdata/fuzz/FuzzSignAndVerifyMLDSA/
 /testdata/fuzz/FuzzInferJWSVerifier/
 /testdata/fuzz/FuzzNewJWSConstructors/

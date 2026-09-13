@@ -50,9 +50,9 @@ func FuzzSignAndVerifyJWS(f *testing.F) {
 	})
 }
 
-// FuzzVerifyRequestJWS looks for panics when verifying attacker-controlled Signature headers
+// FuzzJWSVerifyRequest looks for panics when verifying attacker-controlled Signature headers
 // with a foreign ES256 verifier (inferred *ecdsa.PublicKey path).
-func FuzzVerifyRequestJWS(f *testing.F) {
+func FuzzJWSVerifyRequest(f *testing.F) {
 	f.Add(httpreq1pssNoSig,
 		`sig1=("@method");created=1618884475;keyid="fuzz-es256"`,
 		`sig1=:AQAB:`)

@@ -29,11 +29,23 @@ jobs:
           go-version: '1.27'
           cache: false
       - name: Fuzz smoke
-        # Short per-target budget (~75s total). See internal-docs/FUZZ.md.
+        # Short per-target budget. -fuzz is a regexp — use ^Name$ so names are not
+        # substrings of each other (see internal-docs/FUZZ.md).
         run: |
           set -euo pipefail
-          for target in FuzzVerifyRequest FuzzVerifyViaMessage FuzzSignAndVerifyHMAC FuzzHMACViaMessage FuzzNewMessage; do
+          for target in \
+            FuzzVerifyRequest \
+            FuzzVerifyViaMessage \
+            FuzzSignAndVerifyHMAC \
+            FuzzHMACViaMessage \
+            FuzzNewMessage \
+            FuzzSignAndVerifyJWS \
+            FuzzJWSVerifyRequest \
+            FuzzSignAndVerifyMLDSA \
+            FuzzInferJWSVerifier \
+            FuzzNewJWSConstructors
+          do
             echo "::group::fuzz $target"
-            go test -run='^$' -fuzz="$target" -fuzztime=15s .
+            go test -run='^$' -fuzz="^${target}$" -fuzztime=15s .
             echo "::endgroup::"
           done

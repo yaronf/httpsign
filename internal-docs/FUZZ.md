@@ -19,7 +19,7 @@ Foreign JWS / ML-DSA targets live in [`fuzz_jws_test.go`](../fuzz_jws_test.go):
 | Target | Role |
 |--------|------|
 | `FuzzSignAndVerifyJWS` | ES256 foreign sign → verify round-trip |
-| `FuzzVerifyRequestJWS` | Panic-oriented verify with inferred ES256 verifier |
+| `FuzzJWSVerifyRequest` | Panic-oriented verify with inferred ES256 verifier |
 | `FuzzSignAndVerifyMLDSA` | ML-DSA-44 sign → verify round-trip |
 | `FuzzInferJWSVerifier` | Mutated JWK JSON through `NewJWSVerifier` / infer |
 | `FuzzNewJWSConstructors` | Fuzzed alg names × key shapes through constructors |
@@ -37,14 +37,19 @@ go tool cover -func=cov-verify.out
 go tool cover -func=cov-hmac.out
 ```
 
-Mutating fuzz (fixed budget):
+Mutating fuzz (fixed budget); `-fuzz` is a regexp — prefer `^Name$`:
 
 ```bash
-go test -run='^$' -fuzz=FuzzVerifyRequest -fuzztime=30s .
-go test -run='^$' -fuzz=FuzzVerifyViaMessage -fuzztime=30s .
-go test -run='^$' -fuzz=FuzzSignAndVerifyHMAC -fuzztime=30s .
-go test -run='^$' -fuzz=FuzzHMACViaMessage -fuzztime=30s .
-go test -run='^$' -fuzz=FuzzNewMessage -fuzztime=30s .
+go test -run='^$' -fuzz='^FuzzVerifyRequest$' -fuzztime=30s .
+go test -run='^$' -fuzz='^FuzzVerifyViaMessage$' -fuzztime=30s .
+go test -run='^$' -fuzz='^FuzzSignAndVerifyHMAC$' -fuzztime=30s .
+go test -run='^$' -fuzz='^FuzzHMACViaMessage$' -fuzztime=30s .
+go test -run='^$' -fuzz='^FuzzNewMessage$' -fuzztime=30s .
+go test -run='^$' -fuzz='^FuzzSignAndVerifyJWS$' -fuzztime=30s .
+go test -run='^$' -fuzz='^FuzzJWSVerifyRequest$' -fuzztime=30s .
+go test -run='^$' -fuzz='^FuzzSignAndVerifyMLDSA$' -fuzztime=30s .
+go test -run='^$' -fuzz='^FuzzInferJWSVerifier$' -fuzztime=30s .
+go test -run='^$' -fuzz='^FuzzNewJWSConstructors$' -fuzztime=30s .
 ```
 
 CI uses a shorter per-target budget (`-fuzztime=15s`); see `.github/workflows/test.yml`.
