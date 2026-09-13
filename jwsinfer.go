@@ -47,43 +47,10 @@ func inferJWSVerifierKey(key any) (jwa.SignatureAlgorithm, any, error) {
 }
 
 func inferFromJWK(key jwk.Key) (jwa.SignatureAlgorithm, any, error) {
-	var fromAlg jwa.SignatureAlgorithm
-	var hasAlg bool
-	if ka, ok := key.Algorithm(); ok {
-		sig, ok := jwa.LookupSignatureAlgorithm(ka.String())
-		if !ok {
-			return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("JWK alg %q is not a known JWS signature algorithm", ka.String())
-		}
-		fromAlg = sig
-		hasAlg = true
-	}
-
-	fromStruct, hasStruct, err := structuralAlgFromJWK(key)
+	alg, err := resolveAlgFromJWK(key)
 	if err != nil {
 		return jwa.EmptySignatureAlgorithm(), nil, err
 	}
-
-	var alg jwa.SignatureAlgorithm
-	switch {
-	case hasAlg && hasStruct:
-		if !jwsSignatureAlgsAgree(fromAlg, fromStruct) {
-			return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf(
-				"JWK alg %s disagrees with structural mapping %s", fromAlg, fromStruct,
-			)
-		}
-		// Prefer the JWK's stated alg; EdDSA ↔ Ed25519 are treated as agreeing (RFC 9864).
-		alg = fromAlg
-	case hasAlg:
-		alg = fromAlg
-	case hasStruct:
-		alg = fromStruct
-	default:
-		return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf(
-			"cannot infer JWS algorithm from JWK (kty=%s): set alg, or use NewJWSVerifierWithAlg",
-			key.KeyType(),
-		)
-	}
-
 	raw, err := jwk.Export[any](key)
 	if err != nil {
 		return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("export JWK: %w", err)
@@ -108,9 +75,82 @@ func inferFromJWK(key jwk.Key) (jwa.SignatureAlgorithm, any, error) {
 	return alg, raw, nil
 }
 
+// inferJWSSignerKeyFromJWK resolves alg and raw private key material from a private JWK.
+func inferJWSSignerKeyFromJWK(key jwk.Key) (jwa.SignatureAlgorithm, any, error) {
+	if key == nil {
+		return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("key must not be nil")
+	}
+	if err := requirePrivateJWKForSign(key); err != nil {
+		return jwa.EmptySignatureAlgorithm(), nil, err
+	}
+	alg, err := resolveAlgFromJWK(key)
+	if err != nil {
+		return jwa.EmptySignatureAlgorithm(), nil, err
+	}
+	raw, err := jwk.Export[any](key)
+	if err != nil {
+		return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("export JWK: %w", err)
+	}
+	return alg, raw, nil
+}
+
+func requirePrivateJWKForSign(key jwk.Key) error {
+	priv, err := jwk.IsPrivateKey(key)
+	if err != nil {
+		// Symmetric oct keys are not AsymmetricKey; they are valid HMAC signing material.
+		if key.KeyType() == jwa.OctetSeq() {
+			return nil
+		}
+		return fmt.Errorf("JWK is not usable for signing: %w", err)
+	}
+	if !priv {
+		return fmt.Errorf("JWK must be a private key for signing")
+	}
+	return nil
+}
+
+func resolveAlgFromJWK(key jwk.Key) (jwa.SignatureAlgorithm, error) {
+	var fromAlg jwa.SignatureAlgorithm
+	var hasAlg bool
+	if ka, ok := key.Algorithm(); ok {
+		sig, ok := jwa.LookupSignatureAlgorithm(ka.String())
+		if !ok {
+			return jwa.EmptySignatureAlgorithm(), fmt.Errorf("JWK alg %q is not a known JWS signature algorithm", ka.String())
+		}
+		fromAlg = sig
+		hasAlg = true
+	}
+
+	fromStruct, hasStruct, err := structuralAlgFromJWK(key)
+	if err != nil {
+		return jwa.EmptySignatureAlgorithm(), err
+	}
+
+	switch {
+	case hasAlg && hasStruct:
+		if !jwsSignatureAlgsAgree(fromAlg, fromStruct) {
+			return jwa.EmptySignatureAlgorithm(), fmt.Errorf(
+				"JWK alg %s disagrees with structural mapping %s", fromAlg, fromStruct,
+			)
+		}
+		// Prefer the JWK's stated alg; EdDSA ↔ Ed25519 are treated as agreeing (RFC 9864).
+		return fromAlg, nil
+	case hasAlg:
+		return fromAlg, nil
+	case hasStruct:
+		return fromStruct, nil
+	default:
+		return jwa.EmptySignatureAlgorithm(), fmt.Errorf(
+			"cannot infer JWS algorithm from JWK (kty=%s): set alg, or use NewJWSSigner / NewJWSVerifierWithAlg",
+			key.KeyType(),
+		)
+	}
+}
+
 type jwkHasCrv interface {
 	Crv() (jwa.EllipticCurveAlgorithm, bool)
 }
+
 
 func structuralAlgFromJWK(key jwk.Key) (jwa.SignatureAlgorithm, bool, error) {
 	switch key.KeyType() {
@@ -202,6 +242,13 @@ func algFromMLDSAParams(params mldsa.Parameters) (jwa.SignatureAlgorithm, error)
 func rejectJWKKey(key any) error {
 	if _, ok := key.(jwk.Key); ok {
 		return fmt.Errorf("jwk.Key is not accepted here; use NewJWSVerifier to infer alg from the JWK")
+	}
+	return nil
+}
+
+func rejectJWKKeyForSigner(key any) error {
+	if _, ok := key.(jwk.Key); ok {
+		return fmt.Errorf("jwk.Key is not accepted here; use NewJWSSignerFromJWK to infer alg from the JWK")
 	}
 	return nil
 }

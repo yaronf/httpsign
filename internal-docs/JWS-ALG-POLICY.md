@@ -76,6 +76,7 @@ NewJWSVerifier(allowed *JWSAlgAllowlist, key any, config *VerifyConfig, fields F
 NewJWSVerifierWithAlg(allowed *JWSAlgAllowlist, alg jwa.SignatureAlgorithm, key any, config *VerifyConfig, fields Fields) (*Verifier, error)
 
 NewJWSSigner(alg jwa.SignatureAlgorithm, key any, config *SignConfig, fields Fields) (*Signer, error) // no allowlist (outbound)
+NewJWSSignerFromJWK(key jwk.Key, config *SignConfig, fields Fields) (*Signer, error)                 // infer from private JWK
 ```
 
 **Migration:** `NewJWSVerifier(alg, key, cfg, fields)` → `NewJWSVerifierWithAlg(allowed, alg, key, cfg, fields)`, or preferably `NewJWSVerifier(allowed, key, …)` when the key type is inferrable.
@@ -94,7 +95,9 @@ NewJWSSigner(alg jwa.SignatureAlgorithm, key any, config *SignConfig, fields Fie
 3. Existing **`validateJWSKeyAlg`**; default “unsupported” → fall through to **`jws.VerifierFor(alg)`** (jwx).
 4. Reject raw `jwk.Key` here — use preferred `NewJWSVerifier` (or convert).
 
-**`NewJWSSigner`:** hardening + passthrough; **no** allowlist; force `SignAlg(false)`.
+**`NewJWSSigner`:** hardening + passthrough; **no** allowlist; force `SignAlg(false)`. Reject raw `jwk.Key` — use `NewJWSSignerFromJWK`.
+
+**`NewJWSSignerFromJWK`:** require a **private** JWK (symmetric `oct` OK); resolve alg with the same table / EdDSA↔Ed25519 rules as verify; export raw **private** material; then `NewJWSSigner`.
 
 Do **not** put the JWS allowlist on `VerifyConfig`.
 

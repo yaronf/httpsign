@@ -14,6 +14,7 @@ import (
 	"fmt"
 
 	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/lestrrat-go/jwx/v4/jws"
 )
 
@@ -129,11 +130,15 @@ func NewEd25519SignerFromSeed(seed []byte, config *SignConfig, fields Fields) (*
 // NewJWSSigner creates a generic signer for JWS algorithms via github.com/lestrrat-go/jwx/v4.
 // The particular key type for each algorithm is documented in that package (including
 // crypto/mldsa keys for ML-DSA on Go 1.27+). HMAC keys must be []byte (not string).
+// Do not pass jwk.Key here — use NewJWSSignerFromJWK so alg can be taken from the JWK.
 // Config may be nil (defaults with SignAlg(false)). A non-nil config that would emit
 // HTTP Signature-Input "alg" is rejected — foreign JWS has no RFC 9421 algorithm id.
 func NewJWSSigner(alg jwa.SignatureAlgorithm, key any, config *SignConfig, fields Fields) (*Signer, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
+	}
+	if err := rejectJWKKeyForSigner(key); err != nil {
+		return nil, err
 	}
 	alg, err := resolveRegisteredJWSAlg(alg)
 	if err != nil {
@@ -158,6 +163,18 @@ func NewJWSSigner(alg jwa.SignatureAlgorithm, key any, config *SignConfig, field
 		fields:        fields,
 		foreignSigner: jwsSigner,
 	}, nil
+}
+
+// NewJWSSignerFromJWK creates a foreign-JWS signer by inferring the algorithm from a private jwk.Key
+// (JWK alg and/or unambiguous crv), then exporting raw private key material. Preferred when keys
+// are stored as JWKs (e.g. WIMSE WIT cnf.jwk). Public-only JWKs are rejected.
+// Config may be nil (defaults with SignAlg(false)); SignAlg(true) is rejected as for NewJWSSigner.
+func NewJWSSignerFromJWK(key jwk.Key, config *SignConfig, fields Fields) (*Signer, error) {
+	alg, raw, err := inferJWSSignerKeyFromJWK(key)
+	if err != nil {
+		return nil, err
+	}
+	return NewJWSSigner(alg, raw, config, fields)
 }
 
 func (s Signer) sign(buff []byte) ([]byte, error) {

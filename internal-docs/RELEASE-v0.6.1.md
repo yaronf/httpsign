@@ -11,6 +11,7 @@ Copy the **Summary** section below into the GitHub release when tagging `v0.6.1`
 ### Highlights
 
 - **Preferred verify API:** `NewJWSVerifier(allowed, key, …)` infers the JWS algorithm from `jwk.Key`, `*ecdsa.PublicKey`, or `*mldsa.PublicKey`.
+- **`NewJWSSignerFromJWK`:** infer alg from a **private** `jwk.Key` and sign (symmetric with preferred verify for JWK-stored keys).
 - **Escape hatch:** `NewJWSVerifierWithAlg(allowed, alg, key, …)` when alg cannot be inferred (raw RSA/HMAC) or the store already chose alg. Today’s `NewJWSVerifier(alg, key, …)` migrates here.
 - **`JWSAlgAllowlist`:** both verify constructors take an allowlist (`nil` skips policy for tests/lazy use). Prefer a non-nil allowlist when `keyid` can select among keys.
 - **`NewJWSSigner`:** nil config defaults to `SignAlg(false)`; configs with `SignAlg(true)` are rejected.
@@ -24,7 +25,7 @@ Copy the **Summary** section below into the GitHub release when tagging `v0.6.1`
 |---------|--------|
 | **Native only** | No API changes. |
 | **`NewJWSVerifier(alg, key, …)`** | Prefer `NewJWSVerifier(allowed, key, …)` when the key is inferrable; else `NewJWSVerifierWithAlg(allowed, alg, key, …)`. |
-| **`NewJWSSigner`** | Omit config or keep `SignAlg(false)`; `SignAlg(true)` now errors. |
+| **`NewJWSSigner`** | Omit config or keep `SignAlg(false)`; `SignAlg(true)` now errors. Prefer `NewJWSSignerFromJWK` when the private key is a JWK. |
 | **HTTP `SetAllowedAlgs`** | Unchanged — Signature-Input `alg` only, not JWS `jwa`. |
 | **Response `;req` fields** | Prefer `AddRequestComponent("@method")` (etc.) over `AddHeaderExt(..., false, false, true, false)`. |
 | **Locate signature by `tag`** | Prefer `RequestDetailsByTag` / `ResponseDetailsByTag`, then `Verify*` on `details.Label` (see below). |
@@ -54,6 +55,8 @@ priv, _ := mldsa.GenerateKey(mldsa.MLDSA65())
 pub := priv.Public().(*mldsa.PublicKey)
 allowed, _ := httpsign.NewJWSAlgAllowlist(jwa.MLDSA65())
 signer, _ := httpsign.NewJWSSigner(jwa.MLDSA65(), priv, nil, fields)
+// or, when the private key is a JWK:
+// signer, _ := httpsign.NewJWSSignerFromJWK(privJWK, nil, fields)
 verifier, _ := httpsign.NewJWSVerifier(allowed, pub, httpsign.NewVerifyConfig(), fields)
 ```
 

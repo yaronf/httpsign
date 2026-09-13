@@ -31,13 +31,13 @@ in the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign).
 
 **v0.6.0** (shipped) raised the Go floor to **1.27+** and cut foreign JWS over to **jwx v4** + ML-DSA. See [internal-docs/RELEASE-v0.6.0.md](internal-docs/RELEASE-v0.6.0.md).
 
-**v0.6.1** breaks foreign-JWS **verify** again: prefer `NewJWSVerifier(allowed, key, …)` (infer alg); use `NewJWSVerifierWithAlg` when needed; pass a `JWSAlgAllowlist` (`nil` skips policy). `NewJWSSigner` defaults to / requires `SignAlg(false)`.
+**v0.6.1** breaks foreign-JWS **verify** again: prefer `NewJWSVerifier(allowed, key, …)` (infer alg); use `NewJWSVerifierWithAlg` when needed; pass a `JWSAlgAllowlist` (`nil` skips policy). `NewJWSSigner` defaults to / requires `SignAlg(false)`; use `NewJWSSignerFromJWK` when the private key is a JWK.
 
 | Caller | Change in v0.6.1 |
 |--------|------------------|
 | Native algorithms only | None. |
 | `NewJWSVerifier(alg, key, …)` (v0.6.0) | Prefer `NewJWSVerifier(allowed, key, …)`; else `NewJWSVerifierWithAlg(allowed, alg, key, …)`. |
-| `NewJWSSigner` | Nil config ⇒ `SignAlg(false)`; `SignAlg(true)` errors. |
+| `NewJWSSigner` | Nil config ⇒ `SignAlg(false)`; `SignAlg(true)` errors. Prefer `NewJWSSignerFromJWK` for private JWKs. |
 
 Pass a non-nil allowlist when `keyid` can select among keys. `SetAllowedAlgs` still only filters Signature-Input `alg`, not JWS `jwa`.
 
@@ -45,7 +45,7 @@ Full notes: [internal-docs/RELEASE-v0.6.1.md](internal-docs/RELEASE-v0.6.1.md).
 
 ### Foreign JWS and ML-DSA
 
-Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) (≥ v4.5.0) via `NewJWSSigner` / `NewJWSVerifier`.
+Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) (≥ v4.5.0) via `NewJWSSigner` / `NewJWSSignerFromJWK` / `NewJWSVerifier`.
 
 **ML-DSA (FIPS 204)** works through the same path with `crypto/mldsa` keys. Prefer inferring the alg from the public key:
 
