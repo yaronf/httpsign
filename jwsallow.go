@@ -52,12 +52,20 @@ func NewJWSAlgAllowlist(algs ...jwa.SignatureAlgorithm) (*JWSAlgAllowlist, error
 // Contains reports whether alg is permitted. A nil receiver does not contain any alg
 // (callers should treat nil allowlist as “skip policy” before calling Contains).
 // Comparison is by algorithm name string; constructors resolve to registry values first.
+// Legacy "EdDSA" and RFC 9864 "Ed25519" are treated as equivalent.
 func (a *JWSAlgAllowlist) Contains(alg jwa.SignatureAlgorithm) bool {
 	if a == nil {
 		return false
 	}
-	_, ok := a.algs[alg.String()]
-	return ok
+	if _, ok := a.algs[alg.String()]; ok {
+		return true
+	}
+	if !isEd25519JWSAlg(alg) {
+		return false
+	}
+	_, legacy := a.algs[jwa.EdDSA().String()]
+	_, modern := a.algs[jwa.EdDSAEd25519().String()]
+	return legacy || modern
 }
 
 func checkJWSAlgAllowed(allowed *JWSAlgAllowlist, alg jwa.SignatureAlgorithm) error {

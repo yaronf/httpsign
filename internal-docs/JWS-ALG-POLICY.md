@@ -135,13 +135,13 @@ config.SetFetchVerifier(func(r *http.Request) (string, *httpsign.Verifier) {
 | `key` type | How alg is chosen |
 | ---------- | ----------------- |
 | `jwk.Key` with `alg` | Use JWK `alg` |
-| `jwk.Key` EC/OKP without `alg` | `crv` → ES256/384/512 or EdDSA |
+| `jwk.Key` EC/OKP without `alg` | `crv` → ES256/384/512 or **EdDSAEd25519** (RFC 9864); legacy JWK `alg` `"EdDSA"` agrees with that mapping |
 | `jwk.Key` RSA/`oct`/AKP without `alg` | Error (RSA/HMAC ambiguous; AKP requires `alg` per RFC 9964) |
 | `*ecdsa.PublicKey` | Curve → ES256/384/512 |
 | `*mldsa.PublicKey` | `Parameters()` → ML-DSA-44/65/87 |
 | `*rsa.PublicKey`, `[]byte`, … | Error — `NewJWSVerifierWithAlg(allowed, alg, …)` or a JWK with `alg` |
 
-If JWK has both `alg` and a structural mapping and they **disagree** → error.
+If JWK has both `alg` and a structural mapping and they **disagree** → error. Legacy `"EdDSA"` and RFC 9864 `"Ed25519"` are **not** a disagreement (same Ed25519 crypto). `JWSAlgAllowlist.Contains` treats those two names as equivalent.
 
 After JWK → raw key for ML-DSA: cross-check `Parameters()` vs claimed `alg`.
 

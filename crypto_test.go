@@ -618,6 +618,14 @@ func TestJWSAlgAllowlist(t *testing.T) {
 	require.False(t, a.Contains(jwa.ES384()))
 	var nilAllow *JWSAlgAllowlist
 	require.False(t, nilAllow.Contains(jwa.ES256()))
+
+	edModern, err := NewJWSAlgAllowlist(jwa.EdDSAEd25519())
+	require.NoError(t, err)
+	require.True(t, edModern.Contains(jwa.EdDSAEd25519()))
+	require.True(t, edModern.Contains(jwa.EdDSA()), "legacy EdDSA aliases RFC 9864 Ed25519")
+	edLegacy, err := NewJWSAlgAllowlist(jwa.EdDSA())
+	require.NoError(t, err)
+	require.True(t, edLegacy.Contains(jwa.EdDSAEd25519()))
 }
 
 func TestNewJWSSignerSignAlg(t *testing.T) {

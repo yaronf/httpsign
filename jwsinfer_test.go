@@ -139,12 +139,44 @@ func TestNewJWSVerifierFromJWK(t *testing.T) {
 		require.NotNil(t, v)
 	})
 
+	t.Run("ed25519 with RFC 9864 alg", func(t *testing.T) {
+		edJWK, err := jwk.Import[jwk.Key](edPub)
+		require.NoError(t, err)
+		require.NoError(t, edJWK.Set(jwk.AlgorithmKey, jwa.EdDSAEd25519()))
+		allowed, err := NewJWSAlgAllowlist(jwa.EdDSAEd25519())
+		require.NoError(t, err)
+		v, err := NewJWSVerifier(allowed, edJWK, nil, *NewFields())
+		require.NoError(t, err)
+		require.NotNil(t, v)
+	})
+
+	t.Run("ed25519 crv with modern allowlist", func(t *testing.T) {
+		edJWK, err := jwk.Import[jwk.Key](edPub)
+		require.NoError(t, err)
+		allowed, err := NewJWSAlgAllowlist(jwa.EdDSAEd25519())
+		require.NoError(t, err)
+		v, err := NewJWSVerifier(allowed, edJWK, nil, *NewFields())
+		require.NoError(t, err)
+		require.NotNil(t, v)
+	})
+
+	t.Run("ed25519 legacy alg with modern allowlist", func(t *testing.T) {
+		edJWK, err := jwk.Import[jwk.Key](edPub)
+		require.NoError(t, err)
+		require.NoError(t, edJWK.Set(jwk.AlgorithmKey, jwa.EdDSA()))
+		allowed, err := NewJWSAlgAllowlist(jwa.EdDSAEd25519())
+		require.NoError(t, err)
+		v, err := NewJWSVerifier(allowed, edJWK, nil, *NewFields())
+		require.NoError(t, err)
+		require.NotNil(t, v)
+	})
+
 	t.Run("ed25519 private jwk exports public", func(t *testing.T) {
 		edJWK, err := jwk.Import[jwk.Key](edPriv)
 		require.NoError(t, err)
 		alg, raw, err := inferFromJWK(edJWK)
 		require.NoError(t, err)
-		require.Equal(t, jwa.EdDSA().String(), alg.String())
+		require.Equal(t, jwa.EdDSAEd25519().String(), alg.String())
 		got, ok := raw.(ed25519.PublicKey)
 		require.True(t, ok)
 		require.Equal(t, edPub, got)
@@ -235,7 +267,7 @@ func TestAlgFromCurveHelpers(t *testing.T) {
 			{jwa.P256(), jwa.ES256()},
 			{jwa.P384(), jwa.ES384()},
 			{jwa.P521(), jwa.ES512()},
-			{jwa.Ed25519(), jwa.EdDSA()},
+			{jwa.Ed25519(), jwa.EdDSAEd25519()},
 		}
 		for _, tc := range cases {
 			got, err := algFromJWKCurve(tc.crv)
@@ -244,6 +276,12 @@ func TestAlgFromCurveHelpers(t *testing.T) {
 		}
 		_, err := algFromJWKCurve(jwa.X25519())
 		require.Error(t, err)
+	})
+
+	t.Run("ed25519 alg aliases agree", func(t *testing.T) {
+		require.True(t, jwsSignatureAlgsAgree(jwa.EdDSA(), jwa.EdDSAEd25519()))
+		require.True(t, jwsSignatureAlgsAgree(jwa.EdDSAEd25519(), jwa.EdDSA()))
+		require.False(t, jwsSignatureAlgsAgree(jwa.EdDSA(), jwa.ES256()))
 	})
 
 	t.Run("ecdsa nil and unsupported", func(t *testing.T) {

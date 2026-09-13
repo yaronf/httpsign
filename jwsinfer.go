@@ -66,11 +66,12 @@ func inferFromJWK(key jwk.Key) (jwa.SignatureAlgorithm, any, error) {
 	var alg jwa.SignatureAlgorithm
 	switch {
 	case hasAlg && hasStruct:
-		if fromAlg.String() != fromStruct.String() {
+		if !jwsSignatureAlgsAgree(fromAlg, fromStruct) {
 			return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf(
 				"JWK alg %s disagrees with structural mapping %s", fromAlg, fromStruct,
 			)
 		}
+		// Prefer the JWK's stated alg; EdDSA ↔ Ed25519 are treated as agreeing (RFC 9864).
 		alg = fromAlg
 	case hasAlg:
 		alg = fromAlg
@@ -144,9 +145,28 @@ func algFromJWKCurve(crv jwa.EllipticCurveAlgorithm) (jwa.SignatureAlgorithm, er
 	case jwa.P521():
 		return jwa.ES512(), nil
 	case jwa.Ed25519():
-		return jwa.EdDSA(), nil
+		// RFC 9864 name; legacy JWK alg "EdDSA" still agrees via jwsSignatureAlgsAgree.
+		return jwa.EdDSAEd25519(), nil
 	default:
 		return jwa.EmptySignatureAlgorithm(), fmt.Errorf("cannot infer JWS algorithm from crv %s", crv)
+	}
+}
+
+// jwsSignatureAlgsAgree reports whether two registry algs are the same crypto choice.
+// Legacy "EdDSA" and RFC 9864 "Ed25519" both mean Ed25519 signatures in jwx v4.
+func jwsSignatureAlgsAgree(a, b jwa.SignatureAlgorithm) bool {
+	if a.String() == b.String() {
+		return true
+	}
+	return isEd25519JWSAlg(a) && isEd25519JWSAlg(b)
+}
+
+func isEd25519JWSAlg(alg jwa.SignatureAlgorithm) bool {
+	switch alg {
+	case jwa.EdDSA(), jwa.EdDSAEd25519():
+		return true
+	default:
+		return false
 	}
 }
 

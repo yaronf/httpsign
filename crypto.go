@@ -335,7 +335,7 @@ func NewEd25519Verifier(key ed25519.PublicKey, config *VerifyConfig, fields Fiel
 // Preferred over NewJWSVerifierWithAlg when the key type uniquely determines the alg.
 //
 // Allowed key types:
-//   - jwk.Key with alg, or EC/OKP with unambiguous crv (P-256→ES256, …, Ed25519→EdDSA)
+//   - jwk.Key with alg, or EC/OKP with unambiguous crv (P-256→ES256, …, Ed25519→EdDSAEd25519; legacy JWK alg "EdDSA" also accepted)
 //   - *ecdsa.PublicKey (curve → ES256/384/512)
 //   - *mldsa.PublicKey (Parameters → ML-DSA-44/65/87)
 //
