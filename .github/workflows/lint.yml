@@ -17,4 +17,4 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           # v2.13+ is built with Go 1.27 (v2.12.x was go1.26 and rejects go.mod 1.27.0)
-          version: v2.13.1
+          version: v2.13.2
