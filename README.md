@@ -27,35 +27,37 @@ in the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign).
 	_ = res.Body.Close()
 ```
 
-### Upgrading from v0.5.x
+### Upgrading
 
-**v0.6.0** is a breaking release for foreign-JWS users and raises the Go floor to **1.27+**.
+**v0.6.0** (shipped) raised the Go floor to **1.27+** and cut foreign JWS over to **jwx v4** + ML-DSA. See [internal-docs/RELEASE-v0.6.0.md](internal-docs/RELEASE-v0.6.0.md).
 
-| Caller | Change |
-|--------|--------|
-| Native algorithms only (RSA, ECDSA, Ed25519, HMAC) | Upgrade Go to 1.27+; no API changes. |
-| `NewJWSSignerV3` / `NewJWSVerifierV3` | Use `NewJWSSigner` / `NewJWSVerifier` with `github.com/lestrrat-go/jwx/v4/jwa`. |
-| `NewJWSSigner` / `NewJWSVerifier` (jwx v2) | Same: v4 import path; algorithms are functions (`jwa.ES256()`, not string constants). |
+**v0.6.1** breaks foreign-JWS **verify** again: prefer `NewJWSVerifier(allowed, key, …)` (infer alg); use `NewJWSVerifierWithAlg` when needed; pass a `JWSAlgAllowlist` (`nil` skips policy). `NewJWSSigner` defaults to / requires `SignAlg(false)`; use `NewJWSSignerFromJWK` when the private key is a JWK.
 
-Foreign JWS signing must use `SignConfig.SignAlg(false)` — RFC 9421 does not define an HTTP `alg` value for arbitrary JWS algorithms. Verification policy `SetAllowedAlgs` applies to the optional HTTP `alg` signature parameter in the message, not to the JWS algorithm passed to `NewJWSVerifier`.
+| Caller | Change in v0.6.1 |
+|--------|------------------|
+| Native algorithms only | None. |
+| `NewJWSVerifier(alg, key, …)` (v0.6.0) | Prefer `NewJWSVerifier(allowed, key, …)`; else `NewJWSVerifierWithAlg(allowed, alg, key, …)`. |
+| `NewJWSSigner` | Nil config ⇒ `SignAlg(false)`; `SignAlg(true)` errors. Prefer `NewJWSSignerFromJWK` for private JWKs. |
 
-Full migration notes: [internal-docs/RELEASE-v0.6.0.md](internal-docs/RELEASE-v0.6.0.md) (maintainers: paste **Summary** into the GitHub release).
+Pass a non-nil allowlist when `keyid` can select among keys. `SetAllowedAlgs` still only filters Signature-Input `alg`, not JWS `jwa`.
+
+Full notes: [internal-docs/RELEASE-v0.6.1.md](internal-docs/RELEASE-v0.6.1.md).
 
 ### Foreign JWS and ML-DSA
 
-Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) (≥ v4.4.0) via `NewJWSSigner` / `NewJWSVerifier`. Requires **Go 1.27+** (stdlib `encoding/json/v2`; no `GOEXPERIMENT`).
+Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) (≥ v4.5.0) via `NewJWSSigner` / `NewJWSSignerFromJWK` / `NewJWSVerifier`.
 
-**ML-DSA (FIPS 204)** is supported through the same constructors with `crypto/mldsa` keys and `jwa.MLDSA44()` / `MLDSA65()` / `MLDSA87()`. RFC 9421 does not assign HTTP Message Signatures algorithm identifiers for ML-DSA; treat it like other foreign JWS algorithms (`SignAlg(false)`, JWS `alg` in the JWS layer only if your profile requires it).
+**ML-DSA (FIPS 204)** works through the same path with `crypto/mldsa` keys. Prefer inferring the alg from the public key:
 
 ```go
 priv, _ := mldsa.GenerateKey(mldsa.MLDSA65())
 pub := priv.Public().(*mldsa.PublicKey)
-signer, _ := httpsign.NewJWSSigner(jwa.MLDSA65(), priv,
-    httpsign.NewSignConfig().SignAlg(false), fields)
-verifier, _ := httpsign.NewJWSVerifier(jwa.MLDSA65(), pub, httpsign.NewVerifyConfig(), fields)
+signer, _ := httpsign.NewJWSSigner(jwa.MLDSA65(), priv, nil, fields) // SignAlg(false) by default
+allowed, _ := httpsign.NewJWSAlgAllowlist(jwa.MLDSA65())
+verifier, _ := httpsign.NewJWSVerifier(allowed, pub, httpsign.NewVerifyConfig(), fields)
 ```
 
-HMAC keys must be `[]byte` (minimum length per RFC 7518).
+HMAC keys must be `[]byte` (minimum length per RFC 7518). Raw RSA verify needs `NewJWSVerifierWithAlg` (or a JWK that carries `alg`).
 
 ### Notes and Missing Features
 * Requires **Go 1.27+**.

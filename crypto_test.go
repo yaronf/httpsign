@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwk"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -157,7 +158,7 @@ func TestForeignSigner(t *testing.T) {
 	}
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewJWSVerifier(jwa.ES256(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
+	verifier, err := NewJWSVerifier(nil, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -188,7 +189,7 @@ func TestMessageForeignSigner(t *testing.T) {
 	}
 	req.Header.Add("Signature", sig)
 	req.Header.Add("Signature-Input", sigInput)
-	verifier, err := NewJWSVerifier(jwa.ES256(), pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
+	verifier, err := NewJWSVerifier(nil, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("key1"), fields)
 	if err != nil {
 		t.Errorf("could not generate Verifier: %s", err)
 	}
@@ -266,7 +267,11 @@ func TestNewJWSSigner(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "happy path", alg: jwa.HS256(), key: hmacKey},
+		{name: "handcrafted registered name", alg: jwa.NewSignatureAlgorithm("HS256"), key: hmacKey},
 		{name: "none", alg: jwa.NoSignature(), key: hmacKey, wantErr: true},
+		{name: "empty alg", alg: jwa.EmptySignatureAlgorithm(), key: hmacKey, wantErr: true},
+		{name: "handcrafted NONE", alg: jwa.NewSignatureAlgorithm("NONE"), key: hmacKey, wantErr: true},
+		{name: "unregistered alg", alg: jwa.NewSignatureAlgorithm("totally-made-up"), key: hmacKey, wantErr: true},
 		{name: "nil key", alg: jwa.HS256(), key: nil, wantErr: true},
 		{name: "string hmac key", alg: jwa.HS256(), key: "1234", wantErr: true},
 		{name: "short hmac key", alg: jwa.HS256(), key: []byte("too-short"), wantErr: true},
@@ -300,7 +305,7 @@ func TestNewJWSSigner(t *testing.T) {
 	}
 }
 
-func TestNewJWSVerifier(t *testing.T) {
+func TestNewJWSVerifierWithAlg(t *testing.T) {
 	hmacKey := []byte(strings.Repeat("x", 32)) // RFC 7518 HS256 minimum
 	priv, err := rsa.GenerateKey(rand.Reader, 1024)
 	require.NoError(t, err)
@@ -348,6 +353,56 @@ func TestNewJWSVerifier(t *testing.T) {
 			},
 			want:    nil,
 			wantErr: true,
+		},
+		{
+			name: "empty alg",
+			args: args{
+				alg:    jwa.EmptySignatureAlgorithm(),
+				key:    hmacKey,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "handcrafted NONE",
+			args: args{
+				alg:    jwa.NewSignatureAlgorithm("NONE"),
+				key:    hmacKey,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "unregistered alg",
+			args: args{
+				alg:    jwa.NewSignatureAlgorithm("totally-made-up"),
+				key:    hmacKey,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "handcrafted registered name",
+			args: args{
+				alg:    jwa.NewSignatureAlgorithm("HS256"),
+				key:    hmacKey,
+				config: NewVerifyConfig(),
+				fields: *NewFields(),
+			},
+			want: &Verifier{
+				key:             hmacKey,
+				alg:             "",
+				config:          NewVerifyConfig(),
+				fields:          *NewFields(),
+				foreignVerifier: nil,
+			},
+			wantErr: false,
 		},
 		{
 			name: "nil key",
@@ -472,9 +527,9 @@ func TestNewJWSVerifier(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewJWSVerifier(tt.args.alg, tt.args.key, tt.args.config, tt.args.fields)
+			got, err := NewJWSVerifierWithAlg(nil, tt.args.alg, tt.args.key, tt.args.config, tt.args.fields)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewJWSVerifier() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NewJWSVerifierWithAlg() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != nil {
@@ -484,10 +539,243 @@ func TestNewJWSVerifier(t *testing.T) {
 				tt.want.foreignVerifier = nil
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewJWSVerifier() got = %v, want %v", got, tt.want)
+				t.Errorf("NewJWSVerifierWithAlg() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+func TestNewJWSVerifierInfer(t *testing.T) {
+	p256, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	p384, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	require.NoError(t, err)
+	p521, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	require.NoError(t, err)
+	mldsa65, err := mldsa.GenerateKey(mldsa.MLDSA65())
+	require.NoError(t, err)
+	pub := mldsa65.Public().(*mldsa.PublicKey)
+	rsaPriv, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+	edPub, _, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	t.Run("ecdsa", func(t *testing.T) {
+		v, err := NewJWSVerifier(nil, &p256.PublicKey, nil, *NewFields())
+		require.NoError(t, err)
+		require.NotNil(t, v.foreignVerifier)
+	})
+	t.Run("ecdsa p384", func(t *testing.T) {
+		v, err := NewJWSVerifier(nil, &p384.PublicKey, nil, *NewFields())
+		require.NoError(t, err)
+		require.NotNil(t, v.foreignVerifier)
+	})
+	t.Run("ecdsa p521", func(t *testing.T) {
+		v, err := NewJWSVerifier(nil, &p521.PublicKey, nil, *NewFields())
+		require.NoError(t, err)
+		require.NotNil(t, v.foreignVerifier)
+	})
+	t.Run("mldsa", func(t *testing.T) {
+		v, err := NewJWSVerifier(nil, pub, nil, *NewFields())
+		require.NoError(t, err)
+		require.NotNil(t, v.foreignVerifier)
+	})
+	t.Run("ed25519 withalg", func(t *testing.T) {
+		v, err := NewJWSVerifierWithAlg(nil, jwa.EdDSA(), edPub, nil, *NewFields())
+		require.NoError(t, err)
+		require.NotNil(t, v.foreignVerifier)
+	})
+	t.Run("rsa raw rejected", func(t *testing.T) {
+		_, err := NewJWSVerifier(nil, &rsaPriv.PublicKey, nil, *NewFields())
+		require.Error(t, err)
+	})
+	t.Run("allowlist deny", func(t *testing.T) {
+		allowed, err := NewJWSAlgAllowlist(jwa.ES384())
+		require.NoError(t, err)
+		_, err = NewJWSVerifier(allowed, &p256.PublicKey, nil, *NewFields())
+		require.Error(t, err)
+	})
+	t.Run("allowlist accept", func(t *testing.T) {
+		allowed, err := NewJWSAlgAllowlist(jwa.ES256(), jwa.MLDSA65())
+		require.NoError(t, err)
+		v, err := NewJWSVerifier(allowed, &p256.PublicKey, nil, *NewFields())
+		require.NoError(t, err)
+		require.NotNil(t, v)
+	})
+}
+
+func TestJWSAlgAllowlist(t *testing.T) {
+	_, err := NewJWSAlgAllowlist()
+	require.Error(t, err)
+	_, err = NewJWSAlgAllowlist(jwa.NoSignature())
+	require.Error(t, err)
+	_, err = NewJWSAlgAllowlist(jwa.NewSignatureAlgorithm("NONE"))
+	require.Error(t, err)
+	_, err = NewJWSAlgAllowlist(jwa.NewSignatureAlgorithm("nope"))
+	require.Error(t, err)
+	a, err := NewJWSAlgAllowlist(jwa.NewSignatureAlgorithm("ES256"))
+	require.NoError(t, err)
+	require.True(t, a.Contains(jwa.ES256()))
+	require.False(t, a.Contains(jwa.ES384()))
+	var nilAllow *JWSAlgAllowlist
+	require.False(t, nilAllow.Contains(jwa.ES256()))
+
+	edModern, err := NewJWSAlgAllowlist(jwa.EdDSAEd25519())
+	require.NoError(t, err)
+	require.True(t, edModern.Contains(jwa.EdDSAEd25519()))
+	require.True(t, edModern.Contains(jwa.EdDSA()), "legacy EdDSA aliases RFC 9864 Ed25519")
+	edLegacy, err := NewJWSAlgAllowlist(jwa.EdDSA())
+	require.NoError(t, err)
+	require.True(t, edLegacy.Contains(jwa.EdDSAEd25519()))
+}
+
+func TestNewJWSSignerSignAlg(t *testing.T) {
+	hmacKey := []byte(strings.Repeat("x", 32))
+	t.Run("nil config defaults SignAlg false", func(t *testing.T) {
+		s, err := NewJWSSigner(jwa.HS256(), hmacKey, nil, *NewFields())
+		require.NoError(t, err)
+		require.False(t, s.config.signAlg)
+	})
+	t.Run("SignAlg true rejected", func(t *testing.T) {
+		_, err := NewJWSSigner(jwa.HS256(), hmacKey, NewSignConfig().SignAlg(true), *NewFields())
+		require.Error(t, err)
+	})
+	t.Run("jwk key redirected", func(t *testing.T) {
+		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(t, err)
+		key, err := jwk.Import[jwk.Key](priv)
+		require.NoError(t, err)
+		_, err = NewJWSSigner(jwa.ES256(), key, nil, *NewFields())
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "NewJWSSignerFromJWK")
+	})
+}
+
+func TestNewJWSSignerFromJWK(t *testing.T) {
+	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
+	signCfg := NewSignConfig().SignAlg(false).setFakeCreated(1618884475).SetKeyID("jwk1")
+	verifyCfg := NewVerifyConfig().SetVerifyCreated(false).SetKeyID("jwk1")
+
+	t.Run("ecdsa p256 round trip", func(t *testing.T) {
+		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(t, err)
+		privJWK, err := jwk.Import[jwk.Key](priv)
+		require.NoError(t, err)
+		signer, err := NewJWSSignerFromJWK(privJWK, signCfg, fields)
+		require.NoError(t, err)
+
+		pubJWK, err := jwk.Import[jwk.Key](&priv.PublicKey)
+		require.NoError(t, err)
+		allowed, err := NewJWSAlgAllowlist(jwa.ES256())
+		require.NoError(t, err)
+		verifier, err := NewJWSVerifier(allowed, pubJWK, verifyCfg, fields)
+		require.NoError(t, err)
+
+		req := readRequest(httpreq2)
+		sigInput, sig, err := SignRequest("sig1", *signer, req)
+		require.NoError(t, err)
+		req.Header.Add("Signature-Input", sigInput)
+		req.Header.Add("Signature", sig)
+		require.NoError(t, VerifyRequest("sig1", *verifier, req))
+	})
+
+	t.Run("ed25519 round trip", func(t *testing.T) {
+		pub, priv, err := ed25519.GenerateKey(rand.Reader)
+		require.NoError(t, err)
+		privJWK, err := jwk.Import[jwk.Key](priv)
+		require.NoError(t, err)
+		require.NoError(t, privJWK.Set(jwk.AlgorithmKey, jwa.EdDSAEd25519()))
+		signer, err := NewJWSSignerFromJWK(privJWK, signCfg, fields)
+		require.NoError(t, err)
+
+		pubJWK, err := jwk.Import[jwk.Key](pub)
+		require.NoError(t, err)
+		allowed, err := NewJWSAlgAllowlist(jwa.EdDSAEd25519())
+		require.NoError(t, err)
+		verifier, err := NewJWSVerifier(allowed, pubJWK, verifyCfg, fields)
+		require.NoError(t, err)
+
+		req := readRequest(httpreq2)
+		sigInput, sig, err := SignRequest("sig1", *signer, req)
+		require.NoError(t, err)
+		req.Header.Add("Signature-Input", sigInput)
+		req.Header.Add("Signature", sig)
+		require.NoError(t, VerifyRequest("sig1", *verifier, req))
+	})
+
+	t.Run("mldsa44 round trip", func(t *testing.T) {
+		priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
+		require.NoError(t, err)
+		privJWK, err := jwk.Import[jwk.Key](priv)
+		require.NoError(t, err)
+		require.NoError(t, privJWK.Set(jwk.AlgorithmKey, jwa.MLDSA44()))
+		signer, err := NewJWSSignerFromJWK(privJWK, signCfg, fields)
+		require.NoError(t, err)
+
+		pub := priv.Public().(*mldsa.PublicKey)
+		allowed, err := NewJWSAlgAllowlist(jwa.MLDSA44())
+		require.NoError(t, err)
+		verifier, err := NewJWSVerifier(allowed, pub, verifyCfg, fields)
+		require.NoError(t, err)
+
+		req := readRequest(httpreq2)
+		sigInput, sig, err := SignRequest("sig1", *signer, req)
+		require.NoError(t, err)
+		req.Header.Add("Signature-Input", sigInput)
+		req.Header.Add("Signature", sig)
+		require.NoError(t, VerifyRequest("sig1", *verifier, req))
+	})
+
+	t.Run("hmac oct with alg", func(t *testing.T) {
+		raw := []byte(strings.Repeat("k", 32))
+		octJWK, err := jwk.Import[jwk.Key](raw)
+		require.NoError(t, err)
+		require.NoError(t, octJWK.Set(jwk.AlgorithmKey, jwa.HS256()))
+		signer, err := NewJWSSignerFromJWK(octJWK, signCfg, fields)
+		require.NoError(t, err)
+		verifier, err := NewJWSVerifierWithAlg(nil, jwa.HS256(), raw, verifyCfg, fields)
+		require.NoError(t, err)
+
+		req := readRequest(httpreq2)
+		sigInput, sig, err := SignRequest("sig1", *signer, req)
+		require.NoError(t, err)
+		req.Header.Add("Signature-Input", sigInput)
+		req.Header.Add("Signature", sig)
+		require.NoError(t, VerifyRequest("sig1", *verifier, req))
+	})
+
+	t.Run("public jwk rejected", func(t *testing.T) {
+		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(t, err)
+		pubJWK, err := jwk.Import[jwk.Key](&priv.PublicKey)
+		require.NoError(t, err)
+		_, err = NewJWSSignerFromJWK(pubJWK, nil, *NewFields())
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "private")
+	})
+
+	t.Run("rsa without alg rejected", func(t *testing.T) {
+		priv, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+		rsaJWK, err := jwk.Import[jwk.Key](priv)
+		require.NoError(t, err)
+		_, err = NewJWSSignerFromJWK(rsaJWK, nil, *NewFields())
+		require.Error(t, err)
+	})
+
+	t.Run("nil key", func(t *testing.T) {
+		_, err := NewJWSSignerFromJWK(nil, nil, *NewFields())
+		require.Error(t, err)
+	})
+
+	t.Run("SignAlg true rejected", func(t *testing.T) {
+		priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(t, err)
+		privJWK, err := jwk.Import[jwk.Key](priv)
+		require.NoError(t, err)
+		_, err = NewJWSSignerFromJWK(privJWK, NewSignConfig().SignAlg(true), *NewFields())
+		require.Error(t, err)
+	})
 }
 
 func TestVerify(t *testing.T) {
@@ -535,7 +823,7 @@ func TestForeignSignerMLDSA(t *testing.T) {
 			req.Header.Add("Signature", sig)
 			req.Header.Add("Signature-Input", sigInput)
 
-			verifier, err := NewJWSVerifier(tc.alg, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("pq1"), fields)
+			verifier, err := NewJWSVerifier(nil, pub, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("pq1"), fields)
 			require.NoError(t, err)
 			require.NoError(t, VerifyRequest(signatureName, *verifier, req))
 		})

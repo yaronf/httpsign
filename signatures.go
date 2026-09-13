@@ -513,7 +513,7 @@ func RequestDetails(signatureName string, req *http.Request) (details *MessageDe
 	if err != nil {
 		return nil, fmt.Errorf("could not extract signature: %w", err)
 	}
-	return signatureDetails(psiSig)
+	return signatureDetails(signatureName, psiSig)
 }
 
 func verifyDebug(signatureName string, verifier Verifier, message *Message) (string, *psiSignature, error) {
@@ -571,7 +571,7 @@ func ResponseDetails(signatureName string, res *http.Response) (details *Message
 	if err != nil {
 		return nil, fmt.Errorf("could not extract signature: %w", err)
 	}
-	return signatureDetails(psiSig)
+	return signatureDetails(signatureName, psiSig)
 }
 
 // RequestSignatureNames returns the list of signature names present in a request (empty list if none found).
@@ -619,7 +619,7 @@ func messageSignatureNames(parsedMessage *parsedMessage, withTrailers bool) ([]s
 	return names, nil
 }
 
-func signatureDetails(signature *psiSignature) (details *MessageDetails, err error) {
+func signatureDetails(label string, signature *psiSignature) (details *MessageDetails, err error) {
 	var keyID *string
 	if keyIDParam, ok := signature.params["keyid"]; ok {
 		k, ok := keyIDParam.(string)
@@ -637,6 +637,7 @@ func signatureDetails(signature *psiSignature) (details *MessageDetails, err err
 		}
 	}
 	details = &MessageDetails{
+		Label:  label,
 		KeyID:  keyID,
 		Alg:    alg,
 		Fields: signature.fields,
@@ -975,12 +976,16 @@ func parseSignatureInput(input string, sigName string) (*psiSignature, error) {
 	}
 	memberForName, _ := sigs.Get(sigName)
 	fieldsList, ok := memberForName.(httpsfv.InnerList)
+	if !ok {
+		return nil, fmt.Errorf("Signature-Input: signature %s does not have an inner list", sigName)
+	}
+	return psiSignatureFromInnerList(sigName, fieldsList)
+}
+
+func psiSignatureFromInnerList(sigName string, fieldsList httpsfv.InnerList) (*psiSignature, error) {
 	osp, err := httpsfv.Marshal(fieldsList) // undocumented functionality
 	if err != nil {
 		return nil, fmt.Errorf("could not marshal inner list: %w", err)
-	}
-	if !ok {
-		return nil, fmt.Errorf("Signature-Input: signature %s does not have an inner list", sigName)
 	}
 	var f Fields
 	for _, ff := range fieldsList.Items {
@@ -996,6 +1001,53 @@ func parseSignatureInput(input string, sigName string) (*psiSignature, error) {
 		params[p] = pp
 	}
 	return &psiSignature{sigName, osp, f, params}, nil
+}
+
+// signatureDetailsListFromHeaders builds MessageDetails for each Signature-Input member
+// in a single SFV pass. Each label must also appear in Signature (RFC 9421). Missing
+// Signature / Signature-Input yields an empty list (same spirit as RequestSignatureNames).
+func signatureDetailsListFromHeaders(headers http.Header) ([]*MessageDetails, error) {
+	if headers == nil {
+		return nil, nil
+	}
+	normalized := normalizeHeaderNames(headers)
+	siVals := normalized["signature-input"] //nolint:staticcheck // SA1008: lowercase map keys by design
+	sigVals := normalized["signature"]     //nolint:staticcheck // SA1008: lowercase map keys by design
+	if len(siVals) == 0 || len(sigVals) == 0 {
+		return nil, nil
+	}
+	siDict, err := httpsfv.UnmarshalDictionary(siVals)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse Signature-Input: %w", err)
+	}
+	sigDict, err := httpsfv.UnmarshalDictionary(sigVals)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse Signature: %w", err)
+	}
+	var out []*MessageDetails
+	for _, name := range siDict.Names() {
+		if _, ok := sigDict.Get(name); !ok {
+			return nil, fmt.Errorf("Signature-Input label %q missing from Signature", name)
+		}
+		member, ok := siDict.Get(name)
+		if !ok {
+			return nil, fmt.Errorf("cannot read Signature-Input member %q", name)
+		}
+		inner, ok := member.(httpsfv.InnerList)
+		if !ok {
+			return nil, fmt.Errorf("Signature-Input: signature %s does not have an inner list", name)
+		}
+		psi, err := psiSignatureFromInnerList(name, inner)
+		if err != nil {
+			return nil, err
+		}
+		details, err := signatureDetails(name, psi)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, details)
+	}
+	return out, nil
 }
 
 func parseWantSignature(wantSignature string) ([]byte, error) {

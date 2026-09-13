@@ -43,8 +43,8 @@ func NewSignConfig() *SignConfig {
 	}
 }
 
-// SignAlg indicates that an "alg" signature parameter must be generated and signed (default: true).
-// Must be false when using NewJWSSigner (foreign JWS has no HTTP Message Signatures algorithm id).
+// SignAlg indicates that an "alg" signature parameter must be generated and signed (default: true for native signers).
+// NewJWSSigner rejects SignAlg(true) and defaults nil configs to SignAlg(false).
 func (c *SignConfig) SignAlg(b bool) *SignConfig {
 	c.signAlg = b
 	return c

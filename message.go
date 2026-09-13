@@ -10,6 +10,7 @@ import (
 
 // MessageDetails aggregates the details of a signed message, for a given signature
 type MessageDetails struct {
+	Label        string  // Signature dictionary member name (the label in Signature / Signature-Input)
 	KeyID        *string // nil when keyid parameter is absent (RFC 9421 does not require it)
 	Alg          string
 	Fields       Fields
@@ -18,8 +19,8 @@ type MessageDetails struct {
 	Nonce        *string
 	Tag          *string
 	CustomParams map[string]interface{} // non-standard parameters; values are int64, string, or bool. Nil if none present.
-	// Note: when populated via RequestDetails/ResponseDetails, the message has not been cryptographically
-	// verified — treat CustomParams (and all other fields) as untrusted until verified.
+	// Note: when populated via RequestDetails/ResponseDetails (or *ByTag), the message has not been
+	// cryptographically verified — treat CustomParams (and all other fields) as untrusted until verified.
 }
 
 // Message represents a parsed HTTP message ready for signature verification.
@@ -223,5 +224,5 @@ func (m *Message) Verify(signatureName string, verifier Verifier) (*MessageDetai
 	if err != nil {
 		return nil, err
 	}
-	return signatureDetails(psiSig)
+	return signatureDetails(signatureName, psiSig)
 }

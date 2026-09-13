@@ -1,9 +1,11 @@
 package httpsign
 
 import (
+	"testing"
+
 	"github.com/dunglas/httpsfv"
 	"github.com/stretchr/testify/assert"
-	"testing"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFields_asSignatureInput(t *testing.T) {
@@ -81,6 +83,12 @@ func TestFields_hasHeader(t *testing.T) {
 			want:   true,
 		},
 		{
+			name:   "associated-request component via AddRequestComponent",
+			fields: NewFields().AddRequestComponent("@method"),
+			header: "@method",
+			want:   true,
+		},
+		{
 			name:   "header not in fields",
 			fields: NewFields().AddHeaders("content-type"),
 			header: "content-digest",
@@ -99,6 +107,25 @@ func TestFields_hasHeader(t *testing.T) {
 			assert.Equalf(t, tt.want, got, "hasHeader(%q)", tt.header)
 		})
 	}
+}
+
+func TestAddRequestComponent(t *testing.T) {
+	got := NewFields().AddRequestComponent("@method").AddRequestComponent("@path")
+	want := NewFields().
+		AddHeaderExt("@method", false, false, true, false).
+		AddHeaderExt("@path", false, false, true, false)
+	require.Equal(t, len(want.f), len(got.f))
+	for i := range got.f {
+		assert.True(t, got.f[i].Equal(want.f[i]), "field %d: got %s want %s", i, got.f[i], want.f[i])
+		req, err := got.f[i].associatedRequest()
+		require.NoError(t, err)
+		assert.True(t, req)
+		opt, err := got.f[i].optional()
+		require.NoError(t, err)
+		assert.False(t, opt)
+	}
+	assert.Equal(t, `"@method";req`, got.f[0].String())
+	assert.Equal(t, `"@path";req`, got.f[1].String())
 }
 
 func Test_field_String(t *testing.T) {

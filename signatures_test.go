@@ -2036,7 +2036,7 @@ func TestSignResponseNilRequestWhenAssocFieldsRequired(t *testing.T) {
 	priv, pub, err := genP256KeyPair()
 	assert.NoError(t, err)
 	fields := *NewFields().AddHeaders("@status", "date").
-		AddHeaderExt("@authority", false, false, true, false) // requires associated request
+		AddRequestComponent("@authority") // requires associated request
 	signer, err := NewP256Signer(*priv, NewSignConfig().SetKeyID("key"), fields)
 	assert.NoError(t, err)
 	res := readResponse(httpres2)
@@ -3221,10 +3221,10 @@ func TestRequestBinding17(t *testing.T) {
 	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
 	assert.NoError(t, err, "read pub key")
 	fields2 := *NewFields().AddHeaders("@status", "content-digest", "content-type").
-		AddHeaderExt("@authority", false, false, true, false).
-		AddHeaderExt("@method", false, false, true, false).
-		AddHeaderExt("@path", false, false, true, false).
-		AddHeaderExt("content-digest", false, false, true, false)
+		AddRequestComponent("@authority").
+		AddRequestComponent("@method").
+		AddRequestComponent("@path").
+		AddRequestComponent("content-digest")
 	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
 	assert.NoError(t, err, "create verifier")
 	sigBase, err := verifyResponseDebug("reqres", *verifier2, res, req)
@@ -3257,10 +3257,10 @@ func TestMessageRequestBinding17(t *testing.T) {
 	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
 	assert.NoError(t, err, "read pub key")
 	fields2 := *NewFields().AddHeaders("@status", "content-digest", "content-type").
-		AddHeaderExt("@authority", false, false, true, false).
-		AddHeaderExt("@method", false, false, true, false).
-		AddHeaderExt("@path", false, false, true, false).
-		AddHeaderExt("content-digest", false, false, true, false)
+		AddRequestComponent("@authority").
+		AddRequestComponent("@method").
+		AddRequestComponent("@path").
+		AddRequestComponent("content-digest")
 	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
 	assert.NoError(t, err, "create verifier")
 	sigBase, _, err := verifyDebug("reqres", *verifier2, msg)
@@ -3393,11 +3393,11 @@ func TestRequestBindingSignedResponse17(t *testing.T) {
 	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
 	assert.NoError(t, err, "read pub key")
 	fields2 := *NewFields().AddHeaders("@status", "content-digest", "content-type").
-		AddHeaderExt("@authority", false, false, true, false).
-		AddHeaderExt("@method", false, false, true, false).
-		AddHeaderExt("@path", false, false, true, false).
-		AddHeaderExt("@query", false, false, true, false).
-		AddHeaderExt("content-digest", false, false, true, false)
+		AddRequestComponent("@authority").
+		AddRequestComponent("@method").
+		AddRequestComponent("@path").
+		AddRequestComponent("@query").
+		AddRequestComponent("content-digest")
 	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
 	assert.NoError(t, err, "create verifier")
 	sigBase, err := verifyResponseDebug("reqres", *verifier2, res, req)
@@ -3521,11 +3521,11 @@ func TestMessageRequestBindingSignedResponse17(t *testing.T) {
 	pubKey2, err := parseECPublicKeyFromPemStr(p256PubKey2)
 	assert.NoError(t, err, "read pub key")
 	fields2 := *NewFields().AddHeaders("@status", "content-digest", "content-type").
-		AddHeaderExt("@authority", false, false, true, false).
-		AddHeaderExt("@method", false, false, true, false).
-		AddHeaderExt("@path", false, false, true, false).
-		AddHeaderExt("@query", false, false, true, false).
-		AddHeaderExt("content-digest", false, false, true, false)
+		AddRequestComponent("@authority").
+		AddRequestComponent("@method").
+		AddRequestComponent("@path").
+		AddRequestComponent("@query").
+		AddRequestComponent("content-digest")
 	verifier2, err := NewP256Verifier(*pubKey2, NewVerifyConfig().SetVerifyCreated(false).SetKeyID("test-key-ecc-p256"), fields2)
 	assert.NoError(t, err, "create verifier")
 	sigBase, _, err := verifyDebug("reqres", *verifier2, msg)

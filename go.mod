@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/dunglas/httpsfv v1.1.1
-	github.com/lestrrat-go/jwx/v4 v4.4.0
+	github.com/lestrrat-go/jwx/v4 v4.5.0
 	github.com/sergi/go-diff v1.4.0
 	github.com/stretchr/testify v1.12.1
 )
