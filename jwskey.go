@@ -141,11 +141,6 @@ func ecdsaKeyOf(key any) (curve elliptic.Curve, isPrivate, ok bool) {
 	case ecdsa.PublicKey:
 		return k.Curve, false, true
 	case crypto.Signer:
-		// An opaque signer (HSM, KMS, or any remote/hardware-backed key)
-		// that implements the standard interface without being one of the
-		// concrete stdlib types above. Its Public() method determines the
-		// curve, so the private key material never has to be extracted —
-		// or even exist locally.
 		pub, isECDSA := k.Public().(*ecdsa.PublicKey)
 		if !isECDSA || pub == nil {
 			return nil, false, false
@@ -235,11 +230,6 @@ func mldsaKeyOf(key any) (params mldsa.Parameters, isPrivate, ok bool) {
 		}
 		return k.Parameters(), false, true
 	case crypto.Signer:
-		// An opaque signer (HSM, KMS, or any remote/hardware-backed key)
-		// that implements the standard interface without being a literal
-		// *mldsa.PrivateKey. Its Public() method determines the parameter
-		// set, so the private key material never has to be extracted — or
-		// even exist locally.
 		pub, isMLDSA := k.Public().(*mldsa.PublicKey)
 		if !isMLDSA || pub == nil {
 			return mldsa.Parameters{}, false, false
