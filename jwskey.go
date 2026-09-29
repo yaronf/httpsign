@@ -1,6 +1,7 @@
 package httpsign
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -14,8 +15,10 @@ import (
 // validateJWSKeyAlg checks that key is an appropriate Go type for alg, without using
 // jws.AlgorithmsForKey (deprecated; not a compatibility API; over-broad for ECDSA/ML-DSA).
 // When signing is true, asymmetric keys must be private; when false, they must be public.
-// HMAC keys are symmetric and accepted for either role. Only raw stdlib key types are
-// accepted; crypto.Signer / JWK wrappers are rejected here so callers convert first.
+// HMAC keys are symmetric and accepted for either role. Raw stdlib key types are
+// accepted, and so is any opaque crypto.Signer (HSM/KMS-backed keys, etc.) whose
+// Public() reports the expected key shape — see ecdsaKeyOf/mldsaKeyOf. JWK wrappers
+// are still rejected here so callers convert first.
 func validateJWSKeyAlg(alg jwa.SignatureAlgorithm, key any, signing bool) error {
 	switch alg {
 	case jwa.HS256(), jwa.HS384(), jwa.HS512():
@@ -137,6 +140,17 @@ func ecdsaKeyOf(key any) (curve elliptic.Curve, isPrivate, ok bool) {
 		return k.Curve, false, true
 	case ecdsa.PublicKey:
 		return k.Curve, false, true
+	case crypto.Signer:
+		// An opaque signer (HSM, KMS, or any remote/hardware-backed key)
+		// that implements the standard interface without being one of the
+		// concrete stdlib types above. Its Public() method determines the
+		// curve, so the private key material never has to be extracted —
+		// or even exist locally.
+		pub, isECDSA := k.Public().(*ecdsa.PublicKey)
+		if !isECDSA || pub == nil {
+			return nil, false, false
+		}
+		return pub.Curve, true, true
 	default:
 		return nil, false, false
 	}
@@ -220,6 +234,17 @@ func mldsaKeyOf(key any) (params mldsa.Parameters, isPrivate, ok bool) {
 			return mldsa.Parameters{}, false, false
 		}
 		return k.Parameters(), false, true
+	case crypto.Signer:
+		// An opaque signer (HSM, KMS, or any remote/hardware-backed key)
+		// that implements the standard interface without being a literal
+		// *mldsa.PrivateKey. Its Public() method determines the parameter
+		// set, so the private key material never has to be extracted — or
+		// even exist locally.
+		pub, isMLDSA := k.Public().(*mldsa.PublicKey)
+		if !isMLDSA || pub == nil {
+			return mldsa.Parameters{}, false, false
+		}
+		return pub.Parameters(), true, true
 	default:
 		return mldsa.Parameters{}, false, false
 	}
