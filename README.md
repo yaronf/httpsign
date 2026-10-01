@@ -33,7 +33,7 @@ in the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign).
 
 **v0.6.1** breaks foreign-JWS **verify** again: prefer `NewJWSVerifier(allowed, key, …)` (infer alg); use `NewJWSVerifierWithAlg` when needed; pass a `JWSAlgAllowlist` (`nil` skips policy). `NewJWSSigner` defaults to / requires `SignAlg(false)`; use `NewJWSSignerFromJWK` when the private key is a JWK.
 
-**v0.6.2** restores opaque `crypto.Signer` (HSM/KMS) for classical foreign JWS RSA/ECDSA/Ed25519 on sign and verify. See [internal-docs/RELEASE-v0.6.2.md](internal-docs/RELEASE-v0.6.2.md).
+**v0.6.2** restores opaque `crypto.Signer` (HSM/KMS) for foreign JWS RSA/ECDSA/Ed25519 and ML-DSA on sign and verify. See [internal-docs/RELEASE-v0.6.2.md](internal-docs/RELEASE-v0.6.2.md).
 
 | Caller | Change in v0.6.1 |
 |--------|------------------|
@@ -49,9 +49,11 @@ Full notes: [internal-docs/RELEASE-v0.6.1.md](internal-docs/RELEASE-v0.6.1.md).
 
 Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) (≥ v4.5.0) via `NewJWSSigner` / `NewJWSSignerFromJWK` / `NewJWSVerifier`.
 
-For **RSA / ECDSA / Ed25519**, `NewJWSSigner` and `NewJWSVerifierWithAlg` accept either raw stdlib keys or an opaque [`crypto.Signer`](https://pkg.go.dev/crypto#Signer) (HSM/KMS). Verify via `crypto.Signer` uses `Public()` locally (same as jwx); you can also pass the exported public key. Opaque Signers must use `NewJWSVerifierWithAlg` — the preferred infer path (`NewJWSVerifier`) does not recognize them. **ML-DSA** still requires raw `crypto/mldsa` keys only.
+For **RSA / ECDSA / Ed25519 / ML-DSA**, `NewJWSSigner` and `NewJWSVerifierWithAlg` accept either raw stdlib keys or an opaque [`crypto.Signer`](https://pkg.go.dev/crypto#Signer) (HSM/KMS) whose `Public()` matches the algorithm. Verify via `crypto.Signer` uses `Public()` locally; you can also pass the exported public key. Opaque Signers must use `NewJWSVerifierWithAlg` — the preferred infer path (`NewJWSVerifier`) does not recognize them.
 
-**ML-DSA (FIPS 204)** works through the same path with `crypto/mldsa` keys. Prefer inferring the alg from the public key:
+Default jwx ML-DSA signing still requires `*mldsa.PrivateKey`. For an opaque ML-DSA Signer (e.g. KMS), register a custom `jws.Signer` with [`jws.RegisterSigner`](https://pkg.go.dev/github.com/lestrrat-go/jwx/v4/jws#RegisterSigner) that calls `crypto.Signer.Sign` (prefer also handling raw `*mldsa.PrivateKey` if other code in the process needs it). ML-DSA remains foreign-JWS only — not a native RFC 9421 algorithm.
+
+**ML-DSA (FIPS 204)** with raw keys — prefer inferring the alg from the public key:
 
 ```go
 priv, _ := mldsa.GenerateKey(mldsa.MLDSA65())

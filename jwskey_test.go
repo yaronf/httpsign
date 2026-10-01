@@ -142,10 +142,7 @@ func TestValidateMLDSAKey(t *testing.T) {
 
 	var nilPriv *mldsa.PrivateKey
 	var nilPub *mldsa.PublicKey
-	_, _, ok := mldsaKeyOf(nilPriv)
-	require.False(t, ok)
-	_, _, ok = mldsaKeyOf(nilPub)
-	require.False(t, ok)
-	_, _, ok = mldsaKeyOf("nope")
-	require.False(t, ok)
+	require.Error(t, validateMLDSAKey(jwa.MLDSA44(), nilPriv, true))
+	require.Error(t, validateMLDSAKey(jwa.MLDSA44(), nilPub, false))
+	require.Error(t, validateMLDSAKey(jwa.MLDSA44(), "nope", true))
 }

@@ -17,11 +17,12 @@ import (
 // When signing is true, asymmetric keys must be private; when false, they must be public.
 // HMAC keys are symmetric and accepted for either role.
 //
-// Classical algs (RSA, ECDSA, Ed25519) also accept an opaque crypto.Signer (HSM/KMS-backed
-// keys, etc.) whose Public() reports the expected key shape — valid for both sign and verify
-// (verify is local via Public(), matching jwx). ML-DSA accepts only raw crypto/mldsa keys:
-// jwx/dsig documents crypto.Signer for RSA/ECDSA/EdDSA only and requires *mldsa.PrivateKey
-// at sign time, so an opaque Signer would pass construction here and fail later in jwx.
+// Classical algs (RSA, ECDSA, Ed25519) and ML-DSA also accept an opaque crypto.Signer
+// (HSM/KMS-backed keys, etc.) whose Public() reports the expected key shape — valid for
+// both sign and verify (verify is local via Public()). Default jwx ML-DSA signing still
+// requires *mldsa.PrivateKey; callers using an opaque Signer for ML-DSA must register a
+// custom jws.Signer (jws.RegisterSigner) that accepts crypto.Signer. ML-DSA is foreign-JWS
+// only — not a native RFC 9421 algorithm.
 // JWK wrappers are rejected here so callers convert first (NewJWSSignerFromJWK / preferred verify).
 func validateJWSKeyAlg(alg jwa.SignatureAlgorithm, key any, signing bool) error {
 	switch alg {
@@ -269,17 +270,11 @@ func validateEd25519Key(alg jwa.SignatureAlgorithm, key any, signing bool) error
 }
 
 // validateMLDSAKey enforces that an ML-DSA JWS algorithm matches the key's parameter set.
-// jwx also rejects mismatches at Sign/Verify; this fails earlier at NewJWS* construction.
+// jwx also rejects mismatches at Sign/Verify for raw keys; this fails earlier at NewJWS* construction.
 func validateMLDSAKey(alg jwa.SignatureAlgorithm, key any, signing bool) error {
-	got, isPrivate, ok := mldsaKeyOf(key)
-	if !ok {
-		return fmt.Errorf("algorithm %s requires a crypto/mldsa key, got %T", alg, key)
-	}
-	if signing && !isPrivate {
-		return fmt.Errorf("algorithm %s requires an ML-DSA private key for signing", alg)
-	}
-	if !signing && isPrivate {
-		return fmt.Errorf("algorithm %s requires an ML-DSA public key for verification", alg)
+	got, err := mldsaParamsFor(alg, key, signing)
+	if err != nil {
+		return err
 	}
 	var want mldsa.Parameters
 	switch alg {
@@ -298,19 +293,36 @@ func validateMLDSAKey(alg jwa.SignatureAlgorithm, key any, signing bool) error {
 	return nil
 }
 
-func mldsaKeyOf(key any) (params mldsa.Parameters, isPrivate, ok bool) {
+// mldsaParamsFor returns the parameter set for a concrete crypto/mldsa key or an opaque
+// crypto.Signer whose Public() is *mldsa.PublicKey. Role checks apply only to concrete keys;
+// Signers are accepted for both sign and verify.
+func mldsaParamsFor(alg jwa.SignatureAlgorithm, key any, signing bool) (mldsa.Parameters, error) {
 	switch k := key.(type) {
 	case *mldsa.PrivateKey:
 		if k == nil {
-			return mldsa.Parameters{}, false, false
+			return mldsa.Parameters{}, errNeedKeyType(alg, "crypto/mldsa", typeString(key))
 		}
-		return k.PublicKey().Parameters(), true, true
+		if !signing {
+			return mldsa.Parameters{}, fmt.Errorf("algorithm %s requires an ML-DSA public key for verification", alg)
+		}
+		return k.PublicKey().Parameters(), nil
 	case *mldsa.PublicKey:
 		if k == nil {
-			return mldsa.Parameters{}, false, false
+			return mldsa.Parameters{}, errNeedKeyType(alg, "crypto/mldsa", typeString(key))
 		}
-		return k.Parameters(), false, true
+		if signing {
+			return mldsa.Parameters{}, fmt.Errorf("algorithm %s requires an ML-DSA private key for signing", alg)
+		}
+		return k.Parameters(), nil
 	default:
-		return mldsa.Parameters{}, false, false
+		pub, ok := publicFromSigner(key)
+		if !ok {
+			return mldsa.Parameters{}, errNeedKeyType(alg, "crypto/mldsa", typeString(key))
+		}
+		mp, ok := pub.(*mldsa.PublicKey)
+		if !ok || mp == nil {
+			return mldsa.Parameters{}, errNeedKeyTypeFromSigner(alg, "crypto/mldsa", typeString(key), typeString(pub))
+		}
+		return mp.Parameters(), nil
 	}
 }

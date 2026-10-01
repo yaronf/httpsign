@@ -130,8 +130,9 @@ func NewEd25519SignerFromSeed(seed []byte, config *SignConfig, fields Fields) (*
 // NewJWSSigner creates a generic signer for JWS algorithms via github.com/lestrrat-go/jwx/v4.
 // The particular key type for each algorithm is documented in that package (including
 // crypto/mldsa keys for ML-DSA on Go 1.27+). HMAC keys must be []byte (not string).
-// Classical RSA/ECDSA/Ed25519 also accept an opaque crypto.Signer (HSM/KMS) whose Public()
-// matches the algorithm; ML-DSA requires raw crypto/mldsa keys.
+// Classical RSA/ECDSA/Ed25519 and ML-DSA also accept an opaque crypto.Signer (HSM/KMS) whose
+// Public() matches the algorithm. Default jwx ML-DSA signing still needs *mldsa.PrivateKey;
+// opaque ML-DSA Signers require a custom jws.RegisterSigner (see README).
 // Do not pass jwk.Key here — use NewJWSSignerFromJWK so alg can be taken from the JWK.
 // Config may be nil (defaults with SignAlg(false)). A non-nil config that would emit
 // HTTP Signature-Input "alg" is rejected — foreign JWS has no RFC 9421 algorithm id.
@@ -370,7 +371,7 @@ func NewJWSVerifier(allowed *JWSAlgAllowlist, key any, config *VerifyConfig, fie
 
 // NewJWSVerifierWithAlg creates a foreign-JWS verifier for an explicit JWS algorithm.
 // Use when the algorithm cannot be inferred (raw RSA/HMAC) or the store already chose alg.
-// Classical RSA/ECDSA/Ed25519 accept raw public keys or an opaque crypto.Signer (local verify
+// Classical RSA/ECDSA/Ed25519 and ML-DSA accept raw public keys or an opaque crypto.Signer (local verify
 // via Public()). Do not pass jwk.Key here — use NewJWSVerifier so alg can be taken from the JWK.
 // allowed may be nil to skip alg policy.
 func NewJWSVerifierWithAlg(allowed *JWSAlgAllowlist, alg jwa.SignatureAlgorithm, key any, config *VerifyConfig, fields Fields) (*Verifier, error) {

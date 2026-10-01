@@ -8,11 +8,13 @@ import (
 	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
 
 	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jws"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,6 +39,13 @@ type ed25519CryptoSigner struct{ priv ed25519.PrivateKey }
 
 func (w ed25519CryptoSigner) Public() crypto.PublicKey { return w.priv.Public().(ed25519.PublicKey) }
 func (w ed25519CryptoSigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return w.priv.Sign(r, digest, opts)
+}
+
+type mldsaCryptoSigner struct{ priv *mldsa.PrivateKey }
+
+func (w mldsaCryptoSigner) Public() crypto.PublicKey { return w.priv.Public() }
+func (w mldsaCryptoSigner) Sign(r io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
 	return w.priv.Sign(r, digest, opts)
 }
 
@@ -212,15 +221,68 @@ func TestCryptoSignerRejectCurveMismatch(t *testing.T) {
 	require.Contains(t, err.Error(), "curve")
 }
 
-func TestCryptoSignerRejectMLDSA(t *testing.T) {
+func TestCryptoSignerConstructMLDSA(t *testing.T) {
 	priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
 	require.NoError(t, err)
-	// *mldsa.PrivateKey implements crypto.Signer; opaque wrapper still rejected for ML-DSA policy.
-	type mldsaWrap struct{ *mldsa.PrivateKey }
-	wrap := mldsaWrap{PrivateKey: priv}
+	wrap := mldsaCryptoSigner{priv: priv}
+
+	signer, err := NewJWSSigner(jwa.MLDSA44(), wrap, nil, *NewFields())
+	require.NoError(t, err)
+	require.NotNil(t, signer)
+
+	verifier, err := NewJWSVerifierWithAlg(nil, jwa.MLDSA44(), wrap, nil, *NewFields())
+	require.NoError(t, err)
+	require.NotNil(t, verifier)
+}
+
+func TestCryptoSignerRejectMLDSAParamMismatch(t *testing.T) {
+	priv, err := mldsa.GenerateKey(mldsa.MLDSA65())
+	require.NoError(t, err)
+	wrap := mldsaCryptoSigner{priv: priv}
 
 	_, err = NewJWSSigner(jwa.MLDSA44(), wrap, nil, *NewFields())
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "parameter set")
+}
+
+func TestCryptoSignerRoundTripMLDSAWithRegisterSigner(t *testing.T) {
+	// Stock jwx ML-DSA requires *mldsa.PrivateKey; opaque Signer needs a custom jws.Signer.
+	prev, err := jws.SignerFor(jwa.MLDSA44())
+	require.NoError(t, err)
+	require.NoError(t, jws.RegisterSigner(jwa.MLDSA44(), jws.SignerFunc(func(key any, payload []byte) ([]byte, error) {
+		signer, ok := key.(crypto.Signer)
+		if !ok {
+			return nil, fmt.Errorf("want crypto.Signer, got %T", key)
+		}
+		if _, ok := signer.Public().(*mldsa.PublicKey); !ok {
+			return nil, fmt.Errorf("Public() want *mldsa.PublicKey, got %T", signer.Public())
+		}
+		return signer.Sign(nil, payload, &mldsa.Options{})
+	})))
+	t.Cleanup(func() {
+		_ = jws.RegisterSigner(jwa.MLDSA44(), prev)
+	})
+
+	priv, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	require.NoError(t, err)
+	wrap := mldsaCryptoSigner{priv: priv}
+	pub := priv.Public().(*mldsa.PublicKey)
+
+	config := NewSignConfig().setFakeCreated(1618884475).SignAlg(false).SetKeyID("kms-mldsa")
+	fields := *NewFields().AddHeader("@method").AddHeader("date").AddHeader("content-type").AddQueryParam("pet")
+	signer, err := NewJWSSigner(jwa.MLDSA44(), wrap, config, fields)
+	require.NoError(t, err)
+
+	req := readRequest(httpreq2)
+	sigInput, sig, err := SignRequest("sig1", *signer, req)
+	require.NoError(t, err)
+	req.Header.Add("Signature", sig)
+	req.Header.Add("Signature-Input", sigInput)
+
+	verifier, err := NewJWSVerifierWithAlg(nil, jwa.MLDSA44(), pub,
+		NewVerifyConfig().SetVerifyCreated(false).SetKeyID("kms-mldsa"), fields)
+	require.NoError(t, err)
+	require.NoError(t, VerifyRequest("sig1", *verifier, req))
 }
 
 func TestCryptoSignerRecoverMalformedEd25519OnECDSAProbe(t *testing.T) {
@@ -251,6 +313,8 @@ func TestValidateJWSKeyAlgCryptoSigner(t *testing.T) {
 	require.NoError(t, err)
 	_, edPriv, err := ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
+	mldsaPriv, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	require.NoError(t, err)
 
 	require.NoError(t, validateECDSAKey(jwa.ES256(), ecdsaCryptoSigner{priv: p256}, true))
 	require.NoError(t, validateECDSAKey(jwa.ES256(), ecdsaCryptoSigner{priv: p256}, false))
@@ -258,4 +322,6 @@ func TestValidateJWSKeyAlgCryptoSigner(t *testing.T) {
 	require.NoError(t, validateRSAKey(jwa.RS256(), rsaCryptoSigner{priv: rsaPriv}, false))
 	require.NoError(t, validateEd25519Key(jwa.EdDSA(), ed25519CryptoSigner{priv: edPriv}, true))
 	require.NoError(t, validateEd25519Key(jwa.EdDSA(), ed25519CryptoSigner{priv: edPriv}, false))
+	require.NoError(t, validateMLDSAKey(jwa.MLDSA44(), mldsaCryptoSigner{priv: mldsaPriv}, true))
+	require.NoError(t, validateMLDSAKey(jwa.MLDSA44(), mldsaCryptoSigner{priv: mldsaPriv}, false))
 }
