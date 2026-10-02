@@ -69,6 +69,20 @@
       "enabled": false
     },
     {
+      "description": "Stay on current Go minor: no toolchain minor or major",
+      "matchPackageNames": [
+        "go"
+      ],
+      "matchDepTypes": [
+        "toolchain"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Prompt Go toolchain patch PRs",
       "matchPackageNames": [
         "go"
