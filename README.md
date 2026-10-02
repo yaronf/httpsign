@@ -46,4 +46,3 @@ Contributions to this project are welcome, both as issues and pull requests.
 [![Go Reference](https://pkg.go.dev/badge/github.com/yaronf/httpsign.svg)](https://pkg.go.dev/github.com/yaronf/httpsign)
 [![Test](https://github.com/yaronf/httpsign/actions/workflows/test.yml/badge.svg)](https://github.com/yaronf/httpsign/actions/workflows/test.yml)
 [![Lint](https://github.com/yaronf/httpsign/actions/workflows/lint.yml/badge.svg)](https://github.com/yaronf/httpsign/actions/workflows/lint.yml)
-[![Ask DeepWiki](https://img.shields.io/badge/Ask_DeepWiki-1f6feb)](https://deepwiki.com/yaronf/httpsign)
