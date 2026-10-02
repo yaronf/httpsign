@@ -1,6 +1,6 @@
-# Release notes: httpsign v0.6.2 (draft)
+# Release notes: httpsign v0.6.2 (shipped)
 
-Maintainer draft for the next patch after **v0.6.1**. Tag only when ready.
+Published GitHub release for tag `v0.6.2`. Kept here for maintainers; do not treat as a draft for retagging.
 
 ---
 
