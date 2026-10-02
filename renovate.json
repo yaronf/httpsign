@@ -4,15 +4,25 @@
     "config:recommended",
     ":dependencyDashboard"
   ],
-  "labels": ["dependencies"],
+  "labels": [
+    "dependencies"
+  ],
   "prConcurrentLimit": 3,
   "prHourlyLimit": 2,
-  "postUpdateOptions": ["gomodTidy"],
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
   "packageRules": [
     {
       "description": "Group and automerge GitHub Actions (minor/patch/digest)",
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
       "groupName": "github-actions",
       "automerge": true,
       "automergeType": "pr",
@@ -20,30 +30,59 @@
     },
     {
       "description": "Automerge low-risk Go test deps (minor/patch)",
-      "matchManagers": ["gomod"],
+      "matchManagers": [
+        "gomod"
+      ],
       "matchPackageNames": [
         "github.com/stretchr/testify",
         "github.com/sergi/go-diff"
       ],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "pr",
       "platformAutomerge": true
     },
     {
       "description": "jwx majors require dashboard approval (API/crypto risk)",
-      "matchManagers": ["gomod"],
-      "matchUpdateTypes": ["major"],
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "dependencyDashboardApproval": true,
       "matchPackageNames": [
         "/^github\\.com/lestrrat-go/jwx/"
       ]
     },
     {
-      "description": "Do not bump the go directive automatically",
-      "matchManagers": ["gomod"],
-      "matchDepNames": ["go"],
+      "description": "Do not bump the go (language) directive automatically",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchDepTypes": [
+        "golang"
+      ],
       "enabled": false
+    },
+    {
+      "description": "Prompt Go toolchain patch PRs",
+      "matchPackageNames": [
+        "go"
+      ],
+      "matchDepTypes": [
+        "toolchain"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "groupName": "go toolchain",
+      "schedule": [
+        "at any time"
+      ]
     }
   ]
 }

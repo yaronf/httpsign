@@ -2,6 +2,8 @@ module github.com/yaronf/httpsign
 
 go 1.27.0
 
+toolchain go1.27.1
+
 require (
 	github.com/dunglas/httpsfv v1.1.2
 	github.com/lestrrat-go/jwx/v4 v4.5.0
