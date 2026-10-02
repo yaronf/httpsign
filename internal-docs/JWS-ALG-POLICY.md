@@ -94,10 +94,13 @@ NewJWSSignerFromJWK(key jwk.Key, config *SignConfig, fields Fields) (*Signer, er
 2. Resolve alg via jwx registry (`LookupSignatureAlgorithm`); reject empty / unregistered / `none`. Nil key rejected.
 3. Existing **`validateJWSKeyAlg`**; default “unsupported” → fall through to **`jws.VerifierFor(alg)`** (jwx).
 4. Reject raw `jwk.Key` here — use preferred `NewJWSVerifier` (or convert).
+5. Classical RSA/ECDSA/Ed25519 and ML-DSA: raw keys **or** opaque `crypto.Signer` (local verify via `Public()`). Default jwx ML-DSA Sign still needs `*mldsa.PrivateKey` unless the caller `jws.RegisterSigner`s a custom signer.
 
-**`NewJWSSigner`:** hardening + passthrough; **no** allowlist; force `SignAlg(false)`. Reject raw `jwk.Key` — use `NewJWSSignerFromJWK`.
+**`NewJWSSigner`:** hardening + passthrough; **no** allowlist; force `SignAlg(false)`. Reject raw `jwk.Key` — use `NewJWSSignerFromJWK`. Classical RSA/ECDSA/Ed25519 and ML-DSA accept raw keys **or** opaque `crypto.Signer` (HSM/KMS).
 
 **`NewJWSSignerFromJWK`:** require a **private** JWK (symmetric `oct` OK); resolve alg with the same table / EdDSA↔Ed25519 rules as verify; export raw **private** material; then `NewJWSSigner`.
+
+**`crypto.Signer` note:** same trade-off as jwx — external Signers make alg/key-type misuse harder to detect than in-process stdlib keys. `Public()` panics (e.g. malformed ed25519) are recovered at construction as validation errors. Opaque ML-DSA Signers additionally need `jws.RegisterSigner` for Sign under stock jwx.
 
 Do **not** put the JWS allowlist on `VerifyConfig`.
 

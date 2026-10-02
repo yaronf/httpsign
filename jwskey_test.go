@@ -80,7 +80,7 @@ func TestValidateECDSAKey(t *testing.T) {
 	require.NoError(t, validateECDSAKey(jwa.ES384(), p384, true))
 	require.NoError(t, validateECDSAKey(jwa.ES512(), p521, true))
 
-	// value types via ecdsaKeyOf
+	// value types
 	require.NoError(t, validateECDSAKey(jwa.ES256(), *p256, true))
 	require.NoError(t, validateECDSAKey(jwa.ES256(), p256.PublicKey, false))
 
@@ -93,12 +93,9 @@ func TestValidateECDSAKey(t *testing.T) {
 
 	var nilPriv *ecdsa.PrivateKey
 	var nilPub *ecdsa.PublicKey
-	_, _, ok := ecdsaKeyOf(nilPriv)
-	require.False(t, ok)
-	_, _, ok = ecdsaKeyOf(nilPub)
-	require.False(t, ok)
-	_, _, ok = ecdsaKeyOf("nope")
-	require.False(t, ok)
+	require.Error(t, validateECDSAKey(jwa.ES256(), nilPriv, true))
+	require.Error(t, validateECDSAKey(jwa.ES256(), nilPub, false))
+	require.Error(t, validateECDSAKey(jwa.ES256(), "nope", true))
 }
 
 func TestValidateEd25519Key(t *testing.T) {
@@ -145,10 +142,7 @@ func TestValidateMLDSAKey(t *testing.T) {
 
 	var nilPriv *mldsa.PrivateKey
 	var nilPub *mldsa.PublicKey
-	_, _, ok := mldsaKeyOf(nilPriv)
-	require.False(t, ok)
-	_, _, ok = mldsaKeyOf(nilPub)
-	require.False(t, ok)
-	_, _, ok = mldsaKeyOf("nope")
-	require.False(t, ok)
+	require.Error(t, validateMLDSAKey(jwa.MLDSA44(), nilPriv, true))
+	require.Error(t, validateMLDSAKey(jwa.MLDSA44(), nilPub, false))
+	require.Error(t, validateMLDSAKey(jwa.MLDSA44(), "nope", true))
 }
