@@ -27,43 +27,9 @@ in the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign).
 	_ = res.Body.Close()
 ```
 
-### Upgrading
-
-**v0.6.0** (shipped) raised the Go floor to **1.27+** and cut foreign JWS over to **jwx v4** + ML-DSA. See [internal-docs/RELEASE-v0.6.0.md](internal-docs/RELEASE-v0.6.0.md).
-
-**v0.6.1** breaks foreign-JWS **verify** again: prefer `NewJWSVerifier(allowed, key, …)` (infer alg); use `NewJWSVerifierWithAlg` when needed; pass a `JWSAlgAllowlist` (`nil` skips policy). `NewJWSSigner` defaults to / requires `SignAlg(false)`; use `NewJWSSignerFromJWK` when the private key is a JWK.
-
-**v0.6.2** restores opaque `crypto.Signer` (HSM/KMS) for foreign JWS RSA/ECDSA/Ed25519 and ML-DSA on sign and verify. See [internal-docs/RELEASE-v0.6.2.md](internal-docs/RELEASE-v0.6.2.md).
-
-| Caller | Change in v0.6.1 |
-|--------|------------------|
-| Native algorithms only | None. |
-| `NewJWSVerifier(alg, key, …)` (v0.6.0) | Prefer `NewJWSVerifier(allowed, key, …)`; else `NewJWSVerifierWithAlg(allowed, alg, key, …)`. |
-| `NewJWSSigner` | Nil config ⇒ `SignAlg(false)`; `SignAlg(true)` errors. Prefer `NewJWSSignerFromJWK` for private JWKs. |
-
-Pass a non-nil allowlist when `keyid` can select among keys. `SetAllowedAlgs` still only filters Signature-Input `alg`, not JWS `jwa`.
-
-Full notes: [internal-docs/RELEASE-v0.6.1.md](internal-docs/RELEASE-v0.6.1.md).
-
 ### Foreign JWS and ML-DSA
 
-Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) (≥ v4.5.0) via `NewJWSSigner` / `NewJWSSignerFromJWK` / `NewJWSVerifier`.
-
-For **RSA / ECDSA / Ed25519 / ML-DSA**, `NewJWSSigner` and `NewJWSVerifierWithAlg` accept either raw stdlib keys or an opaque [`crypto.Signer`](https://pkg.go.dev/crypto#Signer) (HSM/KMS) whose `Public()` matches the algorithm. Verify via `crypto.Signer` uses `Public()` locally; you can also pass the exported public key. Opaque Signers must use `NewJWSVerifierWithAlg` — the preferred infer path (`NewJWSVerifier`) does not recognize them.
-
-Default jwx ML-DSA signing still requires `*mldsa.PrivateKey`. For an opaque ML-DSA Signer (e.g. KMS), register a custom `jws.Signer` with [`jws.RegisterSigner`](https://pkg.go.dev/github.com/lestrrat-go/jwx/v4/jws#RegisterSigner) that calls `crypto.Signer.Sign` (prefer also handling raw `*mldsa.PrivateKey` if other code in the process needs it). ML-DSA remains foreign-JWS only — not a native RFC 9421 algorithm.
-
-**ML-DSA (FIPS 204)** with raw keys — prefer inferring the alg from the public key:
-
-```go
-priv, _ := mldsa.GenerateKey(mldsa.MLDSA65())
-pub := priv.Public().(*mldsa.PublicKey)
-signer, _ := httpsign.NewJWSSigner(jwa.MLDSA65(), priv, nil, fields) // SignAlg(false) by default
-allowed, _ := httpsign.NewJWSAlgAllowlist(jwa.MLDSA65())
-verifier, _ := httpsign.NewJWSVerifier(allowed, pub, httpsign.NewVerifyConfig(), fields)
-```
-
-HMAC keys must be `[]byte` (minimum length per RFC 7518). Raw RSA verify needs `NewJWSVerifierWithAlg` (or a JWK that carries `alg`).
+Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) via `NewJWSSigner` / `NewJWSSignerFromJWK` / `NewJWSVerifier` / `NewJWSVerifierWithAlg` (including ML-DSA with `crypto/mldsa`). See the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign) for constructors, allowlists, `crypto.Signer` (HSM/KMS) keys, and examples.
 
 ### Notes and Missing Features
 * Requires **Go 1.27+**.
@@ -72,6 +38,7 @@ HMAC keys must be `[]byte` (minimum length per RFC 7518). Raw RSA verify needs `
 * **Behind a TLS-terminating reverse proxy:** The `@scheme` derived component defaults to `req.TLS != nil`. Behind nginx, Envoy, AWS ALB, etc., `req.TLS` is nil, so `@scheme` becomes `"http"` even for HTTPS traffic. Use `SetSchemeFromRequest` on `SignConfig` and `VerifyConfig` to derive the scheme from `X-Forwarded-Proto` or similar headers.
 * **Nonce-based replay prevention:** The signer can include a nonce via `SetNonce`; the verifier does not track seen nonces by default. Use `SetNonceValidator` on `VerifyConfig` to implement replay prevention—the callback must check uniqueness (e.g. via a cache or database) and return an error for duplicates.
 * **Replay window:** Without nonce validation, `SetNotOlderThan` (default 10s) is the only replay defense. For sensitive operations, reduce this value or use `SetNonceValidator`. See the method docstrings for details.
+* Changelogs: [GitHub releases](https://github.com/yaronf/httpsign/releases).
 
 ### Contributing
 Contributions to this project are welcome, both as issues and pull requests.
@@ -79,4 +46,4 @@ Contributions to this project are welcome, both as issues and pull requests.
 [![Go Reference](https://pkg.go.dev/badge/github.com/yaronf/httpsign.svg)](https://pkg.go.dev/github.com/yaronf/httpsign)
 [![Test](https://github.com/yaronf/httpsign/actions/workflows/test.yml/badge.svg)](https://github.com/yaronf/httpsign/actions/workflows/test.yml)
 [![Lint](https://github.com/yaronf/httpsign/actions/workflows/lint.yml/badge.svg)](https://github.com/yaronf/httpsign/actions/workflows/lint.yml)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/yaronf/httpsign)
+[![Ask DeepWiki](https://img.shields.io/badge/Ask_DeepWiki-1f6feb)](https://deepwiki.com/yaronf/httpsign)
