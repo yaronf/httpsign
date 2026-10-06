@@ -3,7 +3,16 @@ name: dhscanner-sast
 on:
   push:
     branches:
-      - main  
+      - main
+      - chore/dhscanner-sast
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
 
 jobs:
   run-dhscanner:
