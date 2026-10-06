@@ -21,9 +21,20 @@ jobs:
     steps:
       - name: clone dhscanner (with submodules)
         run: |
-          git clone --recurse-submodules https://github.com/OrenGitHub/dhscanner
+          # Upstream main dropped compose.rel.*.yaml; docs still point at main.
+          git clone --recurse-submodules --branch v1.0.0 \
+            https://github.com/OrenGitHub/dhscanner
           cd dhscanner
           docker compose -f compose.rel.x64.yaml up -d
+          for i in $(seq 1 60); do
+            if (echo >/dev/tcp/127.0.0.1/443) >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "dhscanner did not become ready on :443"
+          docker compose -f compose.rel.x64.yaml ps
+          exit 1
 
       - name: checkout specific tag
         uses: actions/checkout@v4
