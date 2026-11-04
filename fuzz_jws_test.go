@@ -6,7 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/mldsa"
 	"crypto/rand"
-	"encoding/json"
+	json "encoding/json/v2"
 	"testing"
 
 	"github.com/lestrrat-go/jwx/v4/jwa"
