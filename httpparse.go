@@ -105,10 +105,18 @@ func derivedComponent(name, v string, components components) {
 }
 
 func generateReqDerivedComponents(method string, u *url.URL, authority string, components components) {
+	canonicalAuthority := strings.ToLower(authority)
+	switch strings.ToLower(u.Scheme) {
+	case "https":
+		canonicalAuthority = strings.TrimSuffix(canonicalAuthority, ":443")
+	case "http":
+		canonicalAuthority = strings.TrimSuffix(canonicalAuthority, ":80")
+	}
+
 	derivedComponent("@method", method, components)
 	derivedComponent("@target-uri", scTargetURI(u), components)
 	derivedComponent("@path", scPath(u), components)
-	derivedComponent("@authority", authority, components)
+	derivedComponent("@authority", canonicalAuthority, components)
 	derivedComponent("@scheme", scScheme(u), components)
 	derivedComponent("@request-target", scRequestTarget(u), components)
 	derivedComponent("@query", scQuery(u), components)
