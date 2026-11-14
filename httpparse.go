@@ -115,7 +115,12 @@ func generateReqDerivedComponents(method string, u *url.URL, authority string, c
 }
 
 func scPath(theURL *url.URL) string {
-	return theURL.EscapedPath()
+	path := theURL.EscapedPath()
+	if path == "" {
+		// RFC 9421 §2.2.6 / HTTP §4.2.3: empty path normalizes to "/".
+		return "/"
+	}
+	return path
 }
 
 func scQuery(url *url.URL) string {
