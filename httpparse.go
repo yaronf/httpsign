@@ -2,6 +2,7 @@ package httpsign
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -108,10 +109,36 @@ func generateReqDerivedComponents(method string, u *url.URL, authority string, c
 	derivedComponent("@method", method, components)
 	derivedComponent("@target-uri", scTargetURI(u), components)
 	derivedComponent("@path", scPath(u), components)
-	derivedComponent("@authority", authority, components)
+	derivedComponent("@authority", canonicalAuthority(u.Scheme, authority), components)
 	derivedComponent("@scheme", scScheme(u), components)
 	derivedComponent("@request-target", scRequestTarget(u), components)
 	derivedComponent("@query", scQuery(u), components)
+}
+
+// canonicalAuthority normalizes @authority per RFC 9421 §2.2.3 / HTTP §4.2.3:
+// lowercase hostname, omit default port (443 for https, 80 for http).
+func canonicalAuthority(scheme, authority string) string {
+	scheme = strings.ToLower(scheme)
+	host, port, err := net.SplitHostPort(authority)
+	if err != nil {
+		// No port present (or not host:port form). Case-fold only.
+		return strings.ToLower(authority)
+	}
+	host = strings.ToLower(host)
+	if (scheme == "https" && port == "443") || (scheme == "http" && port == "80") {
+		// SplitHostPort returns an unbracketed IPv6 literal; Host-form @authority needs brackets.
+		return formatHostPortless(host)
+	}
+	return net.JoinHostPort(host, port)
+}
+
+// formatHostPortless returns host for an authority with no port.
+// IPv6 literals are wrapped in brackets; names and IPv4 are unchanged.
+func formatHostPortless(host string) string {
+	if ip := net.ParseIP(host); ip != nil && ip.To4() == nil {
+		return "[" + host + "]"
+	}
+	return host
 }
 
 func scPath(theURL *url.URL) string {
