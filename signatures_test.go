@@ -3475,10 +3475,10 @@ func TestCustomParamBoolRoundTrip(t *testing.T) {
 
 func TestCustomParamBytesRoundTrip(t *testing.T) {
 	want := []byte{0x01, 0x02, 0xde, 0xad}
-	config := NewSignConfig().AddCustomParam("wimse-kem", want)
+	config := NewSignConfig().AddCustomParam("x-blob", want)
 	details, err := signVerifyResponseCustomParams(t, config)
 	assert.NoError(t, err)
-	got, ok := details.CustomParams["wimse-kem"].([]byte)
+	got, ok := details.CustomParams["x-blob"].([]byte)
 	assert.True(t, ok)
 	assert.Equal(t, want, got)
 }
@@ -3487,12 +3487,12 @@ func TestMultipleCustomParams(t *testing.T) {
 	config := NewSignConfig().
 		AddCustomParam("x-foo", "bar").
 		AddCustomParam("x-num", int64(99)).
-		AddCustomParam("wimse-session-id", []byte{0xaa, 0xbb})
+		AddCustomParam("x-blob", []byte{0xaa, 0xbb})
 	details, err := signVerifyResponseCustomParams(t, config)
 	assert.NoError(t, err)
 	assert.Equal(t, "bar", details.CustomParams["x-foo"])
 	assert.Equal(t, int64(99), details.CustomParams["x-num"])
-	assert.Equal(t, []byte{0xaa, 0xbb}, details.CustomParams["wimse-session-id"])
+	assert.Equal(t, []byte{0xaa, 0xbb}, details.CustomParams["x-blob"])
 }
 
 func TestCustomParamReservedNameRejected(t *testing.T) {
