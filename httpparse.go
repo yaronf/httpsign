@@ -137,7 +137,8 @@ func scScheme(url *url.URL) string {
 	if url.Scheme == "" {
 		return "http"
 	}
-	return url.Scheme
+	// RFC 9421 §2.2.4: scheme MUST be lowercase in the signature base.
+	return strings.ToLower(url.Scheme)
 }
 
 func scTargetURI(url *url.URL) string {
