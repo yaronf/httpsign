@@ -27,11 +27,12 @@ type Signer struct {
 	foreignSigner interface{}
 }
 
-// NewHMACSHA256Signer returns a new Signer structure. Key must be at least 64 bytes long.
+// NewHMACSHA256Signer returns a new Signer structure. Key must be at least 32 bytes long
+// (SHA-256 output size; matches typical KDF-derived MAC keys such as WIMSE fast-httpsig).
 // Config may be nil for a default configuration.
 func NewHMACSHA256Signer(key []byte, config *SignConfig, fields Fields) (*Signer, error) {
-	if len(key) < 64 {
-		return nil, fmt.Errorf("key must be at least 64 bytes long")
+	if len(key) < 32 {
+		return nil, fmt.Errorf("key must be at least 32 bytes long")
 	}
 	if config == nil {
 		config = NewSignConfig()
@@ -265,8 +266,8 @@ func NewHMACSHA256Verifier(key []byte, config *VerifyConfig, fields Fields) (*Ve
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
-	if len(key) < 64 {
-		return nil, fmt.Errorf("key must be at least 64 bytes long")
+	if len(key) < 32 {
+		return nil, fmt.Errorf("key must be at least 32 bytes long")
 	}
 	if config == nil {
 		config = NewVerifyConfig()
