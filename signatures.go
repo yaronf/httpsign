@@ -391,8 +391,10 @@ func generateSigParams(config *SignConfig, alg string, foreignSigner interface{}
 			p.Add(cp.name, v)
 		case bool:
 			p.Add(cp.name, v)
+		case []byte:
+			p.Add(cp.name, v)
 		default:
-			return "", fmt.Errorf("custom param %q: value must be int64, string, or bool", cp.name)
+			return "", fmt.Errorf("custom param %q: value must be int64, string, bool, or []byte", cp.name)
 		}
 	}
 	s, err := fields.asSignatureInput(p)
