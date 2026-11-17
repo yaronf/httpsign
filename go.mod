@@ -7,7 +7,7 @@ toolchain go1.27.4
 require (
 	github.com/dunglas/httpsfv v1.1.2
 	github.com/lestrrat-go/jwx/v4 v4.6.0
-	github.com/sergi/go-diff v1.4.0
+	github.com/sergi/go-diff v1.4.4
 	github.com/stretchr/testify v1.12.1
 )
 
