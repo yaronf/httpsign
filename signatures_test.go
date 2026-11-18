@@ -3473,13 +3473,26 @@ func TestCustomParamBoolRoundTrip(t *testing.T) {
 	assert.Equal(t, map[string]interface{}{"x-flag": true}, details.CustomParams)
 }
 
+func TestCustomParamBytesRoundTrip(t *testing.T) {
+	want := []byte{0x01, 0x02, 0xde, 0xad}
+	config := NewSignConfig().AddCustomParam("x-blob", want)
+	details, err := signVerifyResponseCustomParams(t, config)
+	assert.NoError(t, err)
+	got, ok := details.CustomParams["x-blob"].([]byte)
+	assert.True(t, ok)
+	assert.Equal(t, want, got)
+}
+
 func TestMultipleCustomParams(t *testing.T) {
 	config := NewSignConfig().
 		AddCustomParam("x-foo", "bar").
-		AddCustomParam("x-num", int64(99))
+		AddCustomParam("x-num", int64(99)).
+		AddCustomParam("x-blob", []byte{0xaa, 0xbb})
 	details, err := signVerifyResponseCustomParams(t, config)
 	assert.NoError(t, err)
-	assert.Equal(t, map[string]interface{}{"x-foo": "bar", "x-num": int64(99)}, details.CustomParams)
+	assert.Equal(t, "bar", details.CustomParams["x-foo"])
+	assert.Equal(t, int64(99), details.CustomParams["x-num"])
+	assert.Equal(t, []byte{0xaa, 0xbb}, details.CustomParams["x-blob"])
 }
 
 func TestCustomParamReservedNameRejected(t *testing.T) {
