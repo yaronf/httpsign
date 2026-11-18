@@ -1,7 +1,5 @@
 # Release notes: httpsign v0.6.3
 
-Ready to cut as tag `v0.6.3` after [#43](https://github.com/yaronf/httpsign/pull/43) merges.
-
 ---
 
 ## Summary
