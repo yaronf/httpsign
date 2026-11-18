@@ -1,4 +1,6 @@
-# Release notes: httpsign v0.6.3
+# Release notes: httpsign v0.6.3 (shipped)
+
+Published GitHub release for tag `v0.6.3`. Kept here for maintainers; do not treat as a draft for retagging.
 
 ---
 
