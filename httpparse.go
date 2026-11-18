@@ -133,9 +133,10 @@ func canonicalAuthority(scheme, authority string) string {
 }
 
 // formatHostPortless returns host for an authority with no port.
-// IPv6 literals are wrapped in brackets; names and IPv4 are unchanged.
+// Same rule as net.JoinHostPort: any host containing ":" (IPv6, IPv4-mapped,
+// zone ID) must be wrapped in brackets; names and IPv4 are unchanged.
 func formatHostPortless(host string) string {
-	if ip := net.ParseIP(host); ip != nil && ip.To4() == nil {
+	if strings.Contains(host, ":") {
 		return "[" + host + "]"
 	}
 	return host

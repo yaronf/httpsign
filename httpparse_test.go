@@ -40,6 +40,8 @@ func TestCanonicalAuthority(t *testing.T) {
 		{name: "ipv6 hextet 80 unchanged", scheme: "http", authority: "[2001:db8::80]", want: "[2001:db8::80]"},
 		{name: "ipv6 https non-default port", scheme: "https", authority: "[2001:db8::1]:8443", want: "[2001:db8::1]:8443"},
 		{name: "ipv6 http non-default port", scheme: "http", authority: "[2001:db8::1]:8080", want: "[2001:db8::1]:8080"},
+		{name: "ipv4-mapped ipv6 default https port", scheme: "https", authority: "[::ffff:192.0.2.1]:443", want: "[::ffff:192.0.2.1]"},
+		{name: "ipv6 zone id default https port", scheme: "https", authority: "[fe80::1%eth0]:443", want: "[fe80::1%eth0]"},
 		{name: "empty", scheme: "https", authority: "", want: ""},
 	}
 
