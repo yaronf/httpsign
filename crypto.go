@@ -27,11 +27,11 @@ type Signer struct {
 	foreignSigner interface{}
 }
 
-// NewHMACSHA256Signer returns a new Signer structure. Key must be at least 64 bytes long.
-// Config may be nil for a default configuration.
+// NewHMACSHA256Signer returns a new Signer structure. Key must be at least 32 bytes long
+// (SHA-256 output length L; see RFC 2104 §3). Config may be nil for a default configuration.
 func NewHMACSHA256Signer(key []byte, config *SignConfig, fields Fields) (*Signer, error) {
-	if len(key) < 64 {
-		return nil, fmt.Errorf("key must be at least 64 bytes long")
+	if len(key) < 32 {
+		return nil, fmt.Errorf("key must be at least 32 bytes long")
 	}
 	if config == nil {
 		config = NewSignConfig()
@@ -260,13 +260,14 @@ type Verifier struct {
 }
 
 // NewHMACSHA256Verifier generates a new Verifier for HMAC-SHA256 signatures. Set config to nil for a default configuration.
+// Key must be at least 32 bytes long (SHA-256 output length L; see RFC 2104 §3).
 // Fields is the list of required headers and fields, which may be empty (but this is typically insecure).
 func NewHMACSHA256Verifier(key []byte, config *VerifyConfig, fields Fields) (*Verifier, error) {
 	if key == nil {
 		return nil, fmt.Errorf("key must not be nil")
 	}
-	if len(key) < 64 {
-		return nil, fmt.Errorf("key must be at least 64 bytes long")
+	if len(key) < 32 {
+		return nil, fmt.Errorf("key must be at least 32 bytes long")
 	}
 	if config == nil {
 		config = NewVerifyConfig()

@@ -6,7 +6,7 @@ Draft for the next release after v0.6.2. Update when cutting the tag.
 
 ## Summary
 
-Derived-component normalization fixes for RFC 9421. Sign and verify use the same rules, so pairs that upgrade together stay consistent.
+Derived-component normalization fixes for RFC 9421, plus custom signature-parameter and HMAC key-length updates. Sign and verify use the same derived-component rules, so pairs that upgrade together stay consistent.
 
 ### `@authority` normalization (RFC 9421 §2.2.3)
 
@@ -18,11 +18,21 @@ Hostname is lowercased; default port is omitted (`443` for `https`, `80` for `ht
 
 ### `@scheme` lowercase (RFC 9421 §2.2.4)
 
-`@scheme` is lowercased before it enters the signature base, including values from `WithScheme` / `SetSchemeFromRequest`. See [#45](https://github.com/yaronf/httpsign/issues/45).
+`@scheme` is lowercased before it enters the signature base, including values from `WithScheme` / `SetSchemeFromRequest`. See [#45](https://github.com/yaronf/httpsign/issues/45) / [#46](https://github.com/yaronf/httpsign/pull/46).
+
+### `[]byte` custom signature parameters
+
+`AddCustomParam` accepts `[]byte` values and serializes them as RFC 8941 Byte Sequences. `MessageDetails.CustomParams` may contain `[]byte` after parsing. See [#48](https://github.com/yaronf/httpsign/pull/48).
+
+### HMAC-SHA256 minimum key length
+
+`NewHMACSHA256Signer` / `NewHMACSHA256Verifier` now require at least **32** bytes (was 64), matching the SHA-256 output length `L` in [RFC 2104 §3](https://www.rfc-editor.org/rfc/rfc2104.html#section-3). See [#48](https://github.com/yaronf/httpsign/pull/48).
 
 ### Upgrade notes / behavioral change
 
-**Cross-version mismatch:** if one peer still emits a non-normalized component and the other verifies with this release, signatures that cover that component will fail. Examples:
+**HMAC keys:** keys of 32–63 bytes that were previously rejected at construction are now accepted. Keys shorter than 32 bytes are still rejected.
+
+**Cross-version mismatch (derived components):** if one peer still emits a non-normalized component and the other verifies with this release, signatures that cover that component will fail. Examples:
 
 | Component | Old value (example) | This release |
 |-----------|---------------------|--------------|

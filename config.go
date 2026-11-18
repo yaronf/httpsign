@@ -121,7 +121,7 @@ func (c *SignConfig) SetSchemeFromRequest(f func(*http.Request) string) *SignCon
 // The name must not conflict with reserved parameter names (created, expires, nonce, alg, tag, keyid).
 // Names must conform to the RFC 8941 "key" syntax used for Structured Field parameters: start with
 // a lowercase letter (a–z) or '*', and contain only lowercase letters, digits, and '_', '-', '.', '*'.
-// The value must be int64, string, or bool.
+// The value must be int64, string, bool, or []byte (RFC 8941 Byte Sequence).
 // Errors (reserved name, duplicate name, unsupported type, invalid name syntax) are reported at sign time.
 func (c *SignConfig) AddCustomParam(name string, value interface{}) *SignConfig {
 	c.customParams = append(c.customParams, customParam{name, value})

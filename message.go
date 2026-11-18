@@ -18,7 +18,7 @@ type MessageDetails struct {
 	Expires      *time.Time
 	Nonce        *string
 	Tag          *string
-	CustomParams map[string]interface{} // non-standard parameters; values are int64, string, or bool. Nil if none present.
+	CustomParams map[string]interface{} // non-standard parameters; values are int64, string, bool, or []byte. Nil if none present.
 	// Note: when populated via RequestDetails/ResponseDetails (or *ByTag), the message has not been
 	// cryptographically verified — treat CustomParams (and all other fields) as untrusted until verified.
 }
