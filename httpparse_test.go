@@ -304,6 +304,34 @@ func TestDerivedRequestTarget(t *testing.T) {
 	}
 }
 
+func TestDerivedTargetURI(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "no fragment", raw: "https://example.com/foo?a=b", want: "https://example.com/foo?a=b"},
+		{name: "fragment dropped", raw: "https://example.com/foo#frag", want: "https://example.com/foo"},
+		{name: "fragment after query dropped", raw: "https://example.com/foo?a=b#frag", want: "https://example.com/foo?a=b"},
+		{name: "escaped fragment dropped", raw: "https://example.com/foo?a=b#a%2Fb", want: "https://example.com/foo?a=b"},
+		{name: "escaped hash in query kept", raw: "https://example.com/foo?a=%23b", want: "https://example.com/foo?a=%23b"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", tc.raw, nil)
+			require.NoError(t, err)
+			msg, err := parseRequest(req, false, 0, "https")
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, msg.derived["@target-uri"])
+			// The caller's URL is left untouched.
+			assert.Equal(t, tc.raw, req.URL.String())
+		})
+	}
+}
+
 func mustParseURL(t *testing.T, raw string) *url.URL {
 	t.Helper()
 	u, err := url.Parse(raw)
