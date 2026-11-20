@@ -176,7 +176,9 @@ func scScheme(url *url.URL) string {
 
 func scTargetURI(url *url.URL) string {
 	// HTTP §7.1: the target URI excludes the fragment, which is never sent to the server.
+	// Drop userinfo too: credentials in the URL are not part of the request target.
 	u := *url
+	u.User = nil
 	u.Fragment = ""
 	u.RawFragment = ""
 	return u.String()
