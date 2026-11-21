@@ -33,7 +33,11 @@ func inferJWSVerifierKey(key any) (jwa.SignatureAlgorithm, any, error) {
 		if k == nil {
 			return jwa.EmptySignatureAlgorithm(), nil, fmt.Errorf("key must not be nil")
 		}
-		alg, err := algFromMLDSAParams(k.Parameters())
+		params, err := mldsaParamsFromPublicKey(k)
+		if err != nil {
+			return jwa.EmptySignatureAlgorithm(), nil, err
+		}
+		alg, err := algFromMLDSAParams(params)
 		if err != nil {
 			return jwa.EmptySignatureAlgorithm(), nil, err
 		}

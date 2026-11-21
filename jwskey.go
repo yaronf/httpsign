@@ -305,7 +305,11 @@ func mldsaParamsFor(alg jwa.SignatureAlgorithm, key any, signing bool) (mldsa.Pa
 		if !signing {
 			return mldsa.Parameters{}, fmt.Errorf("algorithm %s requires an ML-DSA public key for verification", alg)
 		}
-		return k.PublicKey().Parameters(), nil
+		params, err := mldsaParamsFromPrivateKey(k)
+		if err != nil {
+			return mldsa.Parameters{}, err
+		}
+		return params, nil
 	case *mldsa.PublicKey:
 		if k == nil {
 			return mldsa.Parameters{}, errNeedKeyType(alg, "crypto/mldsa", typeString(key))
@@ -313,7 +317,11 @@ func mldsaParamsFor(alg jwa.SignatureAlgorithm, key any, signing bool) (mldsa.Pa
 		if signing {
 			return mldsa.Parameters{}, fmt.Errorf("algorithm %s requires an ML-DSA private key for signing", alg)
 		}
-		return k.Parameters(), nil
+		params, err := mldsaParamsFromPublicKey(k)
+		if err != nil {
+			return mldsa.Parameters{}, err
+		}
+		return params, nil
 	default:
 		pub, ok := publicFromSigner(key)
 		if !ok {
@@ -323,6 +331,10 @@ func mldsaParamsFor(alg jwa.SignatureAlgorithm, key any, signing bool) (mldsa.Pa
 		if !ok || mp == nil {
 			return mldsa.Parameters{}, errNeedKeyTypeFromSigner(alg, "crypto/mldsa", typeString(key), typeString(pub))
 		}
-		return mp.Parameters(), nil
+		params, err := mldsaParamsFromPublicKey(mp)
+		if err != nil {
+			return mldsa.Parameters{}, err
+		}
+		return params, nil
 	}
 }
