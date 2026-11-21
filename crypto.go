@@ -245,6 +245,8 @@ func (s Signer) sign(buff []byte) ([]byte, error) {
 			return nil, fmt.Errorf("key must be %d bytes long", ed25519.PrivateKeySize)
 		}
 		return ed25519.Sign(key, buff), nil
+	case "ml-dsa-44", "ml-dsa-65", "ml-dsa-87":
+		return mldsaSign(s.key, buff)
 	default:
 		return nil, fmt.Errorf("sign: unknown algorithm \"%s\"", s.alg)
 	}
@@ -480,6 +482,8 @@ func (v Verifier) verify(buff []byte, sig []byte) (bool, error) {
 			return false, fmt.Errorf("signature verification failed")
 		}
 		return true, nil
+	case "ml-dsa-44", "ml-dsa-65", "ml-dsa-87":
+		return mldsaVerify(v.key, buff, sig)
 	default:
 		return false, fmt.Errorf("verify: unknown algorithm \"%s\"", v.alg)
 	}
