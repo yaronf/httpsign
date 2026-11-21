@@ -104,6 +104,13 @@ func TestHTTPSIGPQVectors(t *testing.T) {
 			assert.NotContains(t, string(m), "\r")
 			assert.False(t, len(m) > 0 && m[len(m)-1] == '\n')
 
+			const paramsPrefix = `"@signature-params": `
+			paramsIdx := strings.LastIndex(string(m), paramsPrefix)
+			require.GreaterOrEqual(t, paramsIdx, 0)
+			coveredParams := string(m)[paramsIdx+len(paramsPrefix):]
+			assert.Equal(t, "Signature-Input: sig1="+coveredParams, vec.SerializedSignatureInput)
+			assert.Contains(t, vec.SerializedSignatureInput, `alg="`+vec.Algorithm+`"`)
+
 			sig, err := base64.StdEncoding.DecodeString(vec.DeterministicSignatureBase64)
 			require.NoError(t, err)
 			assert.Equal(t, params.SignatureSize(), len(sig))
