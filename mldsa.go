@@ -28,10 +28,11 @@ func NewMLDSA87Signer(key *mldsa.PrivateKey, config *SignConfig, fields Fields) 
 }
 
 func newMLDSASigner(params mldsa.Parameters, alg string, key *mldsa.PrivateKey, config *SignConfig, fields Fields) (*Signer, error) {
-	if key == nil {
-		return nil, fmt.Errorf("key must not be nil")
+	got, err := mldsaParamsFromPrivateKey(key)
+	if err != nil {
+		return nil, err
 	}
-	if key.PublicKey().Parameters() != params {
+	if got != params {
 		return nil, fmt.Errorf("key parameter set must be %s", params)
 	}
 	if config == nil {
@@ -67,10 +68,11 @@ func NewMLDSA87Verifier(pub *mldsa.PublicKey, config *VerifyConfig, fields Field
 }
 
 func newMLDSAVerifier(params mldsa.Parameters, alg string, pub *mldsa.PublicKey, config *VerifyConfig, fields Fields) (*Verifier, error) {
-	if pub == nil {
-		return nil, fmt.Errorf("key must not be nil")
+	got, err := mldsaParamsFromPublicKey(pub)
+	if err != nil {
+		return nil, err
 	}
-	if pub.Parameters() != params {
+	if got != params {
 		return nil, fmt.Errorf("key parameter set must be %s", params)
 	}
 	if config == nil {
@@ -97,6 +99,37 @@ func paramsForMLDSAHTTPAlg(alg string) (mldsa.Parameters, error) {
 	}
 }
 
+// mldsaParamsFromPublicKey returns the parameter set for pub. It checks the
+// encoding length before calling Parameters(), which panics on a zero public key.
+func mldsaParamsFromPublicKey(pub *mldsa.PublicKey) (mldsa.Parameters, error) {
+	if pub == nil {
+		return mldsa.Parameters{}, fmt.Errorf("key must not be nil")
+	}
+	n := len(pub.Bytes())
+	var want mldsa.Parameters
+	switch n {
+	case mldsa.MLDSA44PublicKeySize:
+		want = mldsa.MLDSA44()
+	case mldsa.MLDSA65PublicKeySize:
+		want = mldsa.MLDSA65()
+	case mldsa.MLDSA87PublicKeySize:
+		want = mldsa.MLDSA87()
+	default:
+		return mldsa.Parameters{}, fmt.Errorf("invalid ML-DSA public key encoding length %d", n)
+	}
+	if pub.Parameters() != want {
+		return mldsa.Parameters{}, fmt.Errorf("ML-DSA public key parameter set mismatch")
+	}
+	return want, nil
+}
+
+func mldsaParamsFromPrivateKey(key *mldsa.PrivateKey) (mldsa.Parameters, error) {
+	if key == nil {
+		return mldsa.Parameters{}, fmt.Errorf("key must not be nil")
+	}
+	return mldsaParamsFromPublicKey(key.PublicKey())
+}
+
 func mldsaSign(alg string, key interface{}, buff []byte) ([]byte, error) {
 	params, err := paramsForMLDSAHTTPAlg(alg)
 	if err != nil {
@@ -106,8 +139,8 @@ func mldsaSign(alg string, key interface{}, buff []byte) ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("malformed key")
 	}
-	// Ks is the 32-octet seed; parameter set must match the HTTP alg identifier.
-	if len(priv.Bytes()) != mldsa.PrivateKeySize || priv.PublicKey().Parameters() != params {
+	got, err := mldsaParamsFromPrivateKey(priv)
+	if err != nil || got != params {
 		return nil, fmt.Errorf("malformed key")
 	}
 	// Hedged pure ML-DSA with empty context (C2SP httpsig-pq).
@@ -128,7 +161,8 @@ func mldsaVerify(alg string, key interface{}, buff, sig []byte) (bool, error) {
 		return false, fmt.Errorf("malformed key")
 	}
 	// C2SP httpsig-pq HTTP_VERIFY: Kv length and parameter set must match the selected alg.
-	if pub.Parameters() != params || len(pub.Bytes()) != params.PublicKeySize() {
+	got, err := mldsaParamsFromPublicKey(pub)
+	if err != nil || got != params {
 		return false, fmt.Errorf("signature verification failed")
 	}
 	if len(sig) != params.SignatureSize() {

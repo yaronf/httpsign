@@ -23,9 +23,13 @@ func TestMLDSAConstructorsRejectNilAndMismatch(t *testing.T) {
 
 	_, err = NewMLDSA44Signer(nil, nil, *NewFields())
 	require.Error(t, err)
+	_, err = NewMLDSA44Signer(&mldsa.PrivateKey{}, nil, *NewFields())
+	require.Error(t, err)
 	_, err = NewMLDSA44Signer(priv65, nil, *NewFields())
 	require.Error(t, err)
 	_, err = NewMLDSA44Verifier(nil, nil, *NewFields())
+	require.Error(t, err)
+	_, err = NewMLDSA44Verifier(&mldsa.PublicKey{}, nil, *NewFields())
 	require.Error(t, err)
 	_, err = NewMLDSA44Verifier(pub65, nil, *NewFields())
 	require.Error(t, err)
@@ -94,6 +98,15 @@ func TestMLDSAVerifyRejectsBadSignatureLength(t *testing.T) {
 	v, err := NewMLDSA44Verifier(pub, nil, *NewFields())
 	require.NoError(t, err)
 	ok, err := v.verify([]byte("msg"), []byte("short"))
+	assert.False(t, ok)
+	require.Error(t, err)
+}
+
+func TestMLDSASignVerifyRejectZeroKey(t *testing.T) {
+	t.Parallel()
+	_, err := mldsaSign("ml-dsa-44", &mldsa.PrivateKey{}, []byte("msg"))
+	require.Error(t, err)
+	ok, err := mldsaVerify("ml-dsa-44", &mldsa.PublicKey{}, []byte("msg"), make([]byte, mldsa.MLDSA44SignatureSize))
 	assert.False(t, ok)
 	require.Error(t, err)
 }
