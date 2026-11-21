@@ -3521,6 +3521,47 @@ func TestCustomParamInvalidName(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// TestGreaseSignatureMetadataParams checks SFV-style “grease”: unrecognized signature
+// metadata parameters must be ignored for verification policy but preserved in
+// @signature-params (via remashaled origSigParams). Unknown component parameters
+// are not grease; see fields_security_test.go.
+func TestGreaseSignatureMetadataParams(t *testing.T) {
+	cases := []struct {
+		name  string
+		key   string
+		value interface{}
+	}{
+		{name: "string", key: "x-grease", value: "must-ignore"},
+		{name: "bool", key: "x-grease-flag", value: true},
+		{name: "int", key: "x-grease-n", value: int64(1)},
+		{name: "bytes", key: "x-grease-b", value: []byte{0xde, 0xad}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			config := NewSignConfig().AddCustomParam(tc.key, tc.value)
+			fields := Headers("@status", "date", "content-type")
+			signer, verifier := makeHMACSignerVerifier(t, config, fields)
+			res := readResponse(httpres2)
+			sigInput, sig, err := SignResponse("sig1", *signer, res, nil)
+			assert.NoError(t, err)
+			assert.Contains(t, sigInput, tc.key)
+
+			res2 := readResponse(httpres2)
+			res2.Header.Add("Signature", sig)
+			res2.Header.Add("Signature-Input", sigInput)
+			// Verifier has no policy for the grease key: must still verify.
+			err = VerifyResponse("sig1", *verifier, res2, nil)
+			assert.NoError(t, err)
+
+			msg, err := NewMessage(NewMessageConfig().WithResponse(res2, nil))
+			assert.NoError(t, err)
+			details, err := msg.Verify("sig1", *verifier)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.value, details.CustomParams[tc.key])
+		})
+	}
+}
+
 // Same as TestRequestBindingSignedResponse17 but using Message
 func TestMessageRequestBindingSignedResponse17(t *testing.T) {
 	req := readRequest(httpreq14)
