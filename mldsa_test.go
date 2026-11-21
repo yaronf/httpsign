@@ -98,6 +98,30 @@ func TestMLDSAVerifyRejectsBadSignatureLength(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestMLDSASignVerifyRejectAlgKeyMismatch(t *testing.T) {
+	t.Parallel()
+	priv44, err := mldsa.GenerateKey(mldsa.MLDSA44())
+	require.NoError(t, err)
+	priv65, err := mldsa.GenerateKey(mldsa.MLDSA65())
+	require.NoError(t, err)
+
+	s, err := NewMLDSA44Signer(priv44, nil, *NewFields())
+	require.NoError(t, err)
+	s.alg = "ml-dsa-65"
+	_, err = s.sign([]byte("msg"))
+	require.Error(t, err)
+
+	v, err := NewMLDSA44Verifier(priv44.PublicKey(), nil, *NewFields())
+	require.NoError(t, err)
+	sig, err := priv65.Sign(nil, []byte("msg"), &mldsa.Options{})
+	require.NoError(t, err)
+	// Verifier still holds a -44 key but claims -65.
+	v.alg = "ml-dsa-65"
+	ok, err := v.verify([]byte("msg"), sig)
+	assert.False(t, ok)
+	require.Error(t, err)
+}
+
 func TestMLDSASignProducesSignatureSize(t *testing.T) {
 	t.Parallel()
 	priv, err := mldsa.GenerateKey(mldsa.MLDSA44())

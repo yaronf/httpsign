@@ -84,9 +84,30 @@ func newMLDSAVerifier(params mldsa.Parameters, alg string, pub *mldsa.PublicKey,
 	}, nil
 }
 
-func mldsaSign(key interface{}, buff []byte) ([]byte, error) {
+func paramsForMLDSAHTTPAlg(alg string) (mldsa.Parameters, error) {
+	switch alg {
+	case "ml-dsa-44":
+		return mldsa.MLDSA44(), nil
+	case "ml-dsa-65":
+		return mldsa.MLDSA65(), nil
+	case "ml-dsa-87":
+		return mldsa.MLDSA87(), nil
+	default:
+		return mldsa.Parameters{}, fmt.Errorf("unknown ML-DSA algorithm %q", alg)
+	}
+}
+
+func mldsaSign(alg string, key interface{}, buff []byte) ([]byte, error) {
+	params, err := paramsForMLDSAHTTPAlg(alg)
+	if err != nil {
+		return nil, err
+	}
 	priv, ok := key.(*mldsa.PrivateKey)
 	if !ok {
+		return nil, fmt.Errorf("malformed key")
+	}
+	// Ks is the 32-octet seed; parameter set must match the HTTP alg identifier.
+	if len(priv.Bytes()) != mldsa.PrivateKeySize || priv.PublicKey().Parameters() != params {
 		return nil, fmt.Errorf("malformed key")
 	}
 	// Hedged pure ML-DSA with empty context (C2SP httpsig-pq).
@@ -97,12 +118,20 @@ func mldsaSign(key interface{}, buff []byte) ([]byte, error) {
 	return sig, nil
 }
 
-func mldsaVerify(key interface{}, buff, sig []byte) (bool, error) {
+func mldsaVerify(alg string, key interface{}, buff, sig []byte) (bool, error) {
+	params, err := paramsForMLDSAHTTPAlg(alg)
+	if err != nil {
+		return false, fmt.Errorf("signature verification failed")
+	}
 	pub, ok := key.(*mldsa.PublicKey)
 	if !ok {
 		return false, fmt.Errorf("malformed key")
 	}
-	if len(sig) != pub.Parameters().SignatureSize() {
+	// C2SP httpsig-pq HTTP_VERIFY: Kv length and parameter set must match the selected alg.
+	if pub.Parameters() != params || len(pub.Bytes()) != params.PublicKeySize() {
+		return false, fmt.Errorf("signature verification failed")
+	}
+	if len(sig) != params.SignatureSize() {
 		return false, fmt.Errorf("signature verification failed")
 	}
 	if err := mldsa.Verify(pub, buff, sig, &mldsa.Options{}); err != nil {
