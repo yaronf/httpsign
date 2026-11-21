@@ -27,9 +27,13 @@ in the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign).
 	_ = res.Body.Close()
 ```
 
-### Foreign JWS and ML-DSA
+### Native ML-DSA (IANA `ml-dsa-44` / `65` / `87`)
 
-Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) via `NewJWSSigner` / `NewJWSSignerFromJWK` / `NewJWSVerifier` / `NewJWSVerifierWithAlg` (including ML-DSA with `crypto/mldsa`). See the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign) for constructors, allowlists, `crypto.Signer` (HSM/KMS) keys, and examples.
+Native constructors `NewMLDSA44Signer` / `NewMLDSA44Verifier` (and the `-65` / `-87` pairs) implement the [HTTP Signature Algorithms](https://www.iana.org/assignments/http-message-signature/http-message-signature.xhtml) registered from [C2SP httpsig-pq](https://c2sp.org/httpsig-pq@v1.0.1), using Go’s `crypto/mldsa`. They take `*mldsa.PrivateKey` / `*mldsa.PublicKey` and emit the IANA `alg` values (e.g. `;alg="ml-dsa-44"`). ML-DSA signatures are large (about 3.2–6.2 KiB Base64 before field overhead); raise intermediary header limits if needed.
+
+### Foreign JWS (including JOSE ML-DSA)
+
+Optional algorithms beyond the native set use [`lestrrat-go/jwx/v4`](https://github.com/lestrrat-go/jwx) via `NewJWSSigner` / `NewJWSSignerFromJWK` / `NewJWSVerifier` / `NewJWSVerifierWithAlg` (including ML-DSA with `crypto/mldsa`). That path uses JOSE algorithm names and cannot emit an HTTP `alg` parameter. Prefer the native ML-DSA constructors above when you need IANA `ml-dsa-*`. See the [API reference](https://pkg.go.dev/github.com/yaronf/httpsign) for constructors, allowlists, `crypto.Signer` (HSM/KMS) keys, and examples.
 
 ### Notes and Missing Features
 * Requires **Go 1.27+**.
