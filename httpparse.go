@@ -49,12 +49,15 @@ func parseRequest(req *http.Request, withTrailers bool, maxBodySize int64, schem
 
 func parseQueryForSignature(query string) url.Values {
 	escaped := url.Values{}
-	for _, pair := range strings.Split(query, "&") {
+	decoder := unicode.UTF8.NewDecoder()
+	for pair := range strings.SplitSeq(query, "&") {
 		if pair == "" {
 			continue
 		}
 		name, value, _ := strings.Cut(pair, "=")
-		escaped.Add(QueryEscapeForSignature(decodeQueryComponent(name)), QueryEscapeForSignature(decodeQueryComponent(value)))
+		name, _ = decoder.String(decodeQueryComponent(name))
+		value, _ = decoder.String(decodeQueryComponent(value))
+		escaped.Add(QueryEscapeForSignature(name), QueryEscapeForSignature(value))
 	}
 	return escaped
 }
@@ -78,8 +81,7 @@ func decodeQueryComponent(value string) string {
 			decoded.WriteByte(value[position])
 		}
 	}
-	result, _ := unicode.UTF8.NewDecoder().String(decoded.String())
-	return result
+	return decoded.String()
 }
 
 func normalizeHeaderNames(header http.Header) http.Header {
