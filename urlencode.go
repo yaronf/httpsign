@@ -46,6 +46,10 @@ func shouldEscape(c byte, mode encoding) bool {
 		return false
 	}
 
+	if mode == encodeQueryComponentForSignature {
+		return c != '*' && c != '-' && c != '.' && c != '_'
+	}
+
 	if mode == encodeHost || mode == encodeZone {
 		// §3.2.2 Host allows
 		//	sub-delims = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="

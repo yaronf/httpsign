@@ -1,11 +1,14 @@
 package httpsign
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"golang.org/x/text/encoding/unicode"
 )
 
 // some fields (specifically, query params) may appear more than once, and those occurrences are ordered.
@@ -44,17 +47,39 @@ func parseRequest(req *http.Request, withTrailers bool, maxBodySize int64, schem
 	return parseMessage(msg, withTrailers, maxBodySize)
 }
 
-//lint:ignore ST1003 QPs is intentional abbreviation for Query Parameters
-func reEncodeQPs(values url.Values) url.Values {
+func parseQueryForSignature(query string) url.Values {
 	escaped := url.Values{}
-	for key, v := range values { // Re-escape query parameters, both names and values
-		escapedKey := QueryEscapeForSignature(key)
-		escaped[escapedKey] = make([]string, len(values[key]))
-		for key2 := range v {
-			escaped[escapedKey][key2] = QueryEscapeForSignature(values[key][key2])
+	for _, pair := range strings.Split(query, "&") {
+		if pair == "" {
+			continue
 		}
+		name, value, _ := strings.Cut(pair, "=")
+		escaped.Add(QueryEscapeForSignature(decodeQueryComponent(name)), QueryEscapeForSignature(decodeQueryComponent(value)))
 	}
 	return escaped
+}
+
+func decodeQueryComponent(value string) string {
+	var decoded strings.Builder
+	for position := 0; position < len(value); position++ {
+		switch value[position] {
+		case '+':
+			decoded.WriteByte(' ')
+		case '%':
+			if position+2 < len(value) {
+				if octet, err := hex.DecodeString(value[position+1 : position+3]); err == nil {
+					decoded.WriteByte(octet[0])
+					position += 2
+					continue
+				}
+			}
+			decoded.WriteByte('%')
+		default:
+			decoded.WriteByte(value[position])
+		}
+	}
+	result, _ := unicode.UTF8.NewDecoder().String(decoded.String())
+	return result
 }
 
 func normalizeHeaderNames(header http.Header) http.Header {
@@ -196,11 +221,7 @@ func parseMessage(msg *Message, withTrailers bool, maxBodySize int64) (*parsedMe
 		}
 
 		if u.RawQuery != "" {
-			values, err := url.ParseQuery(u.RawQuery)
-			if err != nil {
-				return nil, fmt.Errorf("cannot parse query: %s", u.RawQuery)
-			}
-			qParams = reEncodeQPs(values)
+			qParams = parseQueryForSignature(u.RawQuery)
 		}
 
 		generateReqDerivedComponents(msg.method, u, msg.authority, derived)
